@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { Leave } from '../models/Leave.js';
 import { Employee } from '../models/Employee.js';
+import { User } from '../models/User.js';
 import { createAuditLog } from '../services/auditLog.service.js';
+import { getIO } from '../sockets/socketHandler.js';
 import { AuthRequest } from '../types/index.js';
 
 export const applyLeave = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -15,6 +17,18 @@ export const applyLeave = async (req: AuthRequest, res: Response): Promise<void>
       leave.id,
       `Applied for ${leave.leaveType} (${leave.totalDays} days)`
     );
+
+    const io = getIO();
+    if (io) {
+      const notifData = {
+        title: 'New Leave Request',
+        message: `Employee applied for ${leave.leaveType} (${leave.totalDays} days).`,
+        type: 'LEAVE',
+        recipientId: 'admin-hr',
+      };
+      io.to('ADMIN').emit('receive_notification', notifData);
+      io.to('HR').emit('receive_notification', notifData);
+    }
 
     res.status(201).json({ leaveRequest: leave });
   } catch (error: any) {
@@ -58,6 +72,21 @@ export const updateLeaveStatus = async (req: AuthRequest, res: Response): Promis
       leave.id,
       `Updated leave status to ${status}`
     );
+
+    const io = getIO();
+    if (io) {
+      const empUser = await User.findOne({ employeeId: leave.employeeId });
+      const notifData = {
+        title: `Leave Request ${status}`,
+        message: `Your leave request for ${leave.leaveType} (${leave.totalDays} days) has been ${status.toLowerCase()}.`,
+        type: 'LEAVE',
+        recipientId: empUser ? empUser.id : 'employee',
+      };
+      if (empUser) {
+        io.to(empUser.id).emit('receive_notification', notifData);
+      }
+      io.to('EMPLOYEE').emit('receive_notification', notifData);
+    }
 
     res.status(200).json({ leaveRequest: leave });
   } catch (error: any) {

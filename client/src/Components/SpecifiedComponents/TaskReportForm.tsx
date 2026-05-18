@@ -49,7 +49,7 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
     mutationFn: async (values: TaskFormValues) => {
       // 1. Submit task report
       const task = await taskApi.submitDailyReport({
-        employeeId: user?._id || 'emp-dev-001',
+        employeeId: user?.employeeId || user?._id || 'emp-dev-001',
         date: new Date().toISOString().split('T')[0],
         inProgressTasks: values.inProgressTasks || '',
         completedTasks: values.completedTasks || '',

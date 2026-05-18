@@ -7,6 +7,7 @@ export interface User {
   _id: string;
   name: string;
   email: string;
+  profileImage?: string;
   role: Role;
   employeeId?: string;
   isActive: boolean;
@@ -27,7 +28,7 @@ export interface Employee {
   fullName: string;
   email: string;
   phone: string;
-  department: 'Developers' | 'Designers' | 'BDE' | 'DME';
+  department: 'Developers' | 'Designers' | 'BDE' | 'DME' | 'Internship';
   designation: string;
   joiningDate: string;
   profileImage?: string;

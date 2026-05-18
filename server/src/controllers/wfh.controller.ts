@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { Leave } from '../models/Leave.js';
 import { Employee } from '../models/Employee.js';
+import { User } from '../models/User.js';
 import { createAuditLog } from '../services/auditLog.service.js';
+import { getIO } from '../sockets/socketHandler.js';
 import { AuthRequest } from '../types/index.js';
 
 export const applyWFH = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -25,6 +27,18 @@ export const applyWFH = async (req: AuthRequest, res: Response): Promise<void> =
       wfh.id,
       `Requested WFH for ${date}`
     );
+
+    const io = getIO();
+    if (io) {
+      const notifData = {
+        title: 'New WFH Request',
+        message: `Employee requested WFH for ${date}.`,
+        type: 'WFH',
+        recipientId: 'admin-hr',
+      };
+      io.to('ADMIN').emit('receive_notification', notifData);
+      io.to('HR').emit('receive_notification', notifData);
+    }
 
     res.status(201).json({ wfhRequest: wfh });
   } catch (error: any) {
@@ -68,6 +82,21 @@ export const updateWFHStatus = async (req: AuthRequest, res: Response): Promise<
       wfh.id,
       `Updated WFH status to ${status}`
     );
+
+    const io = getIO();
+    if (io) {
+      const empUser = await User.findOne({ employeeId: wfh.employeeId });
+      const notifData = {
+        title: `WFH Request ${status}`,
+        message: `Your WFH request for ${wfh.startDate} has been ${status.toLowerCase()}.`,
+        type: 'WFH',
+        recipientId: empUser ? empUser.id : 'employee',
+      };
+      if (empUser) {
+        io.to(empUser.id).emit('receive_notification', notifData);
+      }
+      io.to('EMPLOYEE').emit('receive_notification', notifData);
+    }
 
     res.status(200).json({ wfhRequest: wfh });
   } catch (error: any) {

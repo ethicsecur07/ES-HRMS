@@ -1,8 +1,19 @@
 import axios from 'axios';
 
+// Dynamically determine the backend API base URL based on where the browser is accessing from.
+// If VITE_API_URL is set to an external domain (e.g., in production), use it.
+// If VITE_API_URL contains 'localhost', dynamically replace 'localhost' with the actual hostname (e.g., 192.168.x.x)
+const getBaseUrl = () => {
+  const envApiUrl = import.meta.env.VITE_API_URL;
+  if (envApiUrl && !envApiUrl.includes('localhost')) {
+    return envApiUrl;
+  }
+  return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+};
+
 // Create Axios instance with base URL pointing to backend
 export const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getBaseUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

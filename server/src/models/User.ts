@@ -5,6 +5,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password?: string;
+  profileImage?: string;
   role: keyof typeof ROLES;
   employeeId?: mongoose.Types.ObjectId;
   isActive: boolean;
@@ -18,6 +19,7 @@ const userSchema = new Schema<IUser>(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, select: false },
+    profileImage: { type: String },
     role: { type: String, enum: Object.values(ROLES), default: ROLES.EMPLOYEE },
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee' },
     isActive: { type: Boolean, default: true },

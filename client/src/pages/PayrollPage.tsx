@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { payrollApi } from '../api_service/payrollApi';
 import { employeeApi } from '../api_service/employeeApi';
@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
+import { Input } from '../Components/WrapperComponents/Input';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import { PayrollSlipModal } from '../Components/SpecifiedComponents/PayrollSlipModal';
 import type { Payroll, Employee } from '../types';
@@ -21,6 +22,10 @@ export const PayrollPage: React.FC = () => {
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [showModal, setShowModal] = useState(false);
 
+  // Advanced Filter States
+  const [nameFilter, setNameFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
+
   const { data: payrolls, isLoading: payLoading } = useQuery({
     queryKey: ['payrolls'],
     queryFn: payrollApi.getAll,
@@ -30,6 +35,20 @@ export const PayrollPage: React.FC = () => {
     queryKey: ['employees'],
     queryFn: employeeApi.getAll,
   });
+
+  const filteredPayrolls = useMemo(() => {
+    if (!payrolls) return [];
+    return payrolls.filter((item) => {
+      const empId = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId._id : item.employeeId) : '';
+      const emp = employees?.find((e) => e._id === empId);
+      const empName = emp?.fullName || 'Logapriyan M';
+
+      const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
+      const matchMonth = !monthFilter || item.month.includes(monthFilter);
+
+      return matchName && matchMonth;
+    });
+  }, [payrolls, employees, nameFilter, monthFilter]);
 
   const generateMutation = useMutation({
     mutationFn: () => payrollApi.generateMonthlyPayroll('2026-05'),
@@ -49,7 +68,7 @@ export const PayrollPage: React.FC = () => {
   });
 
   const handleViewPayslip = (payroll: Payroll) => {
-    const emp = employees?.find((e) => e._id === (typeof payroll.employeeId === 'object' ? payroll.employeeId._id : payroll.employeeId));
+    const emp = employees?.find((e) => e._id === (payroll.employeeId ? (typeof payroll.employeeId === 'object' ? payroll.employeeId._id : payroll.employeeId) : ''));
     if (emp) {
       setSelectedPayroll(payroll);
       setSelectedEmp(emp);
@@ -61,7 +80,7 @@ export const PayrollPage: React.FC = () => {
     {
       header: 'Employee',
       accessor: (row: Payroll) => {
-        const emp = employees?.find((e) => e._id === (typeof row.employeeId === 'object' ? row.employeeId._id : row.employeeId));
+        const emp = employees?.find((e) => e._id === (row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId._id : row.employeeId) : ''));
         return (
           <div className="flex items-center gap-2">
             <span className="font-bold text-xs text-foreground">{emp?.fullName || 'Logapriyan M'}</span>
@@ -144,12 +163,28 @@ export const PayrollPage: React.FC = () => {
         )}
       </div>
 
-      <Card className="border-l-4 border-l-primary shadow-md">
+      <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6">
+        {/* Advanced Filter Bar */}
+        <div className="flex flex-col sm:flex-row items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
+          <div className="flex-1 w-full">
+            <Input
+              placeholder="Search payroll by employee name..."
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+            />
+          </div>
+          <div className="w-full sm:w-64">
+            <Input
+              type="month"
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+            />
+          </div>
+        </div>
+
         <TableWrapper
           columns={columns}
-          data={payrolls || []}
-          searchKey="month"
-          searchPlaceholder="Search payroll by month (e.g. 2026-05)..."
+          data={filteredPayrolls}
         />
       </Card>
 

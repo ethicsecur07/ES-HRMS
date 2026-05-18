@@ -86,7 +86,7 @@ export const FinancePage: React.FC = () => {
             Office Maintenance & Finance Ledger
           </h1>
           <p className="text-sm text-muted-foreground mt-1 font-medium">
-            Confidential ledger managed exclusively between MD Sir (ADMIN) and HR Manager.
+            Confidential ledger managed exclusively between ADMIN and HR Manager.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -97,7 +97,7 @@ export const FinancePage: React.FC = () => {
               className="bg-primary text-primary-foreground font-bold tracking-wider py-2.5 px-5 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all scale-[1.02]"
             >
               <PlusCircle className="w-5 h-5 mr-2" />
-              ALLOCATE BUDGET (MD Sir)
+              ALLOCATE BUDGET 
             </Button>
           )}
           {role === 'HR' && (
@@ -107,7 +107,7 @@ export const FinancePage: React.FC = () => {
               className="bg-foreground text-background font-bold tracking-wider py-2.5 px-5 shadow-md hover:bg-foreground/90 transition-all scale-[1.02]"
             >
               <PlusCircle className="w-5 h-5 mr-2" />
-              LOG MAINTENANCE EXPENSE (HR)
+              LOG MAINTENANCE EXPENSE 
             </Button>
           )}
         </div>
@@ -117,7 +117,7 @@ export const FinancePage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="p-6 bg-card border border-border shadow-sm hover:shadow-md transition-shadow relative overflow-hidden text-left">
           <div className="absolute top-0 right-0 p-6 opacity-10">
-            <Wallet className="w-20 h-20 text-foreground" />
+            <Wallet className="w-10 h-10 text-foreground" />
           </div>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-xl bg-primary/10 text-primary border border-primary/20">
@@ -129,14 +129,14 @@ export const FinancePage: React.FC = () => {
             </div>
           </div>
           <div className="text-xs text-muted-foreground border-t border-border/50 pt-3 flex items-center justify-between">
-            <span>Allocated by MD Sir</span>
+            <span>Allocated by Admin</span>
             <span className="font-bold text-primary">100% Verified</span>
           </div>
         </Card>
 
         <Card className="p-6 bg-card border border-border shadow-sm hover:shadow-md transition-shadow relative overflow-hidden text-left">
           <div className="absolute top-0 right-0 p-6 opacity-10">
-            <TrendingDown className="w-20 h-20 text-foreground" />
+            <TrendingDown className="w-10 h-10 text-foreground" />
           </div>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-xl bg-muted text-muted-foreground border border-border">
@@ -155,7 +155,7 @@ export const FinancePage: React.FC = () => {
 
         <Card className="p-6 bg-card border-2 border-primary/40 shadow-lg hover:shadow-xl transition-shadow relative overflow-hidden text-left bg-gradient-to-tr from-card to-primary/5">
           <div className="absolute top-0 right-0 p-6 opacity-10">
-            <DollarSign className="w-20 h-20 text-primary" />
+            <DollarSign className="w-10 h-10 text-primary" />
           </div>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
@@ -198,7 +198,7 @@ export const FinancePage: React.FC = () => {
             <Wallet className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
             <p className="text-sm font-bold text-foreground">No Financial Records Logged Yet</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-              MD Sir can allocate budget or HR can log maintenance expenses to begin populating the secure ledger.
+              Admin can allocate budget or HR can log maintenance expenses to begin populating the secure ledger.
             </p>
           </div>
         ) : (

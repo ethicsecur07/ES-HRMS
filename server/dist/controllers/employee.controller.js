@@ -3,6 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteEmployee = exports.updateEmployee = exports.createEmployee = exports.getEmployeeById = exports.getEmployees = void 0;
 const Employee_js_1 = require("../models/Employee.js");
 const User_js_1 = require("../models/User.js");
+const Attendance_js_1 = require("../models/Attendance.js");
+const Leave_js_1 = require("../models/Leave.js");
+const Payroll_js_1 = require("../models/Payroll.js");
+const Permission_js_1 = require("../models/Permission.js");
+const TaskReport_js_1 = require("../models/TaskReport.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const getEmployees = async (req, res) => {
     try {
@@ -30,8 +35,9 @@ const getEmployeeById = async (req, res) => {
 exports.getEmployeeById = getEmployeeById;
 const createEmployee = async (req, res) => {
     try {
-        const employee = await Employee_js_1.Employee.create(req.body);
-        const defaultPassword = 'EthicSec@2026';
+        const { password, ...employeeData } = req.body;
+        const employee = await Employee_js_1.Employee.create(employeeData);
+        const defaultPassword = password || 'EthicSec@2026';
         await User_js_1.User.create({
             name: employee.fullName,
             email: employee.email,
@@ -40,8 +46,8 @@ const createEmployee = async (req, res) => {
             employeeId: employee._id,
             isActive: true,
         });
-        await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_ONBOARD', req.user?.email || 'System', 'EMPLOYEE', employee.employeeCode, `Onboarded ${employee.fullName} & generated credentials`);
-        res.status(201).json({ employee, generatedPassword: defaultPassword });
+        await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_CREATE', req.user?.email || 'System', 'EMPLOYEE', employee.employeeCode, `Onboarded employee ${employee.fullName}`);
+        res.status(201).json({ employee });
     }
     catch (error) {
         res.status(500).json({ message: error.message });
@@ -70,8 +76,16 @@ const deleteEmployee = async (req, res) => {
             res.status(404).json({ message: 'Employee not found' });
             return;
         }
-        await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_DELETE', req.user?.email || 'System', 'EMPLOYEE', employee.employeeCode, `Deleted record for ${employee.fullName}`);
-        res.status(200).json({ message: 'Employee deleted successfully' });
+        await Promise.all([
+            User_js_1.User.findOneAndDelete({ $or: [{ employeeId: req.params.id }, { email: employee.email }] }),
+            Attendance_js_1.Attendance.deleteMany({ employeeId: req.params.id }),
+            Leave_js_1.Leave.deleteMany({ employeeId: req.params.id }),
+            Payroll_js_1.Payroll.deleteMany({ employeeId: req.params.id }),
+            Permission_js_1.Permission.deleteMany({ employeeId: req.params.id }),
+            TaskReport_js_1.TaskReport.deleteMany({ employeeId: req.params.id }),
+        ]);
+        await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_DELETE', req.user?.email || 'System', 'EMPLOYEE', employee.employeeCode, `Deleted record and user account for ${employee.fullName}`);
+        res.status(200).json({ message: 'Employee, user account, and all associated records deleted successfully' });
     }
     catch (error) {
         res.status(500).json({ message: error.message });

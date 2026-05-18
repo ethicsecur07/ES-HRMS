@@ -19,6 +19,7 @@ const analytics_routes_js_1 = __importDefault(require("./routes/analytics.routes
 const permission_routes_js_1 = __importDefault(require("./routes/permission.routes.js"));
 const task_routes_js_1 = __importDefault(require("./routes/task.routes.js"));
 const finance_routes_js_1 = __importDefault(require("./routes/finance.routes.js"));
+const upload_routes_js_1 = __importDefault(require("./routes/upload.routes.js"));
 const rateLimiter_js_1 = require("./middlewares/rateLimiter.js");
 const errorHandler_js_1 = require("./middlewares/errorHandler.js");
 const createApp = () => {
@@ -42,6 +43,7 @@ const createApp = () => {
     app.use('/api/permissions', permission_routes_js_1.default);
     app.use('/api/tasks', task_routes_js_1.default);
     app.use('/api/finance', finance_routes_js_1.default);
+    app.use('/api/upload', upload_routes_js_1.default);
     // Healthcheck Route
     app.get('/health', (req, res) => {
         res.status(200).json({ status: 'UP', timestamp: new Date() });

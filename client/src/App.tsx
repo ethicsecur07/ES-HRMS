@@ -8,6 +8,7 @@ import { ProtectedRoute } from './Components/WrapperComponents/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { EmployeesPage } from './pages/EmployeesPage';
+import { EmployeeDetailsPage } from './pages/EmployeeDetailsPage';
 import { AttendancePage } from './pages/AttendancePage';
 import { LeaveWFHPage } from './pages/LeaveWFHPage';
 import { PayrollPage } from './pages/PayrollPage';
@@ -15,6 +16,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { FinancePage } from './pages/FinancePage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +40,7 @@ export const App: React.FC = () => {
           <Route element={<Layout />}>
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route path="/attendance" element={<AttendancePage />} />
               <Route path="/leave-wfh" element={<LeaveWFHPage />} />
               <Route path="/payroll" element={<PayrollPage />} />
@@ -45,6 +48,7 @@ export const App: React.FC = () => {
               {/* HR & ADMIN Only */}
               <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'HR']} />}>
                 <Route path="/employees" element={<EmployeesPage />} />
+                <Route path="/employees/:id" element={<EmployeeDetailsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/finance" element={<FinancePage />} />
               </Route>

@@ -7,6 +7,11 @@ export const attendanceApi = {
     return response.data.attendances;
   },
 
+  getAll: async () => {
+    const response = await axiosInstance.get<{ attendances: Attendance[] }>('/attendance');
+    return response.data.attendances;
+  },
+
   checkIn: async (data: { employeeId: string; ipAddress: string; deviceInfo: string; overrideReason?: string }) => {
     const response = await axiosInstance.post<{ attendance: Attendance }>('/attendance/checkin', data);
     return response.data.attendance;
@@ -20,5 +25,10 @@ export const attendanceApi = {
   verifyOfficeIP: async () => {
     const response = await axiosInstance.get<{ isOfficeIP: boolean; currentIP: string }>('/attendance/verify-ip');
     return response.data;
+  },
+
+  update: async (id: string, data: { loginTime?: string; logoutTime?: string; status?: string }) => {
+    const response = await axiosInstance.put<{ attendance: Attendance }>(`/attendance/${id}`, data);
+    return response.data.attendance;
   },
 };

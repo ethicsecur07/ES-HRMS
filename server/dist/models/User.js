@@ -40,6 +40,7 @@ const userSchema = new mongoose_1.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, select: false },
+    profileImage: { type: String },
     role: { type: String, enum: Object.values(index_js_1.ROLES), default: index_js_1.ROLES.EMPLOYEE },
     employeeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee' },
     isActive: { type: Boolean, default: true },

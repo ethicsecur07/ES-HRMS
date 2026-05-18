@@ -45,7 +45,7 @@ export const WFHRequestModal: React.FC<WFHRequestModalProps> = ({ isOpen, onClos
   const applyMutation = useMutation({
     mutationFn: (values: WFHFormValues) =>
       wfhApi.applyWFH({
-        employeeId: user?._id || 'emp-dev-001',
+        employeeId: user?.employeeId || user?._id || 'emp-dev-001',
         date: values.date,
         reason: values.reason,
         expectedTasks: values.expectedTasks,

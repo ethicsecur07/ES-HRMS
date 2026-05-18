@@ -14,7 +14,14 @@ export const Layout: React.FC = () => {
 
   // Socket.io client-side integration for real-time notifications & live updates
   useEffect(() => {
-    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    const getSocketUrl = () => {
+      const envApiUrl = import.meta.env.VITE_API_URL;
+      if (envApiUrl && !envApiUrl.includes('localhost')) {
+        return envApiUrl.replace('/api', '');
+      }
+      return `${window.location.protocol}//${window.location.hostname}:5000`;
+    };
+    const socketUrl = getSocketUrl();
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,

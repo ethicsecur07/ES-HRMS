@@ -29,4 +29,5 @@ export const DEPARTMENTS = {
   DES: 'Designers',
   BDE: 'BDE',
   DME: 'DME',
+  INT: 'Internship',
 } as const;
