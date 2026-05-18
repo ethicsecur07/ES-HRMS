@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const attendance_controller_js_1 = require("../controllers/attendance.controller.js");
+const auth_middleware_js_1 = require("../middlewares/auth.middleware.js");
+const ipRestriction_js_1 = require("../middlewares/ipRestriction.js");
+const router = (0, express_1.Router)();
+router.get('/today', auth_middleware_js_1.authenticate, attendance_controller_js_1.getTodayAttendance);
+router.post('/checkin', auth_middleware_js_1.authenticate, ipRestriction_js_1.verifyOfficeIP, attendance_controller_js_1.checkIn);
+router.post('/checkout/:id', auth_middleware_js_1.authenticate, attendance_controller_js_1.checkOut);
+router.get('/verify-ip', attendance_controller_js_1.verifyIP);
+exports.default = router;

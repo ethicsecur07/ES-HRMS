@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const permission_controller_js_1 = require("../controllers/permission.controller.js");
+const auth_middleware_js_1 = require("../middlewares/auth.middleware.js");
+const router = (0, express_1.Router)();
+router.post('/apply', auth_middleware_js_1.authenticate, permission_controller_js_1.applyPermission);
+router.get('/', auth_middleware_js_1.authenticate, permission_controller_js_1.getPermissions);
+router.put('/:id/status', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), permission_controller_js_1.updatePermissionStatus);
+exports.default = router;

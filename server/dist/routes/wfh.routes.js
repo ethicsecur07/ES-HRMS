@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const wfh_controller_js_1 = require("../controllers/wfh.controller.js");
+const auth_middleware_js_1 = require("../middlewares/auth.middleware.js");
+const router = (0, express_1.Router)();
+router.post('/apply', auth_middleware_js_1.authenticate, wfh_controller_js_1.applyWFH);
+router.get('/', auth_middleware_js_1.authenticate, wfh_controller_js_1.getWFHRequests);
+router.put('/:id/status', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), wfh_controller_js_1.updateWFHStatus);
+exports.default = router;

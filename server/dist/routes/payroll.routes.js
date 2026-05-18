@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const payroll_controller_js_1 = require("../controllers/payroll.controller.js");
+const auth_middleware_js_1 = require("../middlewares/auth.middleware.js");
+const router = (0, express_1.Router)();
+router.get('/', auth_middleware_js_1.authenticate, payroll_controller_js_1.getPayrolls);
+router.post('/generate', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), payroll_controller_js_1.generatePayroll);
+router.put('/:id/status', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), payroll_controller_js_1.updatePayrollStatus);
+exports.default = router;
