@@ -16,12 +16,12 @@ export const SettingsPage: React.FC = () => {
     queryFn: analyticsApi.getSettings,
   });
 
-  const [companyName, setCompanyName] = useState(settings?.companyName || 'EthicSec Enterprise');
-  const [adminEmail, setAdminEmail] = useState(settings?.adminEmail || 'admin@ethicsec.com');
+  const [companyName, setCompanyName] = useState(settings?.companyName || 'EthicSecur SofTec');
+  const [adminEmail, setAdminEmail] = useState(settings?.adminEmail || 'Official@ethicsecur.co.in');
   const [monthlyLeaveLimit, setMonthlyLeaveLimit] = useState(settings?.monthlyLeaveLimit || 2);
   const [monthlyWFHLimit, setMonthlyWFHLimit] = useState(settings?.monthlyWFHLimit || 1);
   const [monthlyPermissionHours, setMonthlyPermissionHours] = useState(settings?.monthlyPermissionHours || 3);
-  const [officeIPs, setOfficeIPs] = useState<string[]>(settings?.officeWiFiIPs || ['192.168.1.50', '192.168.1.55']);
+  const [officeIPs, setOfficeIPs] = useState<string[]>(settings?.officeWiFiIPs || ['192.168.29.50', '192.168.29.55']);
   const [newIP, setNewIP] = useState('');
 
   React.useEffect(() => {
@@ -113,7 +113,7 @@ export const SettingsPage: React.FC = () => {
           </p>
 
           <div className="flex items-center gap-3 max-w-md">
-            <Input placeholder="Add new IP address (e.g. 192.168.1.100)..." value={newIP} onChange={(e) => setNewIP(e.target.value)} />
+            <Input placeholder="Add new IP address (e.g. 192.168.29.100)..." value={newIP} onChange={(e) => setNewIP(e.target.value)} />
             <Button type="button" onClick={handleAddIP} className="flex-shrink-0 bg-foreground text-background hover:bg-foreground/90 shadow-md">
               <Plus className="w-4 h-4 mr-1" /> Add IP
             </Button>

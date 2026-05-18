@@ -8,12 +8,12 @@ export const permissionApi = {
   },
 
   getAll: async () => {
-    const response = await axiosInstance.get<{ permissionRequests: PermissionRequest[] }>('/permissions');
-    return response.data.permissionRequests;
+    const response = await axiosInstance.get<{ permissionRequests?: PermissionRequest[]; permissions?: PermissionRequest[] }>('/permissions');
+    return response.data.permissions || response.data.permissionRequests || [];
   },
 
   updateStatus: async (id: string, approvalStatus: ApprovalStatus) => {
-    const response = await axiosInstance.put<{ permissionRequest: PermissionRequest }>(`/permissions/${id}/status`, { approvalStatus });
+    const response = await axiosInstance.put<{ permissionRequest: PermissionRequest }>(`/permissions/${id}/status`, { approvalStatus, status: approvalStatus });
     return response.data.permissionRequest;
   },
 };

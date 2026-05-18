@@ -12,7 +12,7 @@ import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import type { TaskReport } from '../types';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Bell } from 'lucide-react';
 import { LeaveApplyModal } from '../Components/SpecifiedComponents/LeaveApplyModal';
 
 export const DashboardPage: React.FC = () => {
@@ -31,8 +31,8 @@ export const DashboardPage: React.FC = () => {
   });
 
   const { data: myTasks } = useQuery({
-    queryKey: ['myTasks', user?._id],
-    queryFn: () => taskApi.getByEmployee(user?._id || 'emp-dev-001'),
+    queryKey: ['myTasks', user?.employeeId || user?._id],
+    queryFn: () => taskApi.getByEmployee(user?.employeeId || user?._id || 'emp-dev-001'),
     enabled: role === 'EMPLOYEE',
   });
 
@@ -89,6 +89,17 @@ export const DashboardPage: React.FC = () => {
             APPLY LEAVE / WFH
           </Button>
         )}
+
+        {(role === 'HR' || role === 'ADMIN') && (
+          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+            <Button variant="outline" size="sm" className="rounded-full w-10 h-10 p-0 border-border bg-card shadow-sm hover:bg-muted flex items-center justify-center">
+              <Bell className="w-4 h-4 text-foreground" />
+            </Button>
+            <Button className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all">
+              Generate Report
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 1. EMPLOYEE DASHBOARD */}
@@ -114,46 +125,14 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* 2. HR DASHBOARD */}
-      {role === 'HR' && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-              <AdminAnalyticsCharts stats={stats} />
-            </div>
-            <div className="lg:col-span-1 space-y-8">
-              <HRApprovalQueue />
-            </div>
-          </div>
-
-          <Card className="space-y-4 border-l-4 border-l-primary shadow-md">
-            <div>
-              <h3 className="text-lg font-bold text-foreground tracking-tight">Company Productivity Reports</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Daily task submissions from all employees
-              </p>
-            </div>
-            <TableWrapper
-              columns={[
-                { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{typeof row.employeeId === 'object' ? row.employeeId.fullName : 'Logapriyan M'}</span> },
-                ...taskColumns,
-              ]}
-              data={allTasks || []}
-              searchKey="completedTasks"
-              searchPlaceholder="Filter reports by task content..."
-            />
-          </Card>
-        </div>
-      )}
-
-      {/* 3. ADMIN DASHBOARD */}
-      {role === 'ADMIN' && (
+      {/* 2. HR & ADMIN DASHBOARD */}
+      {(role === 'HR' || role === 'ADMIN') && (
         <div className="space-y-8">
           <AdminAnalyticsCharts stats={stats} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-              <Card className="space-y-4 border-l-4 border-l-primary shadow-md">
+              <Card className="space-y-4 border-l-4 border-l-primary shadow-md p-6 bg-card">
                 <div>
                   <h3 className="text-lg font-bold text-foreground tracking-tight">Company Productivity Reports</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -162,7 +141,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
                 <TableWrapper
                   columns={[
-                    { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{typeof row.employeeId === 'object' ? row.employeeId.fullName : 'Logapriyan M'}</span> },
+                    { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId.fullName || 'Logapriyan M' : row.employeeId) : 'Logapriyan M'}</span> },
                     ...taskColumns,
                   ]}
                   data={allTasks || []}

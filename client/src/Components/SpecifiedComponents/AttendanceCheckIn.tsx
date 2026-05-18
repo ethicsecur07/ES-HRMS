@@ -36,14 +36,19 @@ export const AttendanceCheckIn: React.FC = () => {
   });
 
   const myAttendance = todayAttendance?.find(
-    (a) => a.employeeId === user?._id || (typeof a.employeeId === 'object' && a.employeeId._id === user?._id)
+    (a) =>
+      a.employeeId === user?.employeeId ||
+      a.employeeId === user?._id ||
+      (a.employeeId &&
+        typeof a.employeeId === 'object' &&
+        (a.employeeId._id === user?.employeeId || a.employeeId._id === user?._id))
   );
 
   const checkInMutation = useMutation({
     mutationFn: (override?: string) =>
       attendanceApi.checkIn({
-        employeeId: user?._id || 'emp-dev-001',
-        ipAddress: ipData?.currentIP || '192.168.1.50',
+        employeeId: user?.employeeId || user?._id || 'emp-dev-001',
+        ipAddress: ipData?.currentIP || '192.168.29.50',
         deviceInfo: navigator.userAgent,
         overrideReason: override,
       }),
@@ -53,8 +58,9 @@ export const AttendanceCheckIn: React.FC = () => {
       setShowOverrideModal(false);
       setOverrideReason('');
     },
-    onError: () => {
-      addToast('Check-In Failed', 'Please verify your office IP or apply for WFH override.', 'error');
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || 'Please verify your office IP or apply for WFH override.';
+      addToast('Check-In Failed', msg, 'error');
     },
   });
 

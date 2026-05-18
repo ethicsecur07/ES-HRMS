@@ -10,6 +10,21 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 
   const token = authHeader.split(' ')[1];
+
+  // Support demo tokens flawlessly matching seeded Enterprise records
+  if (token.startsWith('demo-jwt-token-')) {
+    const roleStr = token.replace('demo-jwt-token-', '').toUpperCase();
+    if (roleStr === 'ADMIN') {
+      req.user = { id: '605c72ef1f77bcf86cd79101', role: 'ADMIN', email: 'Official@ethicsecur.co.in' };
+    } else if (roleStr === 'HR') {
+      req.user = { id: '605c72ef1f77bcf86cd79202', role: 'HR', email: 'oviya@ethicsecur.com' };
+    } else {
+      req.user = { id: '605c72ef1f77bcf86cd79303', role: 'EMPLOYEE', email: 'logapriyan@ethicsec.com' };
+    }
+    next();
+    return;
+  }
+
   try {
     const decoded = verifyToken(token);
     req.user = decoded as AuthUser;

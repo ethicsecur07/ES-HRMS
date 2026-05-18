@@ -63,7 +63,7 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
 
   const applyMutation = useMutation({
     mutationFn: async (values: LeaveFormValues) => {
-      const empId = user?._id || 'emp-dev-001';
+      const empId = user?.employeeId || user?._id || 'emp-dev-001';
 
       if (values.leaveType === 'WFH') {
         return wfhApi.applyWFH({

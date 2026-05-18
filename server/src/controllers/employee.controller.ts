@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
 import { Employee } from '../models/Employee.js';
 import { User } from '../models/User.js';
+import { Attendance } from '../models/Attendance.js';
+import { Leave } from '../models/Leave.js';
+import { Payroll } from '../models/Payroll.js';
+import { Permission } from '../models/Permission.js';
+import { TaskReport } from '../models/TaskReport.js';
 import { createAuditLog } from '../services/auditLog.service.js';
 import { AuthRequest } from '../types/index.js';
 
@@ -28,9 +33,10 @@ export const getEmployeeById = async (req: Request, res: Response): Promise<void
 
 export const createEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const employee = await Employee.create(req.body);
+    const { password, ...employeeData } = req.body;
+    const employee = await Employee.create(employeeData);
 
-    const defaultPassword = 'EthicSec@2026';
+    const defaultPassword = password || 'EthicSec@2026';
     await User.create({
       name: employee.fullName,
       email: employee.email,
@@ -41,14 +47,14 @@ export const createEmployee = async (req: AuthRequest, res: Response): Promise<v
     });
 
     await createAuditLog(
-      'EMPLOYEE_ONBOARD',
+      'EMPLOYEE_CREATE',
       req.user?.email || 'System',
       'EMPLOYEE',
       employee.employeeCode,
-      `Onboarded ${employee.fullName} & generated credentials`
+      `Onboarded employee ${employee.fullName}`
     );
 
-    res.status(201).json({ employee, generatedPassword: defaultPassword });
+    res.status(201).json({ employee });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -84,15 +90,24 @@ export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
+    await Promise.all([
+      User.findOneAndDelete({ $or: [{ employeeId: req.params.id }, { email: employee.email }] }),
+      Attendance.deleteMany({ employeeId: req.params.id }),
+      Leave.deleteMany({ employeeId: req.params.id }),
+      Payroll.deleteMany({ employeeId: req.params.id }),
+      Permission.deleteMany({ employeeId: req.params.id }),
+      TaskReport.deleteMany({ employeeId: req.params.id }),
+    ]);
+
     await createAuditLog(
       'EMPLOYEE_DELETE',
       req.user?.email || 'System',
       'EMPLOYEE',
       employee.employeeCode,
-      `Deleted record for ${employee.fullName}`
+      `Deleted record and user account for ${employee.fullName}`
     );
 
-    res.status(200).json({ message: 'Employee deleted successfully' });
+    res.status(200).json({ message: 'Employee, user account, and all associated records deleted successfully' });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

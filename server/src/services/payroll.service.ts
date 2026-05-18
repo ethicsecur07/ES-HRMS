@@ -10,7 +10,7 @@ export const calculateMonthlyPayroll = async (month: string): Promise<any[]> => 
     for (const emp of employees) {
       // Basic calculation logic
       const baseSalary = emp.salary;
-      const bonus = emp.department === 'BDE' ? 15000 : emp.department === 'DEV' ? 10000 : 5000;
+      const bonus = emp.department === 'BDE' ? 0 : emp.department === 'DEV' ? 0 : 0;
       const deductions = emp.leaveBalance < 0 ? Math.abs(emp.leaveBalance) * (baseSalary / 30) : 0;
       const finalSalary = baseSalary + bonus - deductions;
 

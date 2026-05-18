@@ -19,35 +19,7 @@ interface NotificationState {
   removeToast: (id: string) => void;
 }
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    _id: 'notif-1',
-    recipientId: 'all',
-    title: 'Payroll Processed',
-    message: 'Monthly salary for May 2026 has been successfully credited.',
-    type: 'PAYROLL',
-    read: false,
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    _id: 'notif-2',
-    recipientId: 'user-emp-303',
-    title: 'WFH Request Approved',
-    message: 'Your WFH request for tomorrow has been approved by HR.',
-    type: 'WFH',
-    read: false,
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-  },
-  {
-    _id: 'notif-3',
-    recipientId: 'user-hr-202',
-    title: 'New Leave Request',
-    message: 'Logapriyan applied for Casual Leave on May 20, 2026.',
-    type: 'LEAVE',
-    read: true,
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
+const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
 
 export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: INITIAL_NOTIFICATIONS,
@@ -84,11 +56,13 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       unreadCount: 0,
     })),
 
-  addToast: (title, message, type = 'info') =>
-    set((state) => {
-      const id = `toast-${Date.now()}`;
-      return { toasts: [...state.toasts, { id, title, message, type }] };
-    }),
+  addToast: (title, message, type = 'info') => {
+    const id = `toast-${Date.now()}`;
+    set((state) => ({ toasts: [...state.toasts, { id, title, message, type }] }));
+    setTimeout(() => {
+      set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
+    }, 5000);
+  },
 
   removeToast: (id) =>
     set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),

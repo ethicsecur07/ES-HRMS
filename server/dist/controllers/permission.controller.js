@@ -26,7 +26,7 @@ exports.applyPermission = applyPermission;
 const getPermissions = async (req, res) => {
     try {
         const permissions = await Permission_js_1.Permission.find().populate('employeeId').sort({ createdAt: -1 });
-        res.status(200).json({ permissions });
+        res.status(200).json({ permissions, permissionRequests: permissions });
     }
     catch (error) {
         res.status(500).json({ message: error.message });

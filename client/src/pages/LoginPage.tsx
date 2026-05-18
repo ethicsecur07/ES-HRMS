@@ -6,12 +6,14 @@ import { authApi } from '../api_service/authApi';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input } from '../Components/WrapperComponents/Input';
 import { Card } from '../Components/WrapperComponents/Card';
-import { ShieldCheck, Lock, Mail } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import type { Role } from '../types';
+import ESLogo from '../assets/ES_Logo.png';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role>('ADMIN');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -47,10 +49,8 @@ export const LoginPage: React.FC = () => {
 
       <Card className="w-full max-w-lg p-8 z-10 border border-border shadow-2xl backdrop-blur-xl bg-card/90">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary to-accent text-white font-black text-3xl shadow-lg shadow-primary/30 mb-4">
-            ES
-          </div>
-          <h2 className="text-3xl font-extrabold text-foreground tracking-tight">ETHICSEC HRMS</h2>
+          <img src={ESLogo} alt="EthicSec Logo" className="h-16 w-16 mx-auto object-contain drop-shadow-md mb-4" />
+          <h2 className="text-3xl font-extrabold text-foreground tracking-tight">ES EthicSecur SofTec HRMS</h2>
           <p className="text-sm text-muted-foreground mt-1 font-medium">
             Enterprise Workforce & Payroll Management SaaS
           </p>
@@ -92,12 +92,20 @@ export const LoginPage: React.FC = () => {
             <Lock className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" />
             <Input
               label="Password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-10"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-9 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
 
           <div className="flex items-center justify-between text-xs">

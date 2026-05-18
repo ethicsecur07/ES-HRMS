@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 
 // Simulated office WiFi IP list
-const OFFICE_IPS = ['192.168.1.50', '192.168.1.55', '127.0.0.1', '::1'];
+const OFFICE_IPS = ['192.168.29.', '127.0.0.1', '::1'];
 
 export const verifyOfficeIP = (req: Request, res: Response, next: NextFunction): void => {
-  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '192.168.1.50';
+  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '192.168.29.50';
   const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
 
   // Check if IP is in office list or if override exists

@@ -14,6 +14,7 @@ import analyticsRoutes from './routes/analytics.routes.js';
 import permissionRoutes from './routes/permission.routes.js';
 import taskRoutes from './routes/task.routes.js';
 import financeRoutes from './routes/finance.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
 
 import { apiRateLimiter } from './middlewares/rateLimiter.js';
 import { errorHandler } from './middlewares/errorHandler.js';
@@ -41,6 +42,7 @@ export const createApp = (): Application => {
   app.use('/api/permissions', permissionRoutes);
   app.use('/api/tasks', taskRoutes);
   app.use('/api/finance', financeRoutes);
+  app.use('/api/upload', uploadRoutes);
 
   // Healthcheck Route
   app.get('/health', (req, res) => {

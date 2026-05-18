@@ -28,4 +28,5 @@ exports.DEPARTMENTS = {
     DES: 'Designers',
     BDE: 'BDE',
     DME: 'DME',
+    INT: 'Internship',
 };

@@ -2,6 +2,8 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Server } from 'http';
 import { logger } from '../utils/logger.js';
 
+let ioInstance: SocketIOServer | null = null;
+
 export const initSockets = (httpServer: Server) => {
   const io = new SocketIOServer(httpServer, {
     cors: {
@@ -9,6 +11,8 @@ export const initSockets = (httpServer: Server) => {
       methods: ['GET', 'POST'],
     },
   });
+
+  ioInstance = io;
 
   io.on('connection', (socket) => {
     logger.info(`Socket connected: ${socket.id}`);
@@ -28,4 +32,12 @@ export const initSockets = (httpServer: Server) => {
   });
 
   return io;
+};
+
+export const getIO = () => {
+  if (!ioInstance) {
+    logger.error('Socket.io not initialized!');
+    return null;
+  }
+  return ioInstance;
 };

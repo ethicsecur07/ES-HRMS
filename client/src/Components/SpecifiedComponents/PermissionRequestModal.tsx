@@ -51,7 +51,7 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({ 
       const totalHours = Math.max(0.5, parseFloat(((end - start) / (1000 * 60 * 60)).toFixed(1)));
 
       return permissionApi.applyPermission({
-        employeeId: user?._id || 'emp-dev-001',
+        employeeId: user?.employeeId || user?._id || 'emp-dev-001',
         date: values.date,
         startTime: values.startTime,
         endTime: values.endTime,

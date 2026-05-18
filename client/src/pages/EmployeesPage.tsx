@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { employeeApi } from '../api_service/employeeApi';
+import { authApi } from '../api_service/authApi';
 import { useNotificationStore } from '../store/useNotificationStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Select, Textarea } from '../Components/WrapperComponents/Input';
@@ -12,29 +15,48 @@ import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Employee } from '../types';
 import { formatCurrency } from '../utils/formatters';
-import { PlusCircle, Edit, Trash2, PhoneCall } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, PhoneCall, Eye, Camera, Loader2 } from 'lucide-react';
 
-const employeeSchema = z.object({
+const baseEmployeeSchema = z.object({
   employeeCode: z.string().min(2, 'Employee Code is required'),
   fullName: z.string().min(3, 'Full name is required'),
   email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   phone: z.string().min(10, 'Valid phone required'),
-  department: z.enum(['Developers', 'Designers', 'BDE', 'DME']),
+  department: z.enum(['Developers', 'Designers', 'BDE', 'DME', 'Internship']),
   designation: z.string().min(2, 'Designation required'),
   joiningDate: z.string().min(1, 'Joining date required'),
-  salary: z.coerce.number().min(10000, 'Minimum salary is 10,000'),
+  salary: z.coerce.number().min(0, 'Salary cannot be negative'),
   address: z.string().min(5, 'Address required'),
   emergencyContactName: z.string().min(2, 'Contact name required'),
   emergencyContactRel: z.string().min(2, 'Relationship required'),
   emergencyContactPhone: z.string().min(10, 'Contact phone required'),
 });
 
-type EmployeeFormValues = z.infer<typeof employeeSchema>;
+const employeeSchema = baseEmployeeSchema.superRefine((data, ctx) => {
+  if (data.department !== 'Internship' && data.salary < 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Minimum salary is 10,000 for regular employees',
+      path: ['salary'],
+    });
+  }
+});
+
+type EmployeeFormValues = z.infer<typeof baseEmployeeSchema>;
 
 export const EmployeesPage: React.FC = () => {
+  const { role } = useAuthStore();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string>('');
+  const [isUploadingImg, setIsUploadingImg] = useState(false);
 
+  // Advanced Filter States
+  const [nameFilter, setNameFilter] = useState('');
+  const [deptFilter, setDeptFilter] = useState('All');
+
+  const navigate = useNavigate();
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
 
@@ -43,15 +65,43 @@ export const EmployeesPage: React.FC = () => {
     queryFn: employeeApi.getAll,
   });
 
+  const filteredEmployees = useMemo(() => {
+    if (!employees) return [];
+    return employees.filter(emp => {
+      const matchName = emp.fullName.toLowerCase().includes(nameFilter.toLowerCase());
+      const matchDept = deptFilter === 'All' || emp.department === deptFilter;
+      return matchName && matchDept;
+    });
+  }, [employees, nameFilter, deptFilter]);
+
   const {
     register,
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeSchema),
   });
+
+  const selectedDept = watch('department');
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImg(true);
+    try {
+      const url = await authApi.uploadImage(file);
+      setProfileImage(url);
+      addToast('Image Uploaded', 'Profile photo uploaded successfully to Cloudinary.', 'success');
+    } catch (error: any) {
+      addToast('Upload Failed', error.message || 'Could not upload image.', 'error');
+    } finally {
+      setIsUploadingImg(false);
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: (values: EmployeeFormValues) => {
@@ -59,10 +109,12 @@ export const EmployeesPage: React.FC = () => {
         employeeCode: values.employeeCode,
         fullName: values.fullName,
         email: values.email,
+        password: values.password || 'EthicSec@2026',
         phone: values.phone,
         department: values.department,
         designation: values.designation,
         joiningDate: values.joiningDate,
+        profileImage,
         salary: values.salary,
         address: values.address,
         emergencyContact: {
@@ -86,6 +138,7 @@ export const EmployeesPage: React.FC = () => {
       reset();
       setShowModal(false);
       setEditingId(null);
+      setProfileImage('');
     },
     onError: () => {
       addToast('Error', 'Failed to save employee data.', 'error');
@@ -96,17 +149,22 @@ export const EmployeesPage: React.FC = () => {
     mutationFn: employeeApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      addToast('Employee Removed', 'Record deleted successfully.', 'info');
+      addToast('Employee Removed', 'Record and user account permanently deleted.', 'info');
+    },
+    onError: (error: any) => {
+      addToast('Delete Failed', error.response?.data?.message || error.message || 'Failed to delete employee.', 'error');
     },
   });
 
   const handleEdit = (emp: Employee) => {
     setEditingId(emp._id);
+    setProfileImage(emp.profileImage || '');
     setValue('employeeCode', emp.employeeCode);
     setValue('fullName', emp.fullName);
     setValue('email', emp.email);
+    setValue('password', '');
     setValue('phone', emp.phone);
-    setValue('department', emp.department);
+    setValue('department', emp.department as any);
     setValue('designation', emp.designation);
     setValue('joiningDate', emp.joiningDate);
     setValue('salary', emp.salary);
@@ -119,10 +177,13 @@ export const EmployeesPage: React.FC = () => {
 
   const handleAddNew = () => {
     setEditingId(null);
+    setProfileImage('');
     reset({
       employeeCode: `EMP-${Date.now().toString().slice(-3)}`,
       joiningDate: new Date().toISOString().split('T')[0],
       department: 'Developers',
+      password: 'EthicSec@2026',
+      salary: 0,
     });
     setShowModal(true);
   };
@@ -168,12 +229,26 @@ export const EmployeesPage: React.FC = () => {
       header: 'Actions',
       accessor: (row: Employee) => (
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => navigate(`/employees/${row._id}`)}>
+            <Eye className="w-4 h-4" />
+          </Button>
           <Button size="sm" variant="outline" onClick={() => handleEdit(row)}>
             <Edit className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(row._id)}>
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          {(role === 'ADMIN' || role === 'HR') && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to permanently delete the account for ${row.fullName}?`)) {
+                  deleteMutation.mutate(row._id);
+                }
+              }}
+              title="Delete Employee & User Account"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -202,22 +277,70 @@ export const EmployeesPage: React.FC = () => {
         </Button>
       </div>
 
-      <Card className="border-l-4 border-l-primary shadow-md">
+      <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6">
+        {/* Advanced Filter Bar */}
+        <div className="flex flex-col sm:flex-row items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
+          <div className="flex-1 w-full">
+            <Input
+              placeholder="Search employees by name..."
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+            />
+          </div>
+          <div className="w-full sm:w-64">
+            <Select
+              value={deptFilter}
+              onChange={(e) => setDeptFilter(e.target.value)}
+              options={[
+                { value: 'All', label: 'All Departments' },
+                { value: 'Developers', label: 'Developers' },
+                { value: 'Designers', label: 'Designers' },
+                { value: 'BDE', label: 'BDE (Business Development)' },
+                { value: 'DME', label: 'DME (Digital Marketing)' },
+                { value: 'Internship', label: 'Internship' },
+              ]}
+            />
+          </div>
+        </div>
+
         <TableWrapper
           columns={columns}
-          data={employees || []}
-          searchKey="fullName"
-          searchPlaceholder="Search employees by name..."
+          data={filteredEmployees}
         />
       </Card>
 
       {/* Onboard / Edit Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? 'Edit Employee Record' : 'Onboard New Employee'} maxWidth="max-w-2xl">
-        <form onSubmit={handleSubmit((v) => createMutation.mutate(v))} className="space-y-4 text-left">
+        <form onSubmit={handleSubmit((v) => createMutation.mutate(v))} className="space-y-4 text-left px-4">
+          {/* Profile Image Upload Box */}
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border">
+            <div className="relative group w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden flex-shrink-0">
+              {profileImage ? (
+                <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <Camera className="w-6 h-6 text-primary opacity-60" />
+              )}
+              <label className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" title="Upload Cloudinary Profile Image">
+                <Camera className="w-5 h-5 text-white" />
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              </label>
+              {isUploadingImg && (
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">Profile Photograph</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Click the image box to upload a high-fidelity profile picture via Cloudinary</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Employee Code *" {...register('employeeCode')} error={errors.employeeCode?.message} />
             <Input label="Full Name *" {...register('fullName')} error={errors.fullName?.message} />
             <Input label="Work Email *" type="email" {...register('email')} error={errors.email?.message} />
+            <Input label="Login Password *" type="text" {...register('password')} error={errors.password?.message} placeholder="Default: EthicSec@2026" />
             <Input label="Phone Number *" {...register('phone')} error={errors.phone?.message} />
             <Select
               label="Department *"
@@ -228,11 +351,12 @@ export const EmployeesPage: React.FC = () => {
                 { value: 'Designers', label: 'Designers' },
                 { value: 'BDE', label: 'BDE (Business Development)' },
                 { value: 'DME', label: 'DME (Digital Marketing)' },
+                { value: 'Internship', label: 'Internship' },
               ]}
             />
             <Input label="Designation *" {...register('designation')} error={errors.designation?.message} />
             <Input label="Joining Date *" type="date" {...register('joiningDate')} error={errors.joiningDate?.message} />
-            <Input label="Monthly Base Salary (USD) *" type="number" {...register('salary')} error={errors.salary?.message} />
+            <Input label={selectedDept === 'Internship' ? 'Monthly Base Salary (INR) (Optional)' : 'Monthly Base Salary (INR) *'} type="number" {...register('salary')} error={errors.salary?.message} />
           </div>
 
           <Textarea label="Residential Address *" {...register('address')} error={errors.address?.message} />

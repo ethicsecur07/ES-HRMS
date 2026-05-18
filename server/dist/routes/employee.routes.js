@@ -8,5 +8,5 @@ router.get('/', auth_middleware_js_1.authenticate, employee_controller_js_1.getE
 router.get('/:id', auth_middleware_js_1.authenticate, employee_controller_js_1.getEmployeeById);
 router.post('/', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), employee_controller_js_1.createEmployee);
 router.put('/:id', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), employee_controller_js_1.updateEmployee);
-router.delete('/:id', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN']), employee_controller_js_1.deleteEmployee);
+router.delete('/:id', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), employee_controller_js_1.deleteEmployee);
 exports.default = router;

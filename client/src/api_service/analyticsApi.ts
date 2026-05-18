@@ -3,7 +3,7 @@ import type { AuditLog, CompanySettings } from '../types';
 
 export const analyticsApi = {
   getDashboardStats: async () => {
-    const response = await axiosInstance.get('/analytics/dashboard');
+    const response = await axiosInstance.get('/analytics/dashboard-stats');
     return response.data;
   },
 
@@ -13,12 +13,12 @@ export const analyticsApi = {
   },
 
   getSettings: async () => {
-    const response = await axiosInstance.get<{ settings: CompanySettings }>('/settings');
-    return response.data.settings;
+    const response = await axiosInstance.get<{ settings?: CompanySettings } & CompanySettings>('/analytics/settings');
+    return response.data.settings || response.data;
   },
 
   updateSettings: async (data: Partial<CompanySettings>) => {
-    const response = await axiosInstance.put<{ settings: CompanySettings }>('/settings', data);
-    return response.data.settings;
+    const response = await axiosInstance.put<{ settings?: CompanySettings } & CompanySettings>('/analytics/settings', data);
+    return response.data.settings || response.data;
   },
 };

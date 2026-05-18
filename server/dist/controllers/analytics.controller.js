@@ -61,13 +61,17 @@ const getAuditLogs = async (req, res) => {
 };
 exports.getAuditLogs = getAuditLogs;
 const getSettings = async (req, res) => {
-    res.status(200).json({
-        companyName: 'EthicSec Enterprise',
-        adminEmail: 'admin@ethicsec.com',
+    const settingsData = {
+        companyName: 'EthicSecur SofTec',
+        adminEmail: 'Official@ethicsecur.com',
         monthlyLeaveLimit: 2,
         monthlyWFHLimit: 1,
         monthlyPermissionHours: 3,
-        officeWiFiIPs: ['192.168.1.50', '192.168.1.55', '127.0.0.1', '::1'],
+        officeWiFiIPs: ['192.168.29.50', '192.168.29.55', '127.0.0.1', '::1'],
+    };
+    res.status(200).json({
+        ...settingsData,
+        settings: settingsData,
     });
 };
 exports.getSettings = getSettings;
