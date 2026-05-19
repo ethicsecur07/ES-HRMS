@@ -23,7 +23,7 @@ const startServer = async () => {
     (0, socketHandler_js_1.initSockets)(server);
     (0, cronJobs_js_1.initCronJobs)();
     const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => {
+    server.listen(Number(PORT), '0.0.0.0', () => {
         logger_js_1.logger.info(`🚀 Enterprise HRMS Backend Server running on port ${PORT}`);
     });
     // Graceful shutdown handling

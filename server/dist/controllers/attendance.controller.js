@@ -34,7 +34,7 @@ const checkIn = async (req, res) => {
             res.status(400).json({ message: 'Attendance already recorded for today' });
             return;
         }
-        const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '192.168.29.50';
+        const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
         const ipAddress = Array.isArray(clientIP) ? clientIP[0] : clientIP;
         const isOfficeIP = ipAddress.includes('192.168.29.') || ipAddress === '127.0.0.1' || ipAddress === '::1';
         const now = new Date();
@@ -127,7 +127,7 @@ const checkOut = async (req, res) => {
 };
 exports.checkOut = checkOut;
 const verifyIP = async (req, res) => {
-    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '192.168.29.50';
+    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
     const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
     const isOfficeIP = ipString.includes('192.168.29.') || ipString === '127.0.0.1' || ipString === '::1';
     res.status(200).json({ isOfficeIP, currentIP: ipString });

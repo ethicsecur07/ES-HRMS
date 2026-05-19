@@ -4,20 +4,15 @@ import { Request, Response, NextFunction } from 'express';
 const OFFICE_IPS = ['192.168.29.', '127.0.0.1', '::1'];
 
 export const verifyOfficeIP = (req: Request, res: Response, next: NextFunction): void => {
-  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '192.168.29.50';
+  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
   const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
 
-  // Check if IP is in office list or if override exists
+  // Check if IP is in office list
   const isOffice = OFFICE_IPS.some((ip) => ipString.includes(ip));
 
-  if (!isOffice && !req.body.overrideReason) {
-    res.status(403).json({
-      success: false,
-      message: 'Access Denied: Attendance check-in is restricted to Office WiFi IP. Please provide approved WFH override justification.',
-      currentIP: ipString,
-    });
-    return;
-  }
+  // The application now allows all IP networks globally.
+  // The attendance controller will automatically mark non-office IPs as WFH.
+  // We no longer block access based on IP.
 
   next();
 };

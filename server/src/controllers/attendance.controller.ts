@@ -34,7 +34,7 @@ export const checkIn = async (req: AuthRequest, res: Response): Promise<void> =>
       return;
     }
 
-    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '192.168.29.50';
+    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
     const ipAddress = Array.isArray(clientIP) ? clientIP[0] : clientIP;
     const isOfficeIP = ipAddress.includes('192.168.29.') || ipAddress === '127.0.0.1' || ipAddress === '::1';
 
@@ -150,7 +150,7 @@ export const checkOut = async (req: AuthRequest, res: Response): Promise<void> =
 };
 
 export const verifyIP = async (req: Request, res: Response): Promise<void> => {
-  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '192.168.29.50';
+  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
   const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
   const isOfficeIP = ipString.includes('192.168.29.') || ipString === '127.0.0.1' || ipString === '::1';
 
