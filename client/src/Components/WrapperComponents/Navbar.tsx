@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Sun, Moon, LogOut, Menu } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { employeeApi } from '../../api_service/employeeApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -12,11 +14,25 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
-  const { user, role, logout } = useAuthStore();
+  const { user, role, logout, updateUser } = useAuthStore();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore();
   const { theme, toggleTheme } = useThemeStore();
   const [showNotifs, setShowNotifs] = useState(false);
   const navigate = useNavigate();
+
+  const { data: employeeData } = useQuery({
+    queryKey: ['employeeProfile', user?.employeeId],
+    queryFn: () => employeeApi.getById(user?.employeeId as string),
+    enabled: !!user?.employeeId,
+  });
+
+  React.useEffect(() => {
+    if (employeeData?.profileImage && employeeData.profileImage !== user?.profileImage) {
+      updateUser({ profileImage: employeeData.profileImage });
+    }
+  }, [employeeData?.profileImage, user?.profileImage, updateUser]);
+
+  const profileImg = user?.profileImage || employeeData?.profileImage;
 
   const roleColors: Record<Role, string> = {
     ADMIN: 'bg-primary/10 text-primary border-primary/20',
@@ -47,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   };
 
   return (
-    <header className="h-20 bg-card border-b border-border flex items-center justify-between px-4 sm:px-8 sticky top-0 z-20 backdrop-blur-md bg-opacity-95 dark:bg-opacity-90 shadow-sm lg:pl-72">
+    <header className="h-20 bg-card border-b border-border flex items-center justify-between px-4 sm:px-8 fixed top-0 left-0 right-0 lg:left-64 z-20 backdrop-blur-md bg-opacity-95 dark:bg-opacity-90 shadow-sm">
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Mobile Brand Display */}
         <div className="flex items-center gap-3 lg:hidden">
@@ -105,11 +121,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                       <div
                         key={n._id}
                         onClick={() => handleNotificationClick(n)}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
-                          n.read
-                            ? 'bg-background border-border text-muted-foreground'
-                            : 'bg-primary/5 border-primary/20 text-foreground shadow-sm hover:border-primary/40'
-                        }`}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${n.read
+                          ? 'bg-background border-border text-muted-foreground'
+                          : 'bg-primary/5 border-primary/20 text-foreground shadow-sm hover:border-primary/40'
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs font-bold uppercase tracking-wider text-primary">
@@ -136,8 +151,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
               className="relative group h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base shadow-md overflow-hidden flex-shrink-0 cursor-pointer"
               title="Click to view Profile Page"
             >
-              {user?.profileImage ? (
-                <img src={user.profileImage} alt={user?.name || 'Profile'} className="w-full h-full object-cover rounded-full" />
+              {profileImg ? (
+                <img src={profileImg} alt={user?.name || 'Profile'} className="w-full h-full object-cover rounded-full" />
               ) : (
                 user?.name?.charAt(0) || 'U'
               )}

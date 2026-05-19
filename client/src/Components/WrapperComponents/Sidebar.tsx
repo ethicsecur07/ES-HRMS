@@ -15,6 +15,8 @@ import {
   Moon,
   LogOut,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { employeeApi } from '../../api_service/employeeApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -32,6 +34,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { theme, toggleTheme } = useThemeStore();
   const [showNotifs, setShowNotifs] = useState(false);
   const navigate = useNavigate();
+
+  const { data: employeeData } = useQuery({
+    queryKey: ['employeeProfile', user?.employeeId],
+    queryFn: () => employeeApi.getById(user?.employeeId as string),
+    enabled: !!user?.employeeId,
+  });
+
+  const profileImg = user?.profileImage || employeeData?.profileImage;
 
   const roleColors: Record<Role, string> = {
     ADMIN: 'bg-primary/10 text-primary border-primary/20',
@@ -85,9 +95,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         />
       )}
       <aside
-        className={`w-64 bg-card border-l lg:border-l-0 lg:border-r border-border flex flex-col h-screen fixed right-0 lg:right-auto lg:left-0 top-0 z-40 shadow-2xl lg:shadow-sm backdrop-blur-md bg-opacity-95 dark:bg-opacity-90 transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
-        }`}
+        className={`w-64 bg-card border-l lg:border-l-0 lg:border-r border-border flex flex-col min-h-screen lg:h-screen fixed right-0 lg:right-auto lg:left-0 top-0 z-40 shadow-2xl lg:shadow-sm backdrop-blur-md bg-opacity-95 dark:bg-opacity-90 transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+          }`}
       >
         <div className="hidden lg:flex p-5 border-b border-border items-center gap-3">
           <img src={ESLogo} alt="EthicSec Logo" className="h-10 w-10 object-contain drop-shadow-md flex-shrink-0" />
@@ -105,8 +114,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               className="relative group h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-base shadow-md overflow-hidden flex-shrink-0 cursor-pointer"
               title="Click to view Profile Page"
             >
-              {user?.profileImage ? (
-                <img src={user.profileImage} alt={user?.name || 'Profile'} className="w-full h-full object-cover rounded-full" />
+              {profileImg ? (
+                <img src={profileImg} alt={user?.name || 'Profile'} className="w-full h-full object-cover rounded-full" />
               ) : (
                 user?.name?.charAt(0) || 'U'
               )}
@@ -174,11 +183,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         <div
                           key={n._id}
                           onClick={() => handleNotificationClick(n)}
-                          className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
-                            n.read
+                          className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${n.read
                               ? 'bg-background border-border text-muted-foreground'
                               : 'bg-primary/5 border-primary/20 text-foreground shadow-sm hover:border-primary/40'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-bold uppercase tracking-wider text-primary">
@@ -209,10 +217,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 to={item.path}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  `flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${isActive
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`
                 }
               >

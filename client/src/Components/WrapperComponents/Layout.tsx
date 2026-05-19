@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import { useQuery } from '@tanstack/react-query';
+import { leaveApi } from '../../api_service/leaveApi';
+import { wfhApi } from '../../api_service/wfhApi';
+import { permissionApi } from '../../api_service/permissionApi';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -8,9 +12,60 @@ import { useNotificationStore } from '../../store/useNotificationStore';
 import { X } from 'lucide-react';
 
 export const Layout: React.FC = () => {
-  const { toasts, removeToast } = useNotificationStore();
+  const { toasts, removeToast, addNotification } = useNotificationStore();
   const { role, user } = useAuthStore();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Fetch pending requests for HR/Admin to populate notifications on load
+  const isPrivileged = role === 'ADMIN' || role === 'HR';
+  const { data: leaves } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll, enabled: isPrivileged });
+  const { data: wfh } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll, enabled: isPrivileged });
+  const { data: perms } = useQuery({ queryKey: ['permissions'], queryFn: permissionApi.getAll, enabled: isPrivileged });
+  
+  const injectedNotifs = React.useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!isPrivileged) return;
+
+    leaves?.filter(l => l.status === 'PENDING').forEach(l => {
+      const uniqueId = `leave-${l._id}`;
+      if (!injectedNotifs.current.has(uniqueId)) {
+        addNotification({
+          recipientId: role,
+          title: 'New Leave Request',
+          message: `Pending request for ${l.leaveType}.`,
+          type: 'LEAVE',
+        });
+        injectedNotifs.current.add(uniqueId);
+      }
+    });
+
+    wfh?.filter(w => w.status === 'PENDING').forEach(w => {
+      const uniqueId = `wfh-${w._id}`;
+      if (!injectedNotifs.current.has(uniqueId)) {
+        addNotification({
+          recipientId: role,
+          title: 'New WFH Request',
+          message: `Pending WFH request for ${w.startDate}.`,
+          type: 'WFH',
+        });
+        injectedNotifs.current.add(uniqueId);
+      }
+    });
+
+    perms?.filter(p => p.approvalStatus === 'PENDING').forEach(p => {
+      const uniqueId = `perm-${p._id}`;
+      if (!injectedNotifs.current.has(uniqueId)) {
+        addNotification({
+          recipientId: role,
+          title: 'New Permission Request',
+          message: `Pending Permission Hours for ${p.date}.`,
+          type: 'PERMISSION',
+        });
+        injectedNotifs.current.add(uniqueId);
+      }
+    });
+  }, [leaves, wfh, perms, isPrivileged, addNotification, role]);
 
   // Socket.io client-side integration for real-time notifications & live updates
   useEffect(() => {
@@ -47,7 +102,7 @@ export const Layout: React.FC = () => {
         recipientId: data.recipientId || 'all',
         title: data.title || 'System Notification',
         message: data.message || '',
-        type: (data.type as any) || 'GENERAL',
+        type: (data.type as 'LEAVE' | 'WFH' | 'ATTENDANCE' | 'PAYROLL' | 'ANNOUNCEMENT' | 'PERMISSION' | 'GENERAL') || 'GENERAL',
       });
     });
 
@@ -60,10 +115,10 @@ export const Layout: React.FC = () => {
     <div className="flex min-h-screen w-full bg-background text-foreground overflow-x-hidden">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-64 pt-20">
         <Navbar onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-        <main className="flex-1 p-4 sm:p-8 lg:ml-64 max-w-[1600px] w-full mx-auto animate-in fade-in duration-300">
+        <main className="flex-1 p-4 sm:p-8 max-w-[1600px] w-full mx-auto animate-in fade-in duration-300">
           <Outlet />
         </main>
       </div>

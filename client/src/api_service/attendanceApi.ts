@@ -12,7 +12,7 @@ export const attendanceApi = {
     return response.data.attendances;
   },
 
-  checkIn: async (data: { employeeId: string; ipAddress: string; deviceInfo: string; overrideReason?: string }) => {
+  checkIn: async (data: { employeeId: string; ipAddress?: string; deviceInfo: string; overrideReason?: string }) => {
     const response = await axiosInstance.post<{ attendance: Attendance }>('/attendance/checkin', data);
     return response.data.attendance;
   },

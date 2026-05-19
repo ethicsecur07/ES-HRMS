@@ -99,11 +99,18 @@ export const AttendancePage: React.FC = () => {
       header: 'Employee',
       accessor: (row: Attendance) => {
         const emp = employees?.find((e) => e._id === (row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId._id : row.employeeId) : ''));
+        const fullName = emp?.fullName || 'Logapriyan M';
         return (
           <div className="flex items-center gap-3">
-            <img src={emp?.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+            {emp?.profileImage ? (
+              <img src={emp.profileImage} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0 uppercase">
+                {fullName.charAt(0)}
+              </div>
+            )}
             <div>
-              <p className="font-bold text-xs text-foreground">{emp?.fullName || 'Logapriyan M'}</p>
+              <p className="font-bold text-xs text-foreground">{fullName}</p>
               <p className="text-[10px] text-muted-foreground font-mono">({emp?.employeeCode || 'DEV-001'})</p>
             </div>
           </div>

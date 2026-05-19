@@ -5,10 +5,9 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { Card } from '../WrapperComponents/Card';
 import { Button } from '../WrapperComponents/Button';
-import { Input } from '../WrapperComponents/Input';
 import { Modal } from '../WrapperComponents/Modal';
 import { TaskReportForm } from './TaskReportForm';
-import { Wifi, Clock, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Clock, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export const AttendanceCheckIn: React.FC = () => {
   const { user } = useAuthStore();
@@ -16,8 +15,6 @@ export const AttendanceCheckIn: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showOverrideModal, setShowOverrideModal] = useState(false);
-  const [overrideReason, setOverrideReason] = useState('');
   const [showTaskModal, setShowTaskModal] = useState(false);
 
   useEffect(() => {
@@ -25,10 +22,6 @@ export const AttendanceCheckIn: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const { data: ipData, isLoading: ipLoading } = useQuery({
-    queryKey: ['verifyIP'],
-    queryFn: attendanceApi.verifyOfficeIP,
-  });
 
   const { data: todayAttendance, isLoading: attLoading } = useQuery({
     queryKey: ['todayAttendance'],
@@ -48,40 +41,24 @@ export const AttendanceCheckIn: React.FC = () => {
     mutationFn: (override?: string) =>
       attendanceApi.checkIn({
         employeeId: user?.employeeId || user?._id || 'emp-dev-001',
-        ipAddress: ipData?.currentIP || '192.168.29.50',
         deviceInfo: navigator.userAgent,
         overrideReason: override,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todayAttendance'] });
       addToast('Check-In Successful', 'Your attendance has been recorded for today.', 'success');
-      setShowOverrideModal(false);
-      setOverrideReason('');
     },
-    onError: (error: any) => {
-      const msg = error.response?.data?.message || 'Please verify your office IP or apply for WFH override.';
+    onError: (error: Error & { response?: { data?: { message?: string } } }) => {
+      const msg = error.response?.data?.message || 'Check-in failed. Please try again.';
       addToast('Check-In Failed', msg, 'error');
     },
   });
 
   const handleCheckInClick = () => {
-    if (ipData?.isOfficeIP) {
-      checkInMutation.mutate(undefined);
-    } else {
-      setShowOverrideModal(true);
-    }
+    checkInMutation.mutate(undefined);
   };
 
-  const handleOverrideSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!overrideReason.trim()) {
-      addToast('Error', 'Override reason is mandatory', 'error');
-      return;
-    }
-    checkInMutation.mutate(overrideReason);
-  };
-
-  if (ipLoading || attLoading) {
+  if (attLoading) {
     return (
       <Card className="animate-pulse h-48 bg-muted/20">
         <div />
@@ -97,11 +74,6 @@ export const AttendanceCheckIn: React.FC = () => {
 
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
         <div className="space-y-3 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted text-xs font-semibold text-muted-foreground border border-border">
-            <Wifi className={`w-3.5 h-3.5 ${ipData?.isOfficeIP ? 'text-primary' : 'text-muted-foreground'}`} />
-            <span>IP Status: {ipData?.isOfficeIP ? 'Office Network Verified' : 'Outside Office IP'}</span>
-            <span className="text-[10px] font-mono text-muted-foreground/80">({ipData?.currentIP})</span>
-          </div>
 
           <div>
             <h2 className="text-3xl font-extrabold text-foreground tracking-tight">
@@ -158,41 +130,6 @@ export const AttendanceCheckIn: React.FC = () => {
         </div>
       </div>
 
-      {/* Override WFH Modal */}
-      <Modal
-        isOpen={showOverrideModal}
-        onClose={() => setShowOverrideModal(false)}
-        title="Remote IP Attendance Override"
-      >
-        <form onSubmit={handleOverrideSubmit} className="space-y-4 text-left">
-          <div className="p-4 rounded-xl bg-foreground/10 border border-border flex items-start gap-3 text-foreground text-sm">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-primary" />
-            <div>
-              <p className="font-bold">Outside Office IP Detected</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                You are logging in from an external IP ({ipData?.currentIP}). Please provide your approved WFH reason or override justification.
-              </p>
-            </div>
-          </div>
-
-          <Input
-            label="Override Justification / WFH Approval Ref"
-            placeholder="e.g. Approved WFH by HR Sarah / Client visit at location"
-            value={overrideReason}
-            onChange={(e) => setOverrideReason(e.target.value)}
-            required
-          />
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" type="button" onClick={() => setShowOverrideModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={checkInMutation.isPending}>
-              Submit & Check In
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Task Report Modal before Checkout */}
       <Modal

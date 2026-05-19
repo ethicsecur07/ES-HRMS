@@ -66,21 +66,17 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="space-y-8 text-left animate-in fade-in duration-300">
       {/* Dynamic Header Banner */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-card to-muted border border-border shadow-sm">
-        <div>
-          <h2 className="text-3xl font-extrabold text-foreground tracking-tight">
-            {role === 'ADMIN' ? 'Admin Analytics Portal' : role === 'HR' ? 'HR Management Dashboard' : 'Employee Workspace'}
-          </h2>
-          <p className="text-xs text-muted-foreground mt-1 font-medium">
-            {role === 'ADMIN'
-              ? 'Complete company overview, payroll cost analysis, and productivity trends'
-              : role === 'HR'
-              ? 'Workforce attendance tracking, approval queues, and daily productivity reports'
-              : 'Daily attendance check-in, leave balances, and mandatory task reporting'}
-          </p>
-        </div>
+      {role === 'EMPLOYEE' && (
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-card to-muted border border-border shadow-sm">
+          <div>
+            <h2 className="text-3xl font-extrabold text-foreground tracking-tight">
+              Employee Workspace
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1 font-medium">
+              Daily attendance check-in, leave balances, and mandatory task reporting
+            </p>
+          </div>
 
-        {role === 'EMPLOYEE' && (
           <Button
             onClick={() => setShowLeaveModal(true)}
             className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all scale-105"
@@ -88,19 +84,8 @@ export const DashboardPage: React.FC = () => {
             <PlusCircle className="w-5 h-5 mr-2" />
             APPLY LEAVE / WFH
           </Button>
-        )}
-
-        {(role === 'HR' || role === 'ADMIN') && (
-          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-            <Button variant="outline" size="sm" className="rounded-full w-10 h-10 p-0 border-border bg-card shadow-sm hover:bg-muted flex items-center justify-center">
-              <Bell className="w-4 h-4 text-foreground" />
-            </Button>
-            <Button className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all">
-              Generate Report
-            </Button>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 1. EMPLOYEE DASHBOARD */}
       {role === 'EMPLOYEE' && (

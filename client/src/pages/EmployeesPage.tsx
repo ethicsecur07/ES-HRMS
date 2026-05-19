@@ -192,11 +192,21 @@ export const EmployeesPage: React.FC = () => {
     {
       header: 'Employee',
       accessor: (row: Employee) => (
-        <div className="flex items-center gap-3">
-          <img src={row.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="" className="w-10 h-10 rounded-xl object-cover border border-border" />
+        <div 
+          onClick={() => navigate(`/employees/${row._id}`)}
+          className="flex items-center gap-3 cursor-pointer group"
+          title="Click to view Employee Details"
+        >
+          {row.profileImage ? (
+            <img src={row.profileImage} alt="" className="w-10 h-10 rounded-xl object-cover border border-border flex-shrink-0 group-hover:border-primary transition-colors" />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0 uppercase group-hover:border-primary transition-colors">
+              {row.fullName.charAt(0)}
+            </div>
+          )}
           <div>
-            <p className="font-bold text-xs text-foreground">{row.fullName}</p>
-            <p className="text-[10px] text-muted-foreground font-mono">{row.employeeCode} | {row.email}</p>
+            <p className="font-bold text-xs text-foreground group-hover:text-primary transition-colors">{row.fullName}</p>
+            <p className="text-[10px] text-muted-foreground font-mono group-hover:text-foreground transition-colors">{row.employeeCode} | {row.email}</p>
           </div>
         </div>
       ),
