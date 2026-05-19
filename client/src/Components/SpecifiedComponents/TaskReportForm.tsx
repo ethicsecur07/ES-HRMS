@@ -12,11 +12,11 @@ import { Textarea } from '../WrapperComponents/Input';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 const taskSchema = z.object({
-  inProgressTasks: z.string().min(5, 'Please elaborate on your in-progress tasks.'),
+  inProgressTasks: z.string().optional(),
   completedTasks: z.string().min(5, 'Please list what you completed today.'),
-  pendingTasks: z.string().min(5, 'Please specify pending tasks.'),
-  blockers: z.string().min(2, 'Specify None if no blockers.'),
-  tomorrowPlan: z.string().min(5, 'Please outline your plan for tomorrow.'),
+  pendingTasks: z.string().optional(),
+  blockers: z.string().optional(),
+  tomorrowPlan: z.string().optional(),
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
@@ -40,7 +40,7 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
       inProgressTasks: '',
       completedTasks: '',
       pendingTasks: '',
-      blockers: 'None',
+      blockers: '',
       tomorrowPlan: '',
     },
   });
@@ -76,10 +76,10 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 space-x-1 text-left">
       <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-3 text-primary text-xs font-semibold">
         <AlertCircle className="w-4 h-4 flex-shrink-0" />
-        <span>Submitting your daily task report is mandatory before checking out.</span>
+        <span>Submitting your daily task report is mandatory before checking out. Only Completed Tasks is required.</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -91,21 +91,21 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
         />
 
         <Textarea
-          label="In Progress Tasks *"
+          label="In Progress Tasks (Optional)"
           placeholder="Tasks currently in progress..."
           {...register('inProgressTasks')}
           error={errors.inProgressTasks?.message}
         />
 
         <Textarea
-          label="Pending Tasks *"
+          label="Pending Tasks (Optional)"
           placeholder="Tasks yet to be started..."
           {...register('pendingTasks')}
           error={errors.pendingTasks?.message}
         />
 
         <Textarea
-          label="Plan for Tomorrow *"
+          label="Plan for Tomorrow (Optional)"
           placeholder="Outline what you will work on tomorrow..."
           {...register('tomorrowPlan')}
           error={errors.tomorrowPlan?.message}
@@ -113,7 +113,7 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
       </div>
 
       <Textarea
-        label="Issues / Blockers *"
+        label="Issues / Blockers (Optional)"
         placeholder="Mention any dependencies or roadblocks (or write None)..."
         {...register('blockers')}
         error={errors.blockers?.message}

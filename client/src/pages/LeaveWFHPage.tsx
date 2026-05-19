@@ -114,7 +114,13 @@ export const LeaveWFHPage: React.FC = () => {
         const empObj = typeof row.employeeId === 'object' ? row.employeeId : null;
         return (
           <div className="flex items-center gap-3">
-            <img src={empObj?.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+            {empObj?.profileImage ? (
+              <img src={empObj.profileImage} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0 uppercase">
+                {(empObj?.fullName || 'Logapriyan M').charAt(0)}
+              </div>
+            )}
             <span className="font-bold text-xs">{empObj?.fullName || 'Logapriyan M'}</span>
           </div>
         );
@@ -171,7 +177,13 @@ export const LeaveWFHPage: React.FC = () => {
         const empObj = typeof row.employeeId === 'object' ? row.employeeId : null;
         return (
           <div className="flex items-center gap-3">
-            <img src={empObj?.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+            {empObj?.profileImage ? (
+              <img src={empObj.profileImage} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0 uppercase">
+                {(empObj?.fullName || 'Vikram Mehta').charAt(0)}
+              </div>
+            )}
             <span className="font-bold text-xs">{empObj?.fullName || 'Vikram Mehta'}</span>
           </div>
         );
@@ -219,7 +231,13 @@ export const LeaveWFHPage: React.FC = () => {
         const empObj = typeof row.employeeId === 'object' ? row.employeeId : null;
         return (
           <div className="flex items-center gap-3">
-            <img src={empObj?.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+            {empObj?.profileImage ? (
+              <img src={empObj.profileImage} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0 uppercase">
+                {(empObj?.fullName || 'Ravi Kumar').charAt(0)}
+              </div>
+            )}
             <span className="font-bold text-xs">{empObj?.fullName || 'Ravi Kumar'}</span>
           </div>
         );

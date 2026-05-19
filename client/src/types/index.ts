@@ -115,7 +115,7 @@ export interface NotificationItem {
   recipientId: string;
   title: string;
   message: string;
-  type: 'LEAVE' | 'WFH' | 'ATTENDANCE' | 'PAYROLL' | 'ANNOUNCEMENT';
+  type: 'LEAVE' | 'WFH' | 'ATTENDANCE' | 'PAYROLL' | 'ANNOUNCEMENT' | 'PERMISSION' | 'GENERAL';
   read: boolean;
   createdAt: string;
 }

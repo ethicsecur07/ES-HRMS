@@ -3,7 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updatePermissionStatus = exports.getPermissions = exports.applyPermission = void 0;
 const Permission_js_1 = require("../models/Permission.js");
 const Employee_js_1 = require("../models/Employee.js");
+const User_js_1 = require("../models/User.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
+const socketHandler_js_1 = require("../sockets/socketHandler.js");
 const applyPermission = async (req, res) => {
     const { employeeId, date, startTime, endTime, totalHours, reason } = req.body;
     try {
@@ -16,6 +18,17 @@ const applyPermission = async (req, res) => {
             reason,
         });
         await (0, auditLog_service_js_1.createAuditLog)('PERMISSION_APPLY', req.user?.email || 'Employee', 'PERMISSION', perm.id, `Requested ${totalHours} hrs permission on ${date}`);
+        const io = (0, socketHandler_js_1.getIO)();
+        if (io) {
+            const notifData = {
+                title: 'New Permission Request',
+                message: `Employee requested ${totalHours} hrs permission on ${date}.`,
+                type: 'PERMISSION',
+                recipientId: 'admin-hr',
+            };
+            io.to('ADMIN').emit('receive_notification', notifData);
+            io.to('HR').emit('receive_notification', notifData);
+        }
         res.status(201).json({ permissionRequest: perm });
     }
     catch (error) {
@@ -46,6 +59,20 @@ const updatePermissionStatus = async (req, res) => {
             await Employee_js_1.Employee.findByIdAndUpdate(perm.employeeId, { $inc: { permissionHoursBalance: -perm.totalHours } });
         }
         await (0, auditLog_service_js_1.createAuditLog)('PERMISSION_STATUS_UPDATE', req.user?.email || 'HR/Admin', 'PERMISSION', perm.id, `Updated permission status to ${status}`);
+        const io = (0, socketHandler_js_1.getIO)();
+        if (io) {
+            const empUser = await User_js_1.User.findOne({ employeeId: perm.employeeId });
+            const notifData = {
+                title: `Permission Request ${status}`,
+                message: `Your permission request for ${perm.date} (${perm.totalHours} hrs) has been ${status.toLowerCase()}.`,
+                type: 'PERMISSION',
+                recipientId: empUser ? empUser.id : 'employee',
+            };
+            if (empUser) {
+                io.to(empUser.id).emit('receive_notification', notifData);
+            }
+            io.to('EMPLOYEE').emit('receive_notification', notifData);
+        }
         res.status(200).json({ permissionRequest: perm });
     }
     catch (error) {

@@ -6,6 +6,13 @@ const Attendance_js_1 = require("../models/Attendance.js");
 const Leave_js_1 = require("../models/Leave.js");
 const Payroll_js_1 = require("../models/Payroll.js");
 const AuditLog_js_1 = require("../models/AuditLog.js");
+const TaskReport_js_1 = require("../models/TaskReport.js");
+const index_js_1 = require("../constants/index.js");
+const countTasks = (text) => {
+    if (!text || text.trim() === '' || text.trim().toLowerCase() === 'none' || text.trim().toLowerCase() === 'n/a' || text.trim() === '-')
+        return 0;
+    return text.split(/[\n,;]+/).filter(item => item.trim().length > 0).length;
+};
 const getDashboardStats = async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
@@ -19,21 +26,56 @@ const getDashboardStats = async (req, res) => {
             { $match: { month: currentMonth } },
             { $group: { _id: null, totalCost: { $sum: '$finalSalary' } } },
         ]);
-        const monthlyPayrollCost = payrollResult[0]?.totalCost || 415000;
-        // Simulated weekly trend for robust chart rendering
-        const attendanceTrends = [
-            { date: 'Mon', present: 10, wfh: 2 },
-            { date: 'Tue', present: 11, wfh: 1 },
-            { date: 'Wed', present: 9, wfh: 3 },
-            { date: 'Thu', present: 12, wfh: 0 },
-            { date: 'Fri', present: 10, wfh: 2 },
-        ];
-        const departmentBreakdown = [
-            { name: 'Developers', count: 6, avgProductivity: 94 },
-            { name: 'Designers', count: 3, avgProductivity: 89 },
-            { name: 'BDE', count: 2, avgProductivity: 92 },
-            { name: 'DME', count: 1, avgProductivity: 90 },
-        ];
+        const monthlyPayrollCost = payrollResult[0]?.totalCost || 0;
+        // Calculate real weekly trend from DB (last 6 days)
+        const last6DaysStr = [];
+        const attendanceTrends = [];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+            last6DaysStr.push({ dateStr, dayName });
+        }
+        const recentAttendance = await Attendance_js_1.Attendance.find({ date: { $in: last6DaysStr.map(d => d.dateStr) } });
+        for (const { dateStr, dayName } of last6DaysStr) {
+            const present = recentAttendance.filter(a => a.date === dateStr && a.status === 'OFFICE').length;
+            const wfh = recentAttendance.filter(a => a.date === dateStr && a.status === 'WFH').length;
+            attendanceTrends.push({ date: dayName, present, wfh });
+        }
+        // Calculate Department Productivity & Overall Productivity using ONLY DB Data
+        const activeEmployees = await Employee_js_1.Employee.find({ isActive: true });
+        const allTaskReports = await TaskReport_js_1.TaskReport.find();
+        let totalCompanyEfficiencySum = 0;
+        let totalCompanyReportsCount = 0;
+        const targetDepartments = [index_js_1.DEPARTMENTS.DEV, index_js_1.DEPARTMENTS.DES, index_js_1.DEPARTMENTS.BDE, index_js_1.DEPARTMENTS.DME];
+        const departmentBreakdown = targetDepartments.map((deptName) => {
+            // Find active employees in this department
+            const deptEmployees = activeEmployees.filter(emp => emp.department === deptName);
+            const deptEmployeeIds = deptEmployees.map(emp => emp._id.toString());
+            // Find task reports submitted by employees in this department
+            const deptReports = allTaskReports.filter(report => deptEmployeeIds.includes(report.employeeId.toString()));
+            let deptEfficiencySum = 0;
+            deptReports.forEach(report => {
+                const completed = countTasks(report.completedTasks);
+                const inProgress = countTasks(report.inProgressTasks);
+                const pending = countTasks(report.pendingTasks);
+                const total = completed + inProgress + pending;
+                const efficiency = total > 0 ? (completed / total) * 100 : 0;
+                deptEfficiencySum += efficiency;
+                totalCompanyEfficiencySum += efficiency;
+                totalCompanyReportsCount += 1;
+            });
+            const avgProductivity = deptReports.length > 0 ? Math.round(deptEfficiencySum / deptReports.length) : 0;
+            return {
+                name: deptName,
+                count: deptEmployees.length,
+                avgProductivity,
+            };
+        });
+        const overallProductivity = totalCompanyReportsCount > 0
+            ? Math.round((totalCompanyEfficiencySum / totalCompanyReportsCount) * 10) / 10
+            : 0;
         res.status(200).json({
             totalEmployees,
             presentToday,
@@ -43,6 +85,7 @@ const getDashboardStats = async (req, res) => {
             monthlyPayrollCost,
             attendanceTrends,
             departmentBreakdown,
+            overallProductivity,
         });
     }
     catch (error) {

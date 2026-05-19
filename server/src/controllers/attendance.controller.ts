@@ -24,7 +24,7 @@ export const getAllAttendance = async (req: Request, res: Response): Promise<voi
 };
 
 export const checkIn = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { employeeId, ipAddress, deviceInfo, overrideReason } = req.body;
+  const { employeeId, deviceInfo, overrideReason } = req.body;
   const today = new Date().toISOString().split('T')[0];
 
   try {
@@ -34,9 +34,13 @@ export const checkIn = async (req: AuthRequest, res: Response): Promise<void> =>
       return;
     }
 
+    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '192.168.29.50';
+    const ipAddress = Array.isArray(clientIP) ? clientIP[0] : clientIP;
+    const isOfficeIP = ipAddress.includes('192.168.29.') || ipAddress === '127.0.0.1' || ipAddress === '::1';
+
     const now = new Date();
     let loginTime = now;
-    let status = overrideReason ? 'WFH' : 'OFFICE';
+    let status = isOfficeIP ? 'OFFICE' : 'WFH';
     let isLate = false;
     let casualLeaveNote = '';
 
@@ -57,8 +61,6 @@ export const checkIn = async (req: AuthRequest, res: Response): Promise<void> =>
         await emp.save();
       }
     }
-
-    const isOfficeIP = ipAddress.startsWith('192.168.29.');
 
     const attendance = await Attendance.create({
       employeeId,

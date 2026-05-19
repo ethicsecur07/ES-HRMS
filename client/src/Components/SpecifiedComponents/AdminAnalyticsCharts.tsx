@@ -4,29 +4,26 @@ import { Users, TrendingUp, CheckCircle, DollarSign, Moon, Clock } from 'lucide-
 import { formatCurrency } from '../../utils/formatters';
 
 interface AdminAnalyticsChartsProps {
-  stats: any;
+  stats: {
+    totalEmployees?: number;
+    presentToday?: number;
+    wfhToday?: number;
+    absentToday?: number;
+    pendingApprovals?: number;
+    monthlyPayrollCost?: number;
+    overallProductivity?: number;
+    attendanceTrends?: Array<{ date?: string; day?: string; present: number; wfh: number }>;
+    departmentBreakdown?: Array<{ name: string; avgProductivity: number; count: number }>;
+  };
 }
 
 export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stats }) => {
   if (!stats) return null;
 
-  const defaultTrends = [
-    { day: 'Mon', present: 8, wfh: 2 },
-    { day: 'Tue', present: 9, wfh: 1 },
-    { day: 'Wed', present: 7, wfh: 3 },
-    { day: 'Thu', present: 10, wfh: 0 },
-    { day: 'Fri', present: 8, wfh: 2 },
-  ];
-  const trendsData = stats.attendanceTrends?.length ? stats.attendanceTrends : defaultTrends;
-  const maxPresent = Math.max(...trendsData.map((t: any) => t.present + t.wfh), 12);
+  const trendsData = stats.attendanceTrends || [];
+  const maxPresent = Math.max(...trendsData.map((t: { present: number; wfh: number }) => t.present + t.wfh), 12);
 
-  const defaultDepts = [
-    { name: 'Developers', avgProductivity: 94, count: 6 },
-    { name: 'Designers', avgProductivity: 89, count: 3 },
-    { name: 'BDE', avgProductivity: 92, count: 2 },
-    { name: 'DME', avgProductivity: 90, count: 1 },
-  ];
-  const deptsData = stats.departmentBreakdown?.length ? stats.departmentBreakdown : defaultDepts;
+  const deptsData = stats.departmentBreakdown || [];
 
   return (
     <div className="space-y-6 text-left">
@@ -37,7 +34,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
               Total Workforce
             </p>
-            <h3 className="text-3xl font-extrabold text-foreground">{stats.totalEmployees || 1}</h3>
+            <h3 className="text-3xl font-extrabold text-foreground">{stats.totalEmployees ?? 0}</h3>
             <p className="text-xs text-primary font-bold mt-2 flex items-center gap-1">
               <TrendingUp className="w-3.5 h-3.5" /> 100% Active Staff
             </p>
@@ -52,9 +49,9 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
               Present Today
             </p>
-            <h3 className="text-3xl font-extrabold text-foreground">{stats.presentToday || 2}</h3>
+            <h3 className="text-3xl font-extrabold text-foreground">{stats.presentToday ?? 0}</h3>
             <p className="text-xs text-muted-foreground font-medium mt-2">
-              Including {stats.wfhToday || 1} WFH Staff
+              Including {stats.wfhToday ?? 0} WFH Staff
             </p>
           </div>
           <div className="p-4 rounded-2xl bg-foreground/10 text-foreground">
@@ -67,9 +64,9 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
               Leave / Absence
             </p>
-            <h3 className="text-3xl font-extrabold text-foreground">{stats.absentToday || 0}</h3>
+            <h3 className="text-3xl font-extrabold text-foreground">{stats.absentToday ?? 0}</h3>
             <p className="text-xs text-primary font-bold mt-2 flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" /> {stats.pendingApprovals || 1} Pending Request
+              <Clock className="w-3.5 h-3.5" /> {stats.pendingApprovals ?? 0} Pending Request
             </p>
           </div>
           <div className="p-4 rounded-2xl bg-foreground/10 text-foreground">
@@ -83,7 +80,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
               Monthly Payroll Cost
             </p>
             <h3 className="text-3xl font-extrabold text-foreground font-mono">
-              {formatCurrency(stats.monthlyPayrollCost || 100000)}
+              {formatCurrency(stats.monthlyPayrollCost ?? 0)}
             </h3>
             <p className="text-xs text-muted-foreground font-medium mt-2">Status: Disbursed & Processing</p>
           </div>
@@ -120,7 +117,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
           </div>
 
           <div className="flex items-end justify-between gap-6 pt-8 pb-4 h-64 px-4 my-auto">
-            {trendsData.map((trend: any, idx: number) => {
+            {trendsData.map((trend: { date?: string; day?: string; present: number; wfh: number }, idx: number) => {
               const total = trend.present + trend.wfh;
               const heightPct = Math.min(100, Math.max(15, (total / maxPresent) * 100));
 
@@ -168,13 +165,13 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
               </p>
             </div>
             <span className="px-3 py-1 bg-muted text-foreground text-xs font-bold rounded-lg border border-border">
-              Overall: 91.2%
+              Overall: {stats.overallProductivity ?? 0}%
             </span>
           </div>
 
           {/* 2x2 Grid of Departments */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-auto py-6">
-            {deptsData.map((dept: any, idx: number) => (
+            {deptsData.map((dept: { name: string; avgProductivity: number; count: number }, idx: number) => (
               <div key={idx} className="space-y-2">
                 <div className="flex justify-between items-center text-sm font-bold">
                   <span className="text-foreground">{dept.name}</span>

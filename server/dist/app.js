@@ -32,6 +32,15 @@ const createApp = () => {
     app.use((0, cookie_parser_1.default)());
     app.use((0, morgan_1.default)('dev'));
     app.use(rateLimiter_js_1.apiRateLimiter);
+    // Disable ETags and Browser Caching to ensure fresh 200 OK responses
+    app.set('etag', false);
+    app.use((req, res, next) => {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+        res.set('Surrogate-Control', 'no-store');
+        next();
+    });
     // API Routes
     app.use('/api/auth', auth_routes_js_1.default);
     app.use('/api/employees', employee_routes_js_1.default);

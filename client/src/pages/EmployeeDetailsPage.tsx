@@ -228,7 +228,13 @@ export const EmployeeDetailsPage: React.FC = () => {
             <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
           </Button>
           <div className="flex items-center gap-3">
-            <img src={employee.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="" className="w-12 h-12 rounded-xl object-cover border border-border" />
+            {employee.profileImage ? (
+              <img src={employee.profileImage} alt="" className="w-12 h-12 rounded-xl object-cover border border-border flex-shrink-0" />
+            ) : (
+              <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xl flex-shrink-0 uppercase">
+                {employee.fullName.charAt(0)}
+              </div>
+            )}
             <div>
               <h2 className="text-2xl font-bold text-foreground tracking-tight">{employee.fullName}</h2>
               <p className="text-xs text-muted-foreground font-mono">{employee.employeeCode} | {employee.designation}</p>
