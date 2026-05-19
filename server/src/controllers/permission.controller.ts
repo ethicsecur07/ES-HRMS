@@ -7,9 +7,29 @@ import { getIO } from '../sockets/socketHandler.js';
 import { AuthRequest } from '../types/index.js';
 
 export const applyPermission = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { employeeId, date, startTime, endTime, totalHours, reason } = req.body;
+  let employeeId = req.body.employeeId;
+  const { date, startTime, endTime, totalHours, reason } = req.body;
 
   try {
+    if (req.user) {
+      const user = await User.findById(req.user.id);
+      if (user && user.role === 'EMPLOYEE') {
+        if (user.employeeId) {
+          employeeId = user.employeeId;
+        } else {
+          const employee = await Employee.findOne({ email: user.email });
+          if (employee) {
+            employeeId = employee._id;
+          }
+        }
+      }
+    }
+
+    if (!employeeId) {
+      res.status(400).json({ message: 'Employee profile not found for this user.' });
+      return;
+    }
+
     const perm = await Permission.create({
       employeeId,
       date,
@@ -30,6 +50,7 @@ export const applyPermission = async (req: AuthRequest, res: Response): Promise<
     const io = getIO();
     if (io) {
       const notifData = {
+        _id: `perm-pending-${perm.id}`,
         title: 'New Permission Request',
         message: `Employee requested ${totalHours} hrs permission on ${date}.`,
         type: 'PERMISSION',
@@ -47,7 +68,27 @@ export const applyPermission = async (req: AuthRequest, res: Response): Promise<
 
 export const getPermissions = async (req: Request, res: Response): Promise<void> => {
   try {
-    const permissions = await Permission.find().populate('employeeId').sort({ createdAt: -1 });
+    const authReq = req as AuthRequest;
+    let query: any = {};
+
+    if (authReq.user && authReq.user.role === 'EMPLOYEE') {
+      const user = await User.findById(authReq.user.id);
+      let employeeId = user?.employeeId;
+      if (user && !employeeId) {
+        const employee = await Employee.findOne({ email: user.email });
+        if (employee) {
+          employeeId = employee._id;
+        }
+      }
+      if (employeeId) {
+        query.employeeId = employeeId;
+      } else {
+        res.status(200).json({ permissions: [], permissionRequests: [] });
+        return;
+      }
+    }
+
+    const permissions = await Permission.find(query).populate('employeeId').sort({ createdAt: -1 });
     res.status(200).json({ permissions, permissionRequests: permissions });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -84,8 +125,10 @@ export const updatePermissionStatus = async (req: AuthRequest, res: Response): P
 
     const io = getIO();
     if (io) {
-      const empUser = await User.findOne({ employeeId: perm.employeeId });
+      const empId = (perm.employeeId as any)._id || perm.employeeId;
+      const empUser = await User.findOne({ employeeId: empId });
       const notifData = {
+        _id: `perm-status-${perm.id}-${status}`,
         title: `Permission Request ${status}`,
         message: `Your permission request for ${perm.date} (${perm.totalHours} hrs) has been ${status.toLowerCase()}.`,
         type: 'PERMISSION',
@@ -94,7 +137,6 @@ export const updatePermissionStatus = async (req: AuthRequest, res: Response): P
       if (empUser) {
         io.to(empUser.id).emit('receive_notification', notifData);
       }
-      io.to('EMPLOYEE').emit('receive_notification', notifData);
     }
 
     res.status(200).json({ permissionRequest: perm });

@@ -115,7 +115,7 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Apply Leave / WFH / Permission" maxWidth="max-w-xl">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 space-x-1 text-left">
         <Select
           label="Request Type *"
           {...register('leaveType')}

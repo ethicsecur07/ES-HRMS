@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { leaveApi } from '../../api_service/leaveApi';
 import { wfhApi } from '../../api_service/wfhApi';
 import { permissionApi } from '../../api_service/permissionApi';
@@ -14,59 +14,127 @@ import { X } from 'lucide-react';
 export const Layout: React.FC = () => {
   const { toasts, removeToast, addNotification } = useNotificationStore();
   const { role, user } = useAuthStore();
+  const queryClient = useQueryClient();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  // Fetch pending requests for HR/Admin to populate notifications on load
+  // Fetch requests to populate notifications on load
   const isPrivileged = role === 'ADMIN' || role === 'HR';
-  const { data: leaves } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll, enabled: isPrivileged });
-  const { data: wfh } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll, enabled: isPrivileged });
-  const { data: perms } = useQuery({ queryKey: ['permissions'], queryFn: permissionApi.getAll, enabled: isPrivileged });
+  const { data: leaves } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll, enabled: !!role });
+  const { data: wfh } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll, enabled: !!role });
+  const { data: perms } = useQuery({ queryKey: ['permissions'], queryFn: permissionApi.getAll, enabled: !!role });
   
   const injectedNotifs = React.useRef(new Set<string>());
 
   useEffect(() => {
-    if (!isPrivileged) return;
+    if (!role) return;
 
-    leaves?.filter(l => l.status === 'PENDING').forEach(l => {
-      const uniqueId = `leave-${l._id}`;
-      if (!injectedNotifs.current.has(uniqueId)) {
-        addNotification({
-          recipientId: role,
-          title: 'New Leave Request',
-          message: `Pending request for ${l.leaveType}.`,
-          type: 'LEAVE',
-        });
-        injectedNotifs.current.add(uniqueId);
-      }
-    });
+    const currentNotifications = useNotificationStore.getState().notifications;
 
-    wfh?.filter(w => w.status === 'PENDING').forEach(w => {
-      const uniqueId = `wfh-${w._id}`;
-      if (!injectedNotifs.current.has(uniqueId)) {
-        addNotification({
-          recipientId: role,
-          title: 'New WFH Request',
-          message: `Pending WFH request for ${w.startDate}.`,
-          type: 'WFH',
-        });
-        injectedNotifs.current.add(uniqueId);
-      }
-    });
+    if (isPrivileged) {
+      // HR/Admin: Populate PENDING requests
+      leaves?.filter(l => l.status === 'PENDING').forEach(l => {
+        const uniqueId = `leave-pending-${l._id}`;
+        const alreadyExists = currentNotifications.some(n => n._id === uniqueId) || injectedNotifs.current.has(uniqueId);
+        if (!alreadyExists) {
+          addNotification({
+            _id: uniqueId,
+            recipientId: role,
+            title: 'New Leave Request',
+            message: `Pending request for ${l.leaveType}.`,
+            type: 'LEAVE',
+          } as any);
+          injectedNotifs.current.add(uniqueId);
+        }
+      });
 
-    perms?.filter(p => p.approvalStatus === 'PENDING').forEach(p => {
-      const uniqueId = `perm-${p._id}`;
-      if (!injectedNotifs.current.has(uniqueId)) {
-        addNotification({
-          recipientId: role,
-          title: 'New Permission Request',
-          message: `Pending Permission Hours for ${p.date}.`,
-          type: 'PERMISSION',
-        });
-        injectedNotifs.current.add(uniqueId);
-      }
-    });
-  }, [leaves, wfh, perms, isPrivileged, addNotification, role]);
+      wfh?.filter(w => w.status === 'PENDING').forEach(w => {
+        const uniqueId = `wfh-pending-${w._id}`;
+        const alreadyExists = currentNotifications.some(n => n._id === uniqueId) || injectedNotifs.current.has(uniqueId);
+        if (!alreadyExists) {
+          addNotification({
+            _id: uniqueId,
+            recipientId: role,
+            title: 'New WFH Request',
+            message: `Pending WFH request for ${w.startDate}.`,
+            type: 'WFH',
+          } as any);
+          injectedNotifs.current.add(uniqueId);
+        }
+      });
 
+      perms?.filter(p => p.approvalStatus === 'PENDING').forEach(p => {
+        const uniqueId = `perm-pending-${p._id}`;
+        const alreadyExists = currentNotifications.some(n => n._id === uniqueId) || injectedNotifs.current.has(uniqueId);
+        if (!alreadyExists) {
+          addNotification({
+            _id: uniqueId,
+            recipientId: role,
+            title: 'New Permission Request',
+            message: `Pending Permission Hours for ${p.date}.`,
+            type: 'PERMISSION',
+          } as any);
+          injectedNotifs.current.add(uniqueId);
+        }
+      });
+    } else {
+      // Employee: Populate their own APPROVED/REJECTED requests
+      const empIdStr = user?.employeeId;
+      if (!empIdStr) return;
+
+      leaves?.filter(l => {
+        const itemEmpId = typeof l.employeeId === 'object' ? (l.employeeId as any)?._id : l.employeeId;
+        return itemEmpId === empIdStr && (l.status === 'APPROVED' || l.status === 'REJECTED');
+      }).forEach(l => {
+        const uniqueId = `leave-status-${l._id}-${l.status}`;
+        const alreadyExists = currentNotifications.some(n => n._id === uniqueId) || injectedNotifs.current.has(uniqueId);
+        if (!alreadyExists) {
+          addNotification({
+            _id: uniqueId,
+            recipientId: user._id,
+            title: `Leave Request ${l.status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+            message: `Your leave request for ${l.leaveType} has been ${l.status.toLowerCase()}.`,
+            type: 'LEAVE',
+          } as any);
+          injectedNotifs.current.add(uniqueId);
+        }
+      });
+
+      wfh?.filter(w => {
+        const itemEmpId = typeof w.employeeId === 'object' ? (w.employeeId as any)?._id : w.employeeId;
+        return itemEmpId === empIdStr && (w.status === 'APPROVED' || w.status === 'REJECTED');
+      }).forEach(w => {
+        const uniqueId = `wfh-status-${w._id}-${w.status}`;
+        const alreadyExists = currentNotifications.some(n => n._id === uniqueId) || injectedNotifs.current.has(uniqueId);
+        if (!alreadyExists) {
+          addNotification({
+            _id: uniqueId,
+            recipientId: user._id,
+            title: `WFH Request ${w.status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+            message: `Your WFH request for ${w.startDate} has been ${w.status.toLowerCase()}.`,
+            type: 'WFH',
+          } as any);
+          injectedNotifs.current.add(uniqueId);
+        }
+      });
+
+      perms?.filter(p => {
+        const itemEmpId = typeof p.employeeId === 'object' ? (p.employeeId as any)?._id : p.employeeId;
+        return itemEmpId === empIdStr && (p.approvalStatus === 'APPROVED' || p.approvalStatus === 'REJECTED');
+      }).forEach(p => {
+        const uniqueId = `perm-status-${p._id}-${p.approvalStatus}`;
+        const alreadyExists = currentNotifications.some(n => n._id === uniqueId) || injectedNotifs.current.has(uniqueId);
+        if (!alreadyExists) {
+          addNotification({
+            _id: uniqueId,
+            recipientId: user._id,
+            title: `Permission Request ${p.approvalStatus === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+            message: `Your permission request for ${p.date} has been ${p.approvalStatus.toLowerCase()}.`,
+            type: 'PERMISSION',
+          } as any);
+          injectedNotifs.current.add(uniqueId);
+        }
+      });
+    }
+  }, [leaves, wfh, perms, isPrivileged, addNotification, role, user]);
   // Socket.io client-side integration for real-time notifications & live updates
   useEffect(() => {
     const getSocketUrl = () => {
@@ -92,24 +160,35 @@ export const Layout: React.FC = () => {
       }
     });
 
-    socket.on('receive_notification', (data: { title: string; message: string; type?: string; recipientId?: string }) => {
+    socket.on('receive_notification', (data: { _id?: string; title: string; message: string; type?: string; recipientId?: string }) => {
       useNotificationStore.getState().addToast(
         data.title || 'Live Notification',
         data.message || 'New update received from HRMS server.',
         data.type === 'error' ? 'error' : data.type === 'success' ? 'success' : 'info'
       );
       useNotificationStore.getState().addNotification({
+        _id: data._id,
         recipientId: data.recipientId || 'all',
         title: data.title || 'System Notification',
         message: data.message || '',
         type: (data.type as 'LEAVE' | 'WFH' | 'ATTENDANCE' | 'PAYROLL' | 'ANNOUNCEMENT' | 'PERMISSION' | 'GENERAL') || 'GENERAL',
-      });
+      } as any);
+
+      // Invalidate queries to refresh lists in real-time
+      const notificationType = (data.type || '').toUpperCase();
+      if (notificationType === 'LEAVE') {
+        queryClient.invalidateQueries({ queryKey: ['leaves'] });
+      } else if (notificationType === 'WFH') {
+        queryClient.invalidateQueries({ queryKey: ['wfh'] });
+      } else if (notificationType === 'PERMISSION') {
+        queryClient.invalidateQueries({ queryKey: ['permissions'] });
+      }
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [role, user?._id]);
+  }, [role, user?._id, queryClient]);
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground overflow-x-hidden">

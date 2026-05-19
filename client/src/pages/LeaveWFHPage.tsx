@@ -66,7 +66,7 @@ export const LeaveWFHPage: React.FC = () => {
   const filteredLeaves = useMemo(() => {
     if (!leaves) return [];
     return leaves.filter(item => {
-      const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Logapriyan M' : item.employeeId) : 'Logapriyan M';
+      const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Unknown Employee' : item.employeeId) : 'Unknown Employee';
       const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
       const matchType = typeFilter === 'All' || item.leaveType === typeFilter;
       const matchStatus = statusFilter === 'All' || item.status === statusFilter;
@@ -77,7 +77,7 @@ export const LeaveWFHPage: React.FC = () => {
   const filteredWFH = useMemo(() => {
     if (!wfh) return [];
     return wfh.filter(item => {
-      const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Vikram Mehta' : item.employeeId) : 'Vikram Mehta';
+      const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Unknown Employee' : item.employeeId) : 'Unknown Employee';
       const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
       const matchType = typeFilter === 'All' || typeFilter === 'WFH';
       const matchStatus = statusFilter === 'All' || item.status === statusFilter;
@@ -88,7 +88,7 @@ export const LeaveWFHPage: React.FC = () => {
   const filteredPerms = useMemo(() => {
     if (!perms) return [];
     return perms.filter(item => {
-      const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Ravi Kumar' : item.employeeId) : 'Ravi Kumar';
+      const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Unknown Employee' : item.employeeId) : 'Unknown Employee';
       const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
       const matchType = typeFilter === 'All' || typeFilter === 'Permission';
       const matchStatus = statusFilter === 'All' || item.approvalStatus === statusFilter;
@@ -118,10 +118,10 @@ export const LeaveWFHPage: React.FC = () => {
               <img src={empObj.profileImage} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0 uppercase">
-                {(empObj?.fullName || 'Logapriyan M').charAt(0)}
+                {(empObj?.fullName || 'Unknown Employee').charAt(0)}
               </div>
             )}
-            <span className="font-bold text-xs">{empObj?.fullName || 'Logapriyan M'}</span>
+            <span className="font-bold text-xs">{empObj?.fullName || 'Unknown Employee'}</span>
           </div>
         );
       },
@@ -181,10 +181,10 @@ export const LeaveWFHPage: React.FC = () => {
               <img src={empObj.profileImage} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0 uppercase">
-                {(empObj?.fullName || 'Vikram Mehta').charAt(0)}
+                {(empObj?.fullName || 'Unknown Employee').charAt(0)}
               </div>
             )}
-            <span className="font-bold text-xs">{empObj?.fullName || 'Vikram Mehta'}</span>
+            <span className="font-bold text-xs">{empObj?.fullName || 'Unknown Employee'}</span>
           </div>
         );
       },
@@ -235,10 +235,10 @@ export const LeaveWFHPage: React.FC = () => {
               <img src={empObj.profileImage} alt="" className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0 uppercase">
-                {(empObj?.fullName || 'Ravi Kumar').charAt(0)}
+                {(empObj?.fullName || 'Unknown Employee').charAt(0)}
               </div>
             )}
-            <span className="font-bold text-xs">{empObj?.fullName || 'Ravi Kumar'}</span>
+            <span className="font-bold text-xs">{empObj?.fullName || 'Unknown Employee'}</span>
           </div>
         );
       },
