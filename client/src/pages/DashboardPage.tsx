@@ -12,7 +12,7 @@ import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import type { TaskReport } from '../types';
-import { PlusCircle, Bell } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { LeaveApplyModal } from '../Components/SpecifiedComponents/LeaveApplyModal';
 
 export const DashboardPage: React.FC = () => {

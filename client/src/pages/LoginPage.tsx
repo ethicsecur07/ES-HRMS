@@ -129,8 +129,8 @@ export const LoginPage: React.FC = () => {
         </form>
 
         <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground">
-          <p className="font-semibold text-foreground">Office IP Restriction Active</p>
-          <p className="mt-1">Access outside office WiFi requires HR pre-approved WFH override.</p>
+          <p className="font-semibold text-foreground">Global Access Enabled</p>
+          <p className="mt-1">Check-ins outside the company network are automatically recorded as Work From Home (WFH).</p>
         </div>
       </Card>
     </div>
