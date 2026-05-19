@@ -69,7 +69,7 @@ export const HRApprovalQueue: React.FC = () => {
     );
   }
 
-  const getEmpName = (emp: any) => (emp ? (typeof emp === 'object' ? emp.fullName || 'Logapriyan' : emp) : 'Logapriyan');
+  const getEmpName = (emp: any) => (emp ? (typeof emp === 'object' ? emp.fullName || 'Unknown Employee' : emp) : 'Unknown Employee');
   const getEmpInitials = (name: string) => name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
   const getTimeAgo = (dateStr?: string) => {

@@ -7,9 +7,29 @@ import { getIO } from '../sockets/socketHandler.js';
 import { AuthRequest } from '../types/index.js';
 
 export const applyWFH = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { employeeId, date, reason, expectedTasks } = req.body;
+  let employeeId = req.body.employeeId;
+  const { date, reason, expectedTasks } = req.body;
 
   try {
+    if (req.user) {
+      const user = await User.findById(req.user.id);
+      if (user && user.role === 'EMPLOYEE') {
+        if (user.employeeId) {
+          employeeId = user.employeeId;
+        } else {
+          const employee = await Employee.findOne({ email: user.email });
+          if (employee) {
+            employeeId = employee._id;
+          }
+        }
+      }
+    }
+
+    if (!employeeId) {
+      res.status(400).json({ message: 'Employee profile not found for this user.' });
+      return;
+    }
+
     const wfh = await Leave.create({
       employeeId,
       leaveType: 'WFH',
@@ -31,6 +51,7 @@ export const applyWFH = async (req: AuthRequest, res: Response): Promise<void> =
     const io = getIO();
     if (io) {
       const notifData = {
+        _id: `wfh-pending-${wfh.id}`,
         title: 'New WFH Request',
         message: `Employee requested WFH for ${date}.`,
         type: 'WFH',
@@ -48,7 +69,27 @@ export const applyWFH = async (req: AuthRequest, res: Response): Promise<void> =
 
 export const getWFHRequests = async (req: Request, res: Response): Promise<void> => {
   try {
-    const wfhRequests = await Leave.find({ leaveType: 'WFH' }).populate('employeeId').sort({ createdAt: -1 });
+    const authReq = req as AuthRequest;
+    let query: any = { leaveType: 'WFH' };
+
+    if (authReq.user && authReq.user.role === 'EMPLOYEE') {
+      const user = await User.findById(authReq.user.id);
+      let employeeId = user?.employeeId;
+      if (user && !employeeId) {
+        const employee = await Employee.findOne({ email: user.email });
+        if (employee) {
+          employeeId = employee._id;
+        }
+      }
+      if (employeeId) {
+        query.employeeId = employeeId;
+      } else {
+        res.status(200).json({ wfhRequests: [] });
+        return;
+      }
+    }
+
+    const wfhRequests = await Leave.find(query).populate('employeeId').sort({ createdAt: -1 });
     res.status(200).json({ wfhRequests });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -85,8 +126,10 @@ export const updateWFHStatus = async (req: AuthRequest, res: Response): Promise<
 
     const io = getIO();
     if (io) {
-      const empUser = await User.findOne({ employeeId: wfh.employeeId });
+      const empId = (wfh.employeeId as any)._id || wfh.employeeId;
+      const empUser = await User.findOne({ employeeId: empId });
       const notifData = {
+        _id: `wfh-status-${wfh.id}-${status}`,
         title: `WFH Request ${status}`,
         message: `Your WFH request for ${wfh.startDate} has been ${status.toLowerCase()}.`,
         type: 'WFH',
@@ -95,7 +138,6 @@ export const updateWFHStatus = async (req: AuthRequest, res: Response): Promise<
       if (empUser) {
         io.to(empUser.id).emit('receive_notification', notifData);
       }
-      io.to('EMPLOYEE').emit('receive_notification', notifData);
     }
 
     res.status(200).json({ wfhRequest: wfh });

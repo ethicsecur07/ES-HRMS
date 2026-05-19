@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useNotificationStore } from './useNotificationStore';
 import type { User, Role } from '../types';
 
 interface AuthState {
@@ -57,13 +58,15 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
         }),
 
-      logout: () =>
+      logout: () => {
+        useNotificationStore.getState().logoutClear();
         set({
           user: null,
           token: null,
           role: null,
           isAuthenticated: false,
-        }),
+        });
+      },
 
       updateUser: (updatedFields) =>
         set((state) => ({

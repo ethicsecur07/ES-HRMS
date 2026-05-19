@@ -8,7 +8,30 @@ import { AuthRequest } from '../types/index.js';
 
 export const applyLeave = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const leave = await Leave.create(req.body);
+    let employeeId = req.body.employeeId;
+    if (req.user) {
+      const user = await User.findById(req.user.id);
+      if (user && user.role === 'EMPLOYEE') {
+        if (user.employeeId) {
+          employeeId = user.employeeId;
+        } else {
+          const employee = await Employee.findOne({ email: user.email });
+          if (employee) {
+            employeeId = employee._id;
+          }
+        }
+      }
+    }
+
+    if (!employeeId) {
+      res.status(400).json({ message: 'Employee profile not found for this user.' });
+      return;
+    }
+
+    const leave = await Leave.create({
+      ...req.body,
+      employeeId,
+    });
 
     await createAuditLog(
       'LEAVE_APPLY',
@@ -21,6 +44,7 @@ export const applyLeave = async (req: AuthRequest, res: Response): Promise<void>
     const io = getIO();
     if (io) {
       const notifData = {
+        _id: `leave-pending-${leave.id}`,
         title: 'New Leave Request',
         message: `Employee applied for ${leave.leaveType} (${leave.totalDays} days).`,
         type: 'LEAVE',
@@ -38,7 +62,27 @@ export const applyLeave = async (req: AuthRequest, res: Response): Promise<void>
 
 export const getLeaves = async (req: Request, res: Response): Promise<void> => {
   try {
-    const leaveRequests = await Leave.find().populate('employeeId').sort({ createdAt: -1 });
+    const authReq = req as AuthRequest;
+    let query: any = { leaveType: { $ne: 'WFH' } };
+
+    if (authReq.user && authReq.user.role === 'EMPLOYEE') {
+      const user = await User.findById(authReq.user.id);
+      let employeeId = user?.employeeId;
+      if (user && !employeeId) {
+        const employee = await Employee.findOne({ email: user.email });
+        if (employee) {
+          employeeId = employee._id;
+        }
+      }
+      if (employeeId) {
+        query.employeeId = employeeId;
+      } else {
+        res.status(200).json({ leaveRequests: [] });
+        return;
+      }
+    }
+
+    const leaveRequests = await Leave.find(query).populate('employeeId').sort({ createdAt: -1 });
     res.status(200).json({ leaveRequests });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -75,8 +119,10 @@ export const updateLeaveStatus = async (req: AuthRequest, res: Response): Promis
 
     const io = getIO();
     if (io) {
-      const empUser = await User.findOne({ employeeId: leave.employeeId });
+      const empId = (leave.employeeId as any)._id || leave.employeeId;
+      const empUser = await User.findOne({ employeeId: empId });
       const notifData = {
+        _id: `leave-status-${leave.id}-${status}`,
         title: `Leave Request ${status}`,
         message: `Your leave request for ${leave.leaveType} (${leave.totalDays} days) has been ${status.toLowerCase()}.`,
         type: 'LEAVE',
@@ -85,7 +131,6 @@ export const updateLeaveStatus = async (req: AuthRequest, res: Response): Promis
       if (empUser) {
         io.to(empUser.id).emit('receive_notification', notifData);
       }
-      io.to('EMPLOYEE').emit('receive_notification', notifData);
     }
 
     res.status(200).json({ leaveRequest: leave });

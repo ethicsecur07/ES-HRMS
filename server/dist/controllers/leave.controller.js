@@ -8,11 +8,34 @@ const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const socketHandler_js_1 = require("../sockets/socketHandler.js");
 const applyLeave = async (req, res) => {
     try {
-        const leave = await Leave_js_1.Leave.create(req.body);
+        let employeeId = req.body.employeeId;
+        if (req.user) {
+            const user = await User_js_1.User.findById(req.user.id);
+            if (user && user.role === 'EMPLOYEE') {
+                if (user.employeeId) {
+                    employeeId = user.employeeId;
+                }
+                else {
+                    const employee = await Employee_js_1.Employee.findOne({ email: user.email });
+                    if (employee) {
+                        employeeId = employee._id;
+                    }
+                }
+            }
+        }
+        if (!employeeId) {
+            res.status(400).json({ message: 'Employee profile not found for this user.' });
+            return;
+        }
+        const leave = await Leave_js_1.Leave.create({
+            ...req.body,
+            employeeId,
+        });
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_APPLY', req.user?.email || 'Employee', 'LEAVE', leave.id, `Applied for ${leave.leaveType} (${leave.totalDays} days)`);
         const io = (0, socketHandler_js_1.getIO)();
         if (io) {
             const notifData = {
+                _id: `leave-pending-${leave.id}`,
                 title: 'New Leave Request',
                 message: `Employee applied for ${leave.leaveType} (${leave.totalDays} days).`,
                 type: 'LEAVE',
@@ -30,7 +53,26 @@ const applyLeave = async (req, res) => {
 exports.applyLeave = applyLeave;
 const getLeaves = async (req, res) => {
     try {
-        const leaveRequests = await Leave_js_1.Leave.find().populate('employeeId').sort({ createdAt: -1 });
+        const authReq = req;
+        let query = { leaveType: { $ne: 'WFH' } };
+        if (authReq.user && authReq.user.role === 'EMPLOYEE') {
+            const user = await User_js_1.User.findById(authReq.user.id);
+            let employeeId = user?.employeeId;
+            if (user && !employeeId) {
+                const employee = await Employee_js_1.Employee.findOne({ email: user.email });
+                if (employee) {
+                    employeeId = employee._id;
+                }
+            }
+            if (employeeId) {
+                query.employeeId = employeeId;
+            }
+            else {
+                res.status(200).json({ leaveRequests: [] });
+                return;
+            }
+        }
+        const leaveRequests = await Leave_js_1.Leave.find(query).populate('employeeId').sort({ createdAt: -1 });
         res.status(200).json({ leaveRequests });
     }
     catch (error) {
@@ -53,8 +95,10 @@ const updateLeaveStatus = async (req, res) => {
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_STATUS_UPDATE', req.user?.email || 'HR/Admin', 'LEAVE', leave.id, `Updated leave status to ${status}`);
         const io = (0, socketHandler_js_1.getIO)();
         if (io) {
-            const empUser = await User_js_1.User.findOne({ employeeId: leave.employeeId });
+            const empId = leave.employeeId._id || leave.employeeId;
+            const empUser = await User_js_1.User.findOne({ employeeId: empId });
             const notifData = {
+                _id: `leave-status-${leave.id}-${status}`,
                 title: `Leave Request ${status}`,
                 message: `Your leave request for ${leave.leaveType} (${leave.totalDays} days) has been ${status.toLowerCase()}.`,
                 type: 'LEAVE',
@@ -63,7 +107,6 @@ const updateLeaveStatus = async (req, res) => {
             if (empUser) {
                 io.to(empUser.id).emit('receive_notification', notifData);
             }
-            io.to('EMPLOYEE').emit('receive_notification', notifData);
         }
         res.status(200).json({ leaveRequest: leave });
     }

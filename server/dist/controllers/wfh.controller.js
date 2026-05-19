@@ -7,8 +7,27 @@ const User_js_1 = require("../models/User.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const socketHandler_js_1 = require("../sockets/socketHandler.js");
 const applyWFH = async (req, res) => {
-    const { employeeId, date, reason, expectedTasks } = req.body;
+    let employeeId = req.body.employeeId;
+    const { date, reason, expectedTasks } = req.body;
     try {
+        if (req.user) {
+            const user = await User_js_1.User.findById(req.user.id);
+            if (user && user.role === 'EMPLOYEE') {
+                if (user.employeeId) {
+                    employeeId = user.employeeId;
+                }
+                else {
+                    const employee = await Employee_js_1.Employee.findOne({ email: user.email });
+                    if (employee) {
+                        employeeId = employee._id;
+                    }
+                }
+            }
+        }
+        if (!employeeId) {
+            res.status(400).json({ message: 'Employee profile not found for this user.' });
+            return;
+        }
         const wfh = await Leave_js_1.Leave.create({
             employeeId,
             leaveType: 'WFH',
@@ -22,6 +41,7 @@ const applyWFH = async (req, res) => {
         const io = (0, socketHandler_js_1.getIO)();
         if (io) {
             const notifData = {
+                _id: `wfh-pending-${wfh.id}`,
                 title: 'New WFH Request',
                 message: `Employee requested WFH for ${date}.`,
                 type: 'WFH',
@@ -39,7 +59,26 @@ const applyWFH = async (req, res) => {
 exports.applyWFH = applyWFH;
 const getWFHRequests = async (req, res) => {
     try {
-        const wfhRequests = await Leave_js_1.Leave.find({ leaveType: 'WFH' }).populate('employeeId').sort({ createdAt: -1 });
+        const authReq = req;
+        let query = { leaveType: 'WFH' };
+        if (authReq.user && authReq.user.role === 'EMPLOYEE') {
+            const user = await User_js_1.User.findById(authReq.user.id);
+            let employeeId = user?.employeeId;
+            if (user && !employeeId) {
+                const employee = await Employee_js_1.Employee.findOne({ email: user.email });
+                if (employee) {
+                    employeeId = employee._id;
+                }
+            }
+            if (employeeId) {
+                query.employeeId = employeeId;
+            }
+            else {
+                res.status(200).json({ wfhRequests: [] });
+                return;
+            }
+        }
+        const wfhRequests = await Leave_js_1.Leave.find(query).populate('employeeId').sort({ createdAt: -1 });
         res.status(200).json({ wfhRequests });
     }
     catch (error) {
@@ -62,8 +101,10 @@ const updateWFHStatus = async (req, res) => {
         await (0, auditLog_service_js_1.createAuditLog)('WFH_STATUS_UPDATE', req.user?.email || 'HR/Admin', 'WFH', wfh.id, `Updated WFH status to ${status}`);
         const io = (0, socketHandler_js_1.getIO)();
         if (io) {
-            const empUser = await User_js_1.User.findOne({ employeeId: wfh.employeeId });
+            const empId = wfh.employeeId._id || wfh.employeeId;
+            const empUser = await User_js_1.User.findOne({ employeeId: empId });
             const notifData = {
+                _id: `wfh-status-${wfh.id}-${status}`,
                 title: `WFH Request ${status}`,
                 message: `Your WFH request for ${wfh.startDate} has been ${status.toLowerCase()}.`,
                 type: 'WFH',
@@ -72,7 +113,6 @@ const updateWFHStatus = async (req, res) => {
             if (empUser) {
                 io.to(empUser.id).emit('receive_notification', notifData);
             }
-            io.to('EMPLOYEE').emit('receive_notification', notifData);
         }
         res.status(200).json({ wfhRequest: wfh });
     }

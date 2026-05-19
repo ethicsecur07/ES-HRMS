@@ -15,10 +15,38 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const { user, role, logout, updateUser } = useAuthStore();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore();
+  const { notifications, markAsRead, markAllAsRead, clearNotifications } = useNotificationStore();
   const { theme, toggleTheme } = useThemeStore();
   const [showNotifs, setShowNotifs] = useState(false);
   const navigate = useNavigate();
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  const isPrivileged = role === 'ADMIN' || role === 'HR';
+
+  // Filter notifications relevant to current user
+  const userNotifications = notifications.filter(
+    (n) => n.recipientId === user?._id || 
+           n.recipientId === role || 
+           n.recipientId === 'all' || 
+           (isPrivileged && n.recipientId === 'admin-hr')
+  );
+  
+  const userUnreadCount = userNotifications.filter((n) => !n.read).length;
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowNotifs(false);
+      }
+    };
+
+    if (showNotifs) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifs]);
 
   const { data: employeeData } = useQuery({
     queryKey: ['employeeProfile', user?.employeeId],
@@ -85,16 +113,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           </button>
 
           {/* Notification Bell */}
-          <div className="relative">
+          <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowNotifs(!showNotifs)}
               className="p-2 sm:p-2.5 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all relative"
               title="Notifications"
             >
               <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-              {unreadCount > 0 && (
+              {userUnreadCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-primary text-primary-foreground text-[9px] sm:text-[10px] font-bold flex items-center justify-center shadow-lg shadow-primary/30 animate-bounce">
-                  {unreadCount}
+                  {userUnreadCount}
                 </span>
               )}
             </button>
@@ -103,21 +131,34 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
               <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl bg-card border border-border shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-4 duration-200">
                 <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
                   <span className="font-bold text-base text-foreground tracking-tight">Notifications</span>
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={markAllAsRead}
-                      className="text-xs text-primary font-semibold hover:underline"
-                    >
-                      Mark all as read
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {userUnreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-xs text-primary font-semibold hover:underline"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                    {userUnreadCount > 0 && userNotifications.length > 0 && (
+                      <span className="text-muted-foreground text-xs">•</span>
+                    )}
+                    {userNotifications.length > 0 && (
+                      <button
+                        onClick={clearNotifications}
+                        className="text-xs text-destructive font-semibold hover:underline"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-                  {notifications.length === 0 ? (
+                  {userNotifications.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-6">No notifications</p>
                   ) : (
-                    notifications.map((n) => (
+                    userNotifications.map((n) => (
                       <div
                         key={n._id}
                         onClick={() => handleNotificationClick(n)}
