@@ -195,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
               {profileImg ? (
                 <img src={profileImg} alt={user?.name || 'Profile'} className="w-full h-full object-cover rounded-full" />
               ) : (
-                user?.name?.charAt(0) || 'U'
+                <img src={ESLogo} alt="Default Profile" className="w-full h-full object-contain p-1 rounded-full bg-muted" />
               )}
             </div>
             <div

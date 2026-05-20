@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -17,24 +17,112 @@ import type { Employee } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { PlusCircle, Edit, Trash2, PhoneCall, Eye, Camera, Loader2 } from 'lucide-react';
 
+const DESIGNATIONS_BY_DEPARTMENT: Record<string, { value: string; label: string }[]> = {
+  Developers: [
+    { value: 'Full Stack Developer', label: 'Full Stack Developer' },
+    { value: 'Backend Developer', label: 'Backend Developer' },
+    { value: 'Frontend Developer', label: 'Frontend Developer' },
+    { value: 'UI UX Developer', label: 'UI UX Developer' },
+  ],
+  Designers: [
+    { value: 'UI/UX Designer', label: 'UI/UX Designer' },
+    { value: 'Graphic Designer', label: 'Graphic Designer' },
+    { value: 'Web Designer', label: 'Web Designer' },
+    { value: 'Motion Designer', label: 'Motion Designer' },
+  ],
+  BDE: [
+    { value: 'Business Development Executive', label: 'Business Development Executive' },
+    { value: 'Business Development Manager', label: 'Business Development Manager' },
+    { value: 'Sales Executive', label: 'Sales Executive' },
+    { value: 'Senior BDE', label: 'Senior BDE' },
+  ],
+  DME: [
+    { value: 'Digital Marketing Executive', label: 'Digital Marketing Executive' },
+    { value: 'SEO Specialist', label: 'SEO Specialist' },
+    { value: 'Social Media Manager', label: 'Social Media Manager' },
+    { value: 'Content Creator', label: 'Content Creator' },
+  ],
+  Internship: [
+    { value: 'Web Development Intern', label: 'Web Development Intern' },
+    { value: 'UI/UX Design Intern', label: 'UI/UX Design Intern' },
+    { value: 'Software Engineering Intern', label: 'Software Engineering Intern' },
+    { value: 'Marketing Intern', label: 'Marketing Intern' },
+  ],
+};
+
 const baseEmployeeSchema = z.object({
-  employeeCode: z.string().min(2, 'Employee Code is required'),
-  fullName: z.string().min(3, 'Full name is required'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
-  phone: z.string().min(10, 'Valid phone required'),
+  id: z.string().optional(),
+  employeeCode: z.string()
+    .min(1, 'Employee Code is required')
+    .regex(/^[A-Z]{2,5}-\d+$/, 'Employee Code must start with 2-5 uppercase letters followed by a hyphen and numbers (e.g., EMP-573)'),
+  fullName: z.string()
+    .min(3, 'Full name must be at least 3 characters')
+    .regex(/^[a-zA-Z\s]+$/, 'Full name must contain only letters and spaces'),
+  email: z.string().min(1, 'Work Email is required').email('Invalid email address'),
+  password: z.string().optional(),
+  phone: z.string().regex(/^\+?[0-9\s-]{10,20}$/, 'Phone number must be a valid number (10 to 20 digits, spaces/hyphens allowed)'),
   department: z.enum(['Developers', 'Designers', 'BDE', 'DME', 'Internship']),
-  designation: z.string().min(2, 'Designation required'),
-  joiningDate: z.string().min(1, 'Joining date required'),
+  designation: z.string().min(1, 'Designation is required'),
+  joiningDate: z.string().min(1, 'Joining date is required'),
   salary: z.coerce.number().min(0, 'Salary cannot be negative'),
-  address: z.string().min(5, 'Address required'),
-  emergencyContactName: z.string().min(2, 'Contact name required'),
-  emergencyContactRel: z.string().min(2, 'Relationship required'),
-  emergencyContactPhone: z.string().min(10, 'Contact phone required'),
+  address: z.string().min(5, 'Residential Address must be at least 5 characters'),
+  emergencyContactName: z.string()
+    .min(3, 'Emergency Contact Name must be at least 3 characters')
+    .regex(/^[a-zA-Z\s]+$/, 'Contact name must contain only letters and spaces'),
+  emergencyContactRel: z.string()
+    .min(2, 'Relationship is required')
+    .regex(/^[a-zA-Z\s]+$/, 'Relationship must contain only letters and spaces'),
+  emergencyContactPhone: z.string().regex(/^\+?[0-9\s-]{10,20}$/, 'Emergency contact phone must be a valid number (10 to 20 digits, spaces/hyphens allowed)'),
 });
 
 const employeeSchema = baseEmployeeSchema.superRefine((data, ctx) => {
-  if (data.department !== 'Internship' && data.salary < 0) {
+  // Validate password strength depending on onboarding/editing context
+  if (!data.id) {
+    // Create mode: password is required and must be strong
+    if (!data.password || data.password.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Password is required for onboarding',
+        path: ['password'],
+      });
+    } else {
+      if (data.password.length < 6) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Password must be at least 6 characters',
+          path: ['password'],
+        });
+      }
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/.test(data.password)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+          path: ['password'],
+        });
+      }
+    }
+  } else {
+    // Edit mode: password is optional, but if entered, it must be strong
+    if (data.password && data.password.trim() !== '') {
+      if (data.password.length < 6) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Password must be at least 6 characters',
+          path: ['password'],
+        });
+      }
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/.test(data.password)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+          path: ['password'],
+        });
+      }
+    }
+  }
+
+  // Minimum salary validation for regular employees (non-interns)
+  if (data.department !== 'Internship' && data.salary < 10000) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Minimum salary is 10,000 for regular employees',
@@ -85,7 +173,45 @@ export const EmployeesPage: React.FC = () => {
     resolver: zodResolver(employeeSchema),
   });
 
+  const editingEmployee = useMemo(() => {
+    if (!editingId || !employees) return null;
+    return employees.find(emp => emp._id === editingId) || null;
+  }, [editingId, employees]);
+
+  const getDesignationOptions = (dept: string) => {
+    const options = DESIGNATIONS_BY_DEPARTMENT[dept] || [];
+    if (editingEmployee && editingEmployee.department === dept && editingEmployee.designation) {
+      if (!options.some(opt => opt.value === editingEmployee.designation)) {
+        return [{ value: editingEmployee.designation, label: editingEmployee.designation }, ...options];
+      }
+    }
+    return options;
+  };
+
   const selectedDept = watch('department');
+
+  // Reset designation if department changes to a department that doesn't support the current designation
+  useEffect(() => {
+    if (selectedDept) {
+      const options = getDesignationOptions(selectedDept);
+      const currentDesig = watch('designation');
+      
+      // If we are currently editing and the selected department is the employee's original department,
+      // and the current designation is not set or matches the original designation, do not reset it.
+      if (
+        editingEmployee &&
+        selectedDept === editingEmployee.department &&
+        (!currentDesig || currentDesig === editingEmployee.designation)
+      ) {
+        return;
+      }
+
+      const isValid = options.some(o => o.value === currentDesig);
+      if (!isValid && options.length > 0) {
+        setValue('designation', options[0].value);
+      }
+    }
+  }, [selectedDept, setValue, watch, editingEmployee]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -159,6 +285,7 @@ export const EmployeesPage: React.FC = () => {
   const handleEdit = (emp: Employee) => {
     setEditingId(emp._id);
     setProfileImage(emp.profileImage || '');
+    setValue('id', emp._id);
     setValue('employeeCode', emp.employeeCode);
     setValue('fullName', emp.fullName);
     setValue('email', emp.email);
@@ -166,7 +293,7 @@ export const EmployeesPage: React.FC = () => {
     setValue('phone', emp.phone);
     setValue('department', emp.department as any);
     setValue('designation', emp.designation);
-    setValue('joiningDate', emp.joiningDate);
+    setValue('joiningDate', emp.joiningDate ? emp.joiningDate.split('T')[0] : '');
     setValue('salary', emp.salary);
     setValue('address', emp.address);
     setValue('emergencyContactName', emp.emergencyContact.name);
@@ -179,6 +306,7 @@ export const EmployeesPage: React.FC = () => {
     setEditingId(null);
     setProfileImage('');
     reset({
+      id: '',
       employeeCode: `EMP-${Date.now().toString().slice(-3)}`,
       joiningDate: new Date().toISOString().split('T')[0],
       department: 'Developers',
@@ -348,10 +476,28 @@ export const EmployeesPage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Employee Code *" {...register('employeeCode')} error={errors.employeeCode?.message} />
-            <Input label="Full Name *" {...register('fullName')} error={errors.fullName?.message} />
+            <Input 
+              label="Full Name *" 
+              {...register('fullName')} 
+              error={errors.fullName?.message} 
+              onKeyPress={(e) => {
+                if (!/^[a-zA-Z\s]$/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+            />
             <Input label="Work Email *" type="email" {...register('email')} error={errors.email?.message} />
             <Input label="Login Password *" type="text" {...register('password')} error={errors.password?.message} placeholder="Default: EthicSec@2026" />
-            <Input label="Phone Number *" {...register('phone')} error={errors.phone?.message} />
+            <Input 
+              label="Phone Number *" 
+              {...register('phone')} 
+              error={errors.phone?.message} 
+              onKeyPress={(e) => {
+                if (!/^[0-9\s+-]$/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+            />
             <Select
               label="Department *"
               {...register('department')}
@@ -364,7 +510,13 @@ export const EmployeesPage: React.FC = () => {
                 { value: 'Internship', label: 'Internship' },
               ]}
             />
-            <Input label="Designation *" {...register('designation')} error={errors.designation?.message} />
+            <Select
+              label="Designation *"
+              {...register('designation')}
+              error={errors.designation?.message}
+              options={getDesignationOptions(selectedDept)}
+              disabled={!selectedDept}
+            />
             <Input label="Joining Date *" type="date" {...register('joiningDate')} error={errors.joiningDate?.message} />
             <Input label={selectedDept === 'Internship' ? 'Monthly Base Salary (INR) (Optional)' : 'Monthly Base Salary (INR) *'} type="number" {...register('salary')} error={errors.salary?.message} />
           </div>
@@ -374,9 +526,36 @@ export const EmployeesPage: React.FC = () => {
           <div className="p-4 rounded-xl bg-muted/50 border border-border space-y-4">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Emergency Contact Information</span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Input label="Contact Name *" {...register('emergencyContactName')} error={errors.emergencyContactName?.message} />
-              <Input label="Relationship *" {...register('emergencyContactRel')} error={errors.emergencyContactRel?.message} />
-              <Input label="Contact Phone *" {...register('emergencyContactPhone')} error={errors.emergencyContactPhone?.message} />
+              <Input 
+                label="Contact Name *" 
+                {...register('emergencyContactName')} 
+                error={errors.emergencyContactName?.message} 
+                onKeyPress={(e) => {
+                  if (!/^[a-zA-Z\s]$/.test(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+              />
+              <Input 
+                label="Relationship *" 
+                {...register('emergencyContactRel')} 
+                error={errors.emergencyContactRel?.message} 
+                onKeyPress={(e) => {
+                  if (!/^[a-zA-Z\s]$/.test(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+              />
+              <Input 
+                label="Contact Phone *" 
+                {...register('emergencyContactPhone')} 
+                error={errors.emergencyContactPhone?.message} 
+                onKeyPress={(e) => {
+                  if (!/^[0-9\s+-]$/.test(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+              />
             </div>
           </div>
 

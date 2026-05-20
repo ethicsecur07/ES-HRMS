@@ -29,7 +29,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
     <div className="space-y-6 text-left">
       {/* Top High-Level Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-lg transition-shadow bg-card">
+        <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
               Total Workforce
@@ -44,7 +44,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
           </div>
         </Card>
 
-        <Card className="border-l-4 border-l-foreground flex items-center justify-between p-6 hover:shadow-lg transition-shadow bg-card">
+        <Card className="border-l-4 border-l-foreground flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
               Present Today
@@ -59,7 +59,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
           </div>
         </Card>
 
-        <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-lg transition-shadow bg-card">
+        <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
               Leave / Absence
@@ -74,7 +74,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
           </div>
         </Card>
 
-        <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-lg transition-shadow bg-card">
+        <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
               Monthly Payroll Cost

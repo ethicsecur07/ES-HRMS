@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     } else if (typeStr === 'EMPLOYEE') {
       navigate('/employees');
     } else if (typeStr === 'REPORT' || typeStr === 'TASK') {
-      navigate('/reports');
+      navigate('/task-reports');
     } else {
       navigate('/dashboard');
     }
@@ -75,8 +75,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
     { name: 'Employees', path: '/employees', icon: Users, roles: ['ADMIN', 'HR'] },
-    { name: 'Attendance', path: '/attendance', icon: CalendarCheck, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
-    { name: 'Leave & WFH', path: '/leave-wfh', icon: Palmtree, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
+    { name: 'Attendance History', path: '/attendance', icon: CalendarCheck, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
+    { name: 'Leave / WFH / Perms', path: '/leave-wfh', icon: Palmtree, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
+    { name: 'Task & Daily Reports', path: '/task-reports', icon: BarChart3, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
     { name: 'Payroll', path: '/payroll', icon: CreditCard, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
     { name: 'Finance & Maintenance', path: '/finance', icon: Wallet, roles: ['ADMIN', 'HR'] },
     { name: 'Reports & Analytics', path: '/reports', icon: BarChart3, roles: ['ADMIN', 'HR'] },
@@ -117,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               {profileImg ? (
                 <img src={profileImg} alt={user?.name || 'Profile'} className="w-full h-full object-cover rounded-full" />
               ) : (
-                user?.name?.charAt(0) || 'U'
+                <img src={ESLogo} alt="Default Profile" className="w-full h-full object-contain p-1 rounded-full bg-muted" />
               )}
             </div>
             <div

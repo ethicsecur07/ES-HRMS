@@ -9,7 +9,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { Button } from '../WrapperComponents/Button';
 import { Textarea } from '../WrapperComponents/Input';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 const taskSchema = z.object({
   inProgressTasks: z.string().optional(),
@@ -76,11 +76,8 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 space-x-1 text-left">
-      <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-3 text-primary text-xs font-semibold">
-        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-        <span>Submitting your daily task report is mandatory before checking out. Only Completed Tasks is required.</span>
-      </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 space-x-1 px-2 text-left">
+     
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Textarea
@@ -91,21 +88,21 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
         />
 
         <Textarea
-          label="In Progress Tasks (Optional)"
+          label="In Progress Tasks "
           placeholder="Tasks currently in progress..."
           {...register('inProgressTasks')}
           error={errors.inProgressTasks?.message}
         />
 
         <Textarea
-          label="Pending Tasks (Optional)"
+          label="Pending Tasks "
           placeholder="Tasks yet to be started..."
           {...register('pendingTasks')}
           error={errors.pendingTasks?.message}
         />
 
         <Textarea
-          label="Plan for Tomorrow (Optional)"
+          label="Plan for Tomorrow "
           placeholder="Outline what you will work on tomorrow..."
           {...register('tomorrowPlan')}
           error={errors.tomorrowPlan?.message}
@@ -113,7 +110,7 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
       </div>
 
       <Textarea
-        label="Issues / Blockers (Optional)"
+        label="Issues / Blockers "
         placeholder="Mention any dependencies or roadblocks (or write None)..."
         {...register('blockers')}
         error={errors.blockers?.message}
