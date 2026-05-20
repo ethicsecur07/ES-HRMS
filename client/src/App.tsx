@@ -13,6 +13,7 @@ import { AttendancePage } from './pages/AttendancePage';
 import { LeaveWFHPage } from './pages/LeaveWFHPage';
 import { PayrollPage } from './pages/PayrollPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { TaskReportsPage } from './pages/TaskReportsPage';
 import { FinancePage } from './pages/FinancePage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -44,6 +45,7 @@ export const App: React.FC = () => {
               <Route path="/attendance" element={<AttendancePage />} />
               <Route path="/leave-wfh" element={<LeaveWFHPage />} />
               <Route path="/payroll" element={<PayrollPage />} />
+              <Route path="/task-reports" element={<TaskReportsPage />} />
 
               {/* HR & ADMIN Only */}
               <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'HR']} />}>

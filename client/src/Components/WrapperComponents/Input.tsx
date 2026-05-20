@@ -4,10 +4,11 @@ import { twMerge } from 'tailwind-merge';
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  icon?: React.ReactNode;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, id, ...props }, ref) => {
+  ({ className, label, error, icon, id, ...props }, ref) => {
     return (
       <div className="w-full">
         {label && (
@@ -15,16 +16,24 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {label}
           </label>
         )}
-        <input
-          id={id}
-          ref={ref}
-          className={twMerge(
-            'flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors',
-            error && 'border-destructive focus-visible:ring-destructive',
-            className
+        <div className="relative flex items-center w-full">
+          {icon && (
+            <div className="absolute left-3 text-muted-foreground pointer-events-none flex items-center justify-center">
+              {icon}
+            </div>
           )}
-          {...props}
-        />
+          <input
+            id={id}
+            ref={ref}
+            className={twMerge(
+              'flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors',
+              icon && 'pl-9',
+              error && 'border-destructive focus-visible:ring-destructive',
+              className
+            )}
+            {...props}
+          />
+        </div>
         {error && <p className="mt-1 text-xs text-destructive text-left font-medium">{error}</p>}
       </div>
     );

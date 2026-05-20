@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
 import { permissionApi } from '../api_service/permissionApi';
+import { employeeApi } from '../api_service/employeeApi';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
@@ -14,11 +15,16 @@ import { WFHRequestModal } from '../Components/SpecifiedComponents/WFHRequestMod
 import { PermissionRequestModal } from '../Components/SpecifiedComponents/PermissionRequestModal';
 import type { LeaveRequest, PermissionRequest } from '../types';
 import { formatDate } from '../utils/formatters';
-import { Palmtree, Laptop, Clock, PlusCircle } from 'lucide-react';
+import { Palmtree, Laptop, Clock, PlusCircle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info, FileText } from 'lucide-react';
 
 export const LeaveWFHPage: React.FC = () => {
-  const { role } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'LEAVE' | 'WFH' | 'PERMISSION'>('LEAVE');
+  const { role, user } = useAuthStore();
+  
+  // Exactly 2 primary page tabs: 'DASHBOARD' (Calendar & Allowances) and 'HISTORY' (Logs & Filters)
+  const [activePageTab, setActivePageTab] = useState<'DASHBOARD' | 'HISTORY'>('DASHBOARD');
+  
+  // Segmented sub-tab inside the history logs
+  const [activeHistoryTab, setActiveHistoryTab] = useState<'LEAVE' | 'WFH' | 'PERMISSION'>('LEAVE');
 
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showWFHModal, setShowWFHModal] = useState(false);
@@ -26,12 +32,23 @@ export const LeaveWFHPage: React.FC = () => {
 
   // Advanced Filter States
   const [nameFilter, setNameFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+
+  // Calendar Month & Selected Date
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
 
   const { data: leaves, isLoading: leavesLoading } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll });
   const { data: wfh, isLoading: wfhLoading } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll });
   const { data: perms, isLoading: permsLoading } = useQuery({ queryKey: ['permissions'], queryFn: permissionApi.getAll });
+
+  const { data: employeeProfile } = useQuery({
+    queryKey: ['employeeProfile', user?.employeeId],
+    queryFn: () => employeeApi.getById(user?.employeeId as string),
+    enabled: !!user?.employeeId,
+  });
 
   const queryClient = useQueryClient();
   const { addToast } = useNotificationStore();
@@ -68,33 +85,102 @@ export const LeaveWFHPage: React.FC = () => {
     return leaves.filter(item => {
       const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Unknown Employee' : item.employeeId) : 'Unknown Employee';
       const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
-      const matchType = typeFilter === 'All' || item.leaveType === typeFilter;
       const matchStatus = statusFilter === 'All' || item.status === statusFilter;
-      return matchName && matchType && matchStatus;
+      return matchName && matchStatus;
     });
-  }, [leaves, nameFilter, typeFilter, statusFilter]);
+  }, [leaves, nameFilter, statusFilter]);
 
   const filteredWFH = useMemo(() => {
     if (!wfh) return [];
     return wfh.filter(item => {
       const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Unknown Employee' : item.employeeId) : 'Unknown Employee';
       const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
-      const matchType = typeFilter === 'All' || typeFilter === 'WFH';
       const matchStatus = statusFilter === 'All' || item.status === statusFilter;
-      return matchName && matchType && matchStatus;
+      return matchName && matchStatus;
     });
-  }, [wfh, nameFilter, typeFilter, statusFilter]);
+  }, [wfh, nameFilter, statusFilter]);
 
   const filteredPerms = useMemo(() => {
     if (!perms) return [];
     return perms.filter(item => {
       const empName = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId.fullName || 'Unknown Employee' : item.employeeId) : 'Unknown Employee';
       const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
-      const matchType = typeFilter === 'All' || typeFilter === 'Permission';
       const matchStatus = statusFilter === 'All' || item.approvalStatus === statusFilter;
-      return matchName && matchType && matchStatus;
+      return matchName && matchStatus;
     });
-  }, [perms, nameFilter, typeFilter, statusFilter]);
+  }, [perms, nameFilter, statusFilter]);
+
+  // Calendar Helpers & Cell Generator
+  const handlePrevMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
+  };
+
+  const calendarCells = useMemo(() => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const prevTotalDays = new Date(year, month, 0).getDate();
+
+    const cells = [];
+
+    // Previous Month padding
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const prevDay = prevTotalDays - i;
+      const prevMonth = month === 0 ? 11 : month - 1;
+      const prevYear = month === 0 ? year - 1 : year;
+      cells.push({
+        dateStr: `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`,
+        dayNum: prevDay,
+        isCurrentMonth: false,
+      });
+    }
+
+    // Current Month days
+    for (let day = 1; day <= totalDays; day++) {
+      cells.push({
+        dateStr: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+        dayNum: day,
+        isCurrentMonth: true,
+      });
+    }
+
+    // Next Month padding
+    const remainingCells = 42 - cells.length;
+    for (let i = 1; i <= remainingCells; i++) {
+      const nextMonth = month === 11 ? 0 : month + 1;
+      const nextYear = month === 11 ? year + 1 : year;
+      cells.push({
+        dateStr: `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
+        dayNum: i,
+        isCurrentMonth: false,
+      });
+    }
+
+    return cells;
+  }, [calendarDate]);
+
+  const getEventsForDate = (dateStr: string) => {
+    const dayLeaves = leaves?.filter(l => dateStr >= l.startDate && dateStr <= l.endDate) || [];
+    const dayWfh = wfh?.filter(w => dateStr >= w.startDate && dateStr <= w.endDate) || [];
+    const dayPerms = perms?.filter(p => p.date === dateStr) || [];
+
+    return {
+      leaves: dayLeaves,
+      wfh: dayWfh,
+      perms: dayPerms,
+      totalCount: dayLeaves.length + dayWfh.length + dayPerms.length,
+    };
+  };
+
+  const selectedDateEvents = useMemo(() => {
+    return getEventsForDate(selectedCalendarDate);
+  }, [selectedCalendarDate, leaves, wfh, perms]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -286,8 +372,11 @@ export const LeaveWFHPage: React.FC = () => {
     );
   }
 
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
+      {/* Title Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border shadow-sm">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
@@ -314,87 +403,260 @@ export const LeaveWFHPage: React.FC = () => {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Exactly 2 Primary Tabs: Dashboard and Logs */}
       <div className="flex items-center gap-2 border-b border-border pb-3">
         <button
-          onClick={() => setActiveTab('LEAVE')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-            activeTab === 'LEAVE' ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' : 'text-muted-foreground hover:bg-muted'
+          onClick={() => setActivePageTab('DASHBOARD')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            activePageTab === 'DASHBOARD' 
+              ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
-          <Palmtree className="w-4 h-4" /> Leave Requests
+          <CalendarIcon className="w-4 h-4" /> Calendar & Balances
         </button>
         <button
-          onClick={() => setActiveTab('WFH')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-            activeTab === 'WFH' ? 'bg-foreground text-background shadow-md' : 'text-muted-foreground hover:bg-muted'
+          onClick={() => setActivePageTab('HISTORY')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            activePageTab === 'HISTORY' 
+              ? 'bg-foreground text-background shadow-md' 
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
-          <Laptop className="w-4 h-4" /> WFH Requests
-        </button>
-        <button
-          onClick={() => setActiveTab('PERMISSION')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-            activeTab === 'PERMISSION' ? 'bg-muted-foreground text-white shadow-md' : 'text-muted-foreground hover:bg-muted'
-          }`}
-        >
-          <Clock className="w-4 h-4" /> Permission Hours
+          <FileText className="w-4 h-4" /> Request History Logs
         </button>
       </div>
 
-      <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6">
-        {/* Advanced Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
-          <div className="flex-1 w-full">
-            <Input
-              placeholder="Search requests by employee name..."
-              value={nameFilter}
-              onChange={(e) => setNameFilter(e.target.value)}
-            />
+      {/* Render selected primary tab */}
+      {activePageTab === 'DASHBOARD' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-250">
+          {/* Balances (Left Column) */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Info className="w-4 h-4 text-primary" />
+              Your Balance Allowances
+            </h3>
+            
+            <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+              <div className="absolute right-3 top-3 opacity-10">
+                <Palmtree className="w-12 h-12 text-primary" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Casual / Sick Leaves</p>
+              <h4 className="text-3xl font-black text-foreground">{employeeProfile?.leaveBalance ?? 2} <span className="text-xs font-semibold text-muted-foreground">days</span></h4>
+              <p className="text-[10px] text-muted-foreground mt-2">Resets monthly (Allocated: 2 days / month)</p>
+            </Card>
+
+            <Card className="border-l-4 border-l-foreground p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+              <div className="absolute right-3 top-3 opacity-10">
+                <Laptop className="w-12 h-12 text-foreground" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Work From Home (WFH)</p>
+              <h4 className="text-3xl font-black text-foreground">{employeeProfile?.wfhBalance ?? 1} <span className="text-xs font-semibold text-muted-foreground">days</span></h4>
+              <p className="text-[10px] text-muted-foreground mt-2">Resets monthly (Allocated: 1 day / month)</p>
+            </Card>
+
+            <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+              <div className="absolute right-3 top-3 opacity-10">
+                <Clock className="w-12 h-12 text-primary" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Permission Hours</p>
+              <h4 className="text-3xl font-black text-foreground">{employeeProfile?.permissionHoursBalance ?? 3} <span className="text-xs font-semibold text-muted-foreground">hrs</span></h4>
+              <p className="text-[10px] text-muted-foreground mt-2">Resets monthly (Allocated: 3 hrs / month)</p>
+            </Card>
           </div>
-          <div className="w-full sm:w-56">
-            <Select
-              value={typeFilter}
-              onChange={(e) => {
-                const val = e.target.value;
-                setTypeFilter(val);
-                if (val === 'WFH') setActiveTab('WFH');
-                else if (val === 'Permission') setActiveTab('PERMISSION');
-                else if (val === 'Casual Leave' || val === 'Sick Leave') setActiveTab('LEAVE');
-              }}
-              options={[
-                { value: 'All', label: 'All Request Types' },
-                { value: 'Casual Leave', label: 'Casual Leave' },
-                { value: 'Sick Leave', label: 'Sick Leave' },
-                { value: 'WFH', label: 'WFH Request' },
-                { value: 'Permission', label: 'Permission Hours' },
-              ]}
-            />
-          </div>
-          <div className="w-full sm:w-56">
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              options={[
-                { value: 'All', label: 'All Statuses' },
-                { value: 'PENDING', label: 'Pending' },
-                { value: 'APPROVED', label: 'Approved' },
-                { value: 'REJECTED', label: 'Rejected' },
-              ]}
-            />
+
+          {/* Interactive Calendar (Right 2 Columns) */}
+          <div className="lg:col-span-2 space-y-4">
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <CalendarIcon className="w-4 h-4 text-primary" />
+              Interactive Leave & WFH Calendar
+            </h3>
+
+            <Card className="p-6 bg-card shadow-md border border-border space-y-4">
+              {/* Calendar Controls */}
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h4 className="font-extrabold text-base text-foreground flex items-center gap-2">
+                  {monthNames[calendarDate.getMonth()]} {calendarDate.getFullYear()}
+                </h4>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" onClick={handlePrevMonth} className="h-8 w-8 p-0">
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleNextMonth} className="h-8 w-8 p-0">
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Weekdays */}
+              <div className="grid grid-cols-7 text-center text-xs font-bold text-muted-foreground border-b border-border pb-2">
+                <div>Sun</div>
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+              </div>
+
+              {/* Days Grid */}
+              <div className="grid grid-cols-7 gap-1.5">
+                {calendarCells.map((cell, idx) => {
+                  const cellEvents = getEventsForDate(cell.dateStr);
+                  const isSelected = cell.dateStr === selectedCalendarDate;
+                  
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedCalendarDate(cell.dateStr)}
+                      className={`h-11 sm:h-12 flex flex-col items-center justify-between p-1 rounded-xl transition-all border text-xs relative ${
+                        cell.isCurrentMonth 
+                          ? 'text-foreground font-semibold bg-background hover:bg-muted/50' 
+                          : 'text-muted-foreground/30 bg-muted/10 border-transparent pointer-events-none'
+                      } ${
+                        isSelected 
+                          ? 'border-primary ring-2 ring-primary/20 bg-primary/5' 
+                          : 'border-border'
+                      }`}
+                    >
+                      <span className="self-start pl-1 pt-0.5">{cell.dayNum}</span>
+                      
+                      {/* Event Dots Container */}
+                      <div className="flex gap-0.5 mt-auto mb-0.5 pb-0.5">
+                        {cellEvents.leaves.length > 0 && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" title="Leave Scheduled" />
+                        )}
+                        {cellEvents.wfh.length > 0 && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-foreground border border-border" title="WFH Scheduled" />
+                        )}
+                        {cellEvents.perms.length > 0 && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" title="Permission Scheduled" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Date Event List */}
+              <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border space-y-2.5">
+                <h5 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border/60 pb-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-primary" />
+                  Schedule for {formatDate(selectedCalendarDate)}
+                </h5>
+                
+                {selectedDateEvents.totalCount === 0 ? (
+                  <p className="text-xs text-muted-foreground italic py-1">No leaves, WFH, or permission slots scheduled on this date.</p>
+                ) : (
+                  <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                    {selectedDateEvents.leaves.map((l) => (
+                      <div key={l._id} className="flex items-center justify-between bg-card p-2 rounded-lg border border-border text-xs">
+                        <div>
+                          <span className="font-bold text-primary">{l.leaveType}</span>
+                          <span className="text-muted-foreground block text-[10px] mt-0.5">Reason: {l.reason}</span>
+                        </div>
+                        {getStatusBadge(l.status)}
+                      </div>
+                    ))}
+                    {selectedDateEvents.wfh.map((w) => (
+                      <div key={w._id} className="flex items-center justify-between bg-card p-2 rounded-lg border border-border text-xs">
+                        <div>
+                          <span className="font-bold text-foreground">Work From Home (WFH)</span>
+                          <span className="text-muted-foreground block text-[10px] mt-0.5">Tasks: {w.expectedTasks || 'General Work'}</span>
+                        </div>
+                        {getStatusBadge(w.status)}
+                      </div>
+                    ))}
+                    {selectedDateEvents.perms.map((p) => (
+                      <div key={p._id} className="flex items-center justify-between bg-card p-2 rounded-lg border border-border text-xs">
+                        <div>
+                          <span className="font-bold text-yellow-600 dark:text-yellow-500">Permission Slot</span>
+                          <span className="text-muted-foreground block text-[10px] mt-0.5">Time: {p.startTime} to {p.endTime} ({p.totalHours} hrs)</span>
+                        </div>
+                        {getStatusBadge(p.approvalStatus)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
         </div>
+      ) : (
+        /* History & Status Logs Tab */
+        <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6 animate-in fade-in duration-250">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+            {/* Segmented sub-tab control */}
+            <div className="flex bg-muted p-1 rounded-xl w-fit border border-border">
+              <button
+                type="button"
+                onClick={() => setActiveHistoryTab('LEAVE')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeHistoryTab === 'LEAVE' ? 'bg-background text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Palmtree className="w-3.5 h-3.5" />
+                Leaves
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveHistoryTab('WFH')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeHistoryTab === 'WFH' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Laptop className="w-3.5 h-3.5" />
+                WFH Requests
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveHistoryTab('PERMISSION')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeHistoryTab === 'PERMISSION' ? 'bg-background text-yellow-600 dark:text-yellow-500 shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                Permissions
+              </button>
+            </div>
 
-        {activeTab === 'LEAVE' && (
-          <TableWrapper columns={leaveColumns} data={filteredLeaves} />
-        )}
-        {activeTab === 'WFH' && (
-          <TableWrapper columns={wfhColumns} data={filteredWFH} />
-        )}
-        {activeTab === 'PERMISSION' && (
-          <TableWrapper columns={permColumns} data={filteredPerms} />
-        )}
-      </Card>
+            {/* Simple Search/Filters */}
+            <div className="flex items-center gap-3">
+              {role !== 'EMPLOYEE' && (
+                <div className="w-48 sm:w-64">
+                  <Input
+                    placeholder="Search name..."
+                    value={nameFilter}
+                    onChange={(e) => setNameFilter(e.target.value)}
+                  />
+                </div>
+              )}
+              <div className="w-40">
+                <Select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  options={[
+                    { value: 'All', label: 'All Statuses' },
+                    { value: 'PENDING', label: 'Pending' },
+                    { value: 'APPROVED', label: 'Approved' },
+                    { value: 'REJECTED', label: 'Rejected' },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+
+          {activeHistoryTab === 'LEAVE' && (
+            <TableWrapper columns={role === 'EMPLOYEE' ? leaveColumns.filter(c => c.header !== 'Employee') : leaveColumns} data={filteredLeaves} />
+          )}
+          {activeHistoryTab === 'WFH' && (
+            <TableWrapper columns={role === 'EMPLOYEE' ? wfhColumns.filter(c => c.header !== 'Employee') : wfhColumns} data={filteredWFH} />
+          )}
+          {activeHistoryTab === 'PERMISSION' && (
+            <TableWrapper columns={role === 'EMPLOYEE' ? permColumns.filter(c => c.header !== 'Employee') : permColumns} data={filteredPerms} />
+          )}
+        </Card>
+      )}
 
       {/* Modals */}
       <LeaveApplyModal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} />

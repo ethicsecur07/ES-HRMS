@@ -3,11 +3,31 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateAttendance = exports.verifyIP = exports.checkOut = exports.checkIn = exports.getAllAttendance = exports.getTodayAttendance = void 0;
 const Attendance_js_1 = require("../models/Attendance.js");
 const Employee_js_1 = require("../models/Employee.js");
+const User_js_1 = require("../models/User.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const getTodayAttendance = async (req, res) => {
     try {
+        const authReq = req;
         const today = new Date().toISOString().split('T')[0];
-        const attendances = await Attendance_js_1.Attendance.find({ date: today }).populate('employeeId');
+        let query = { date: today };
+        if (authReq.user && authReq.user.role === 'EMPLOYEE') {
+            const user = await User_js_1.User.findById(authReq.user.id);
+            let employeeId = user?.employeeId;
+            if (user && !employeeId) {
+                const employee = await Employee_js_1.Employee.findOne({ email: user.email });
+                if (employee) {
+                    employeeId = employee._id;
+                }
+            }
+            if (employeeId) {
+                query.employeeId = employeeId;
+            }
+            else {
+                res.status(200).json({ attendances: [] });
+                return;
+            }
+        }
+        const attendances = await Attendance_js_1.Attendance.find(query).populate('employeeId');
         res.status(200).json({ attendances });
     }
     catch (error) {
@@ -17,7 +37,26 @@ const getTodayAttendance = async (req, res) => {
 exports.getTodayAttendance = getTodayAttendance;
 const getAllAttendance = async (req, res) => {
     try {
-        const attendances = await Attendance_js_1.Attendance.find().populate('employeeId').sort({ date: -1, loginTime: -1 });
+        const authReq = req;
+        let query = {};
+        if (authReq.user && authReq.user.role === 'EMPLOYEE') {
+            const user = await User_js_1.User.findById(authReq.user.id);
+            let employeeId = user?.employeeId;
+            if (user && !employeeId) {
+                const employee = await Employee_js_1.Employee.findOne({ email: user.email });
+                if (employee) {
+                    employeeId = employee._id;
+                }
+            }
+            if (employeeId) {
+                query.employeeId = employeeId;
+            }
+            else {
+                res.status(200).json({ attendances: [] });
+                return;
+            }
+        }
+        const attendances = await Attendance_js_1.Attendance.find(query).populate('employeeId').sort({ date: -1, loginTime: -1 });
         res.status(200).json({ attendances });
     }
     catch (error) {
