@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
 import { analyticsApi } from '../api_service/analyticsApi';
@@ -8,6 +9,7 @@ import { AttendanceCheckIn } from '../Components/SpecifiedComponents/AttendanceC
 import { EmployeeQuickStats } from '../Components/SpecifiedComponents/EmployeeQuickStats';
 import { HRApprovalQueue } from '../Components/SpecifiedComponents/HRApprovalQueue';
 import { AdminAnalyticsCharts } from '../Components/SpecifiedComponents/AdminAnalyticsCharts';
+import { FinanceManagementChart } from '../Components/SpecifiedComponents/AdminAnalyticsCharts';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
@@ -18,6 +20,7 @@ import { LeaveApplyModal } from '../Components/SpecifiedComponents/LeaveApplyMod
 export const DashboardPage: React.FC = () => {
   const { user, role } = useAuthStore();
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const navigate = useNavigate();
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboardStats'],
@@ -175,35 +178,186 @@ export const DashboardPage: React.FC = () => {
       {/* 4. ADMIN DASHBOARD */}
       {role === 'ADMIN' && (
         <div className="space-y-8">
-          <div className="p-6 rounded-2xl bg-card border border-border shadow-sm flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-bold">Admin Workspace</h3>
-              <p className="text-sm text-muted-foreground">Full organizational overview and system analytics.</p>
-            </div>
-          </div>
+
+          {/* Top metrics + charts (Employee Trends, Payroll Analytics) */}
           <AdminAnalyticsCharts stats={stats} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-              <Card className="space-y-4 border-l-4 border-l-foreground shadow-md p-6 bg-card">
-                <div>
-                  <h3 className="text-lg font-bold text-foreground tracking-tight">Company Productivity Reports</h3>
-                </div>
-                <TableWrapper
-                  columns={[
-                    { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId.fullName || 'Unknown' : row.employeeId) : 'Unknown'}</span> },
-                    ...taskColumns,
-                  ]}
-                  data={allTasks || []}
-                  searchKey="completedTasks"
-                  searchPlaceholder="Filter reports..."
-                />
-              </Card>
-            </div>
-            <div className="lg:col-span-1 space-y-8">
-              <HRApprovalQueue />
+          {/* Quick Access Grid */}
+          <div>
+            <h3 className="text-base font-bold text-foreground mb-3 tracking-tight">Quick Access</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[
+                {
+                  label: 'Payroll',
+                  desc: 'Salaries & Payslips',
+                  path: '/payroll',
+                  gradient: 'from-violet-500/20 to-purple-600/10',
+                  border: 'border-violet-500/30',
+                  iconBg: 'bg-violet-500/15 text-violet-600',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  ),
+                },
+                {
+                  label: 'Audit Logs',
+                  desc: 'Activity History',
+                  path: '/audit-logs',
+                  gradient: 'from-rose-500/20 to-red-600/10',
+                  border: 'border-rose-500/30',
+                  iconBg: 'bg-rose-500/15 text-rose-600',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                  ),
+                },
+                {
+                  label: 'Projects',
+                  desc: 'Tasks & Sprints',
+                  path: '/projects',
+                  gradient: 'from-blue-500/20 to-cyan-600/10',
+                  border: 'border-blue-500/30',
+                  iconBg: 'bg-blue-500/15 text-blue-600',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                  ),
+                },
+                {
+                  label: 'Finance',
+                  desc: 'Budget & Expenses',
+                  path: '/finance',
+                  gradient: 'from-emerald-500/20 to-green-600/10',
+                  border: 'border-emerald-500/30',
+                  iconBg: 'bg-emerald-500/15 text-emerald-600',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                  ),
+                },
+                {
+                  label: 'Organization',
+                  desc: 'Structure & Branches',
+                  path: '/organization',
+                  gradient: 'from-amber-500/20 to-orange-600/10',
+                  border: 'border-amber-500/30',
+                  iconBg: 'bg-amber-500/15 text-amber-600',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  ),
+                },
+                {
+                  label: 'Lifecycle',
+                  desc: 'Onboard & Offboard',
+                  path: '/lifecycle',
+                  gradient: 'from-pink-500/20 to-fuchsia-600/10',
+                  border: 'border-pink-500/30',
+                  iconBg: 'bg-pink-500/15 text-pink-600',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  ),
+                },
+              ].map(({ label, desc, path, gradient, border, iconBg, icon }) => (
+                <button
+                  key={path}
+                  onClick={() => navigate(path)}
+                  className={`group relative flex flex-col items-center gap-3 p-5 rounded-2xl border ${border} bg-gradient-to-br ${gradient} hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer text-center w-full`}
+                >
+                  <div className={`p-3 rounded-xl ${iconBg} group-hover:scale-110 transition-transform duration-200`}>
+                    {icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">{label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{desc}</p>
+                  </div>
+                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Middle row: Finance Management (left) + Approval Queue (right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <FinanceManagementChart stats={stats} />
+            <HRApprovalQueue />
+          </div>
+
+          {/* Bottom: Full-width Project Productivity Reports */}
+          <Card className="space-y-4 border-l-4 border-l-foreground shadow-md p-6 bg-card">
+            <div>
+              <h3 className="text-lg font-bold text-foreground tracking-tight">Project Productivity Reports</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Real-time task completion across all active projects</p>
+            </div>
+
+            {(!stats?.projectProductivity || stats.projectProductivity.length === 0) ? (
+              <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
+                No projects found
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border">
+                      <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Project Name</th>
+                      <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Managed By</th>
+                      <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Status</th>
+                      <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">In Progress</th>
+                      <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Completion</th>
+                      <th className="text-center px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Team</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {stats.projectProductivity.map((proj: any, idx: number) => {
+                      const statusColors: Record<string, string> = {
+                        ACTIVE: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
+                        PLANNING: 'bg-blue-500/15 text-blue-600 border-blue-500/30',
+                        ON_HOLD: 'bg-amber-500/15 text-amber-600 border-amber-500/30',
+                        COMPLETED: 'bg-primary/15 text-primary border-primary/30',
+                      };
+                      const statusColor = statusColors[proj.status] || 'bg-muted text-muted-foreground border-border';
+                      return (
+                        <tr key={proj.id || idx} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-foreground">{proj.projectName}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{proj.managedBy}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${statusColor}`}>
+                              {proj.status.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 min-w-[140px]">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                                  style={{ width: `${proj.inProgressPercent}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-bold text-amber-600 w-8 text-right">{proj.inProgressPercent}%</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 min-w-[140px]">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                                  style={{ width: `${proj.completionPercent}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-bold text-emerald-600 w-8 text-right">{proj.completionPercent}%</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                              {proj.teamSize}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
         </div>
       )}
 

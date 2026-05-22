@@ -9,7 +9,7 @@ import { departmentApi } from '../api_service/departmentApi';
 import { designationApi } from '../api_service/designationApi';
 import { authApi } from '../api_service/authApi';
 import { useNotificationStore } from '../store/useNotificationStore';
-import { useAuthStore } from '../store/useAuthStore';
+import { usePermission } from '../hooks/usePermission';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Textarea } from '../Components/WrapperComponents/Input';
@@ -99,7 +99,7 @@ const employeeSchema = baseEmployeeSchema.superRefine((data, ctx) => {
 type EmployeeFormValues = z.infer<typeof baseEmployeeSchema>;
 
 export const EmployeesPage: React.FC = () => {
-  const { role } = useAuthStore();
+  const { hasPermission } = usePermission();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string>('');
@@ -415,10 +415,12 @@ export const EmployeesPage: React.FC = () => {
           <Button size="sm" variant="outline" onClick={() => navigate(`/employees/${row._id}`)} title="View Details">
             <Eye className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => handleEdit(row)} title="Edit Employee">
-            <Edit className="w-4 h-4" />
-          </Button>
-          {(role === 'ADMIN' || role === 'HR') && (
+          {hasPermission('EMPLOYEES', 'edit') && (
+            <Button size="sm" variant="outline" onClick={() => handleEdit(row)} title="Edit Employee">
+              <Edit className="w-4 h-4" />
+            </Button>
+          )}
+          {hasPermission('EMPLOYEES', 'delete') && (
             <Button
               size="sm"
               variant="destructive"
@@ -454,10 +456,12 @@ export const EmployeesPage: React.FC = () => {
             Manage company workforce, dynamic organization structures, bank details, and profiles.
           </p>
         </div>
-        <Button onClick={handleAddNew} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
-          <PlusCircle className="w-5 h-5 mr-2" />
-          ONBOARD EMPLOYEE
-        </Button>
+        {hasPermission('EMPLOYEES', 'create') && (
+          <Button onClick={handleAddNew} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
+            <PlusCircle className="w-5 h-5 mr-2" />
+            ONBOARD EMPLOYEE
+          </Button>
+        )}
       </div>
 
       <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6">

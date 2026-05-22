@@ -22,6 +22,7 @@ const fallbackModuleRoutes: ModuleRouteData[] = [
   { moduleCode: 'WORKFLOW', routePath: '/workflows', displayName: 'Workflow Engine', order: 10 },
   { moduleCode: 'REPORTS', routePath: '/reports', displayName: 'Reports & Analytics', order: 11 },
   { moduleCode: 'AUDIT_LOGS', routePath: '/audit-logs', displayName: 'Audit Logs', order: 12 },
+  { moduleCode: 'SETTINGS', routePath: '/settings', displayName: 'Settings', order: 13 },
   { moduleCode: 'SELF_SERVICE', routePath: '/self-service', displayName: 'Self Service', order: 14 },
   { moduleCode: 'DOCUMENTS', routePath: '/documents', displayName: 'Documents', order: 15 },
   { moduleCode: 'PROJECTS', routePath: '/projects', displayName: 'Projects', order: 16 },

@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { leaveApi } from '../../api_service/leaveApi';
 import { wfhApi } from '../../api_service/wfhApi';
 import { permissionApi } from '../../api_service/permissionApi';
-import { Sidebar } from './Sidebar';
+import { Sidebar, SidebarExpandedContext } from './Sidebar';
 import { Navbar } from './Navbar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
@@ -26,6 +26,7 @@ export const Layout: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   // Fetch requests to populate notifications on load
   const isPrivileged = role === 'ADMIN' || role === 'HR';
   const { data: leaves } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll, enabled: !!role && !!token });
@@ -220,41 +221,47 @@ export const Layout: React.FC = () => {
   }, [role, user?._id, queryClient]);
 
   return (
-    <div className="flex min-h-screen w-full bg-background text-foreground overflow-x-hidden">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+    <SidebarExpandedContext.Provider value={{ expanded: sidebarExpanded, setExpanded: setSidebarExpanded }}>
+      <div className="flex min-h-screen w-full bg-background text-foreground overflow-x-hidden">
+        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-64 pt-20">
-        <Navbar onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <div
+          className={`flex-1 flex flex-col min-w-0 pt-20 transition-all duration-300 ease-in-out ${
+            sidebarExpanded ? 'lg:pl-64' : 'lg:pl-16'
+          }`}
+        >
+          <Navbar onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-        <main className="flex-1 p-4 sm:p-8 max-w-[1600px] w-full mx-auto animate-in fade-in duration-300">
-          <Outlet />
-        </main>
-      </div>
+          <main className="flex-1 p-4 sm:p-8 max-w-[1600px] w-full mx-auto animate-in fade-in duration-300">
+            <Outlet />
+          </main>
+        </div>
 
-      {/* Toast Notification Container */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none p-4 sm:p-0">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`pointer-events-auto flex items-start justify-between p-4 rounded-2xl shadow-2xl border backdrop-blur-md transition-all animate-in slide-in-from-bottom-5 duration-300 ${
-              t.type === 'success' || t.type === 'warning' || t.type === 'error'
-                ? 'bg-card border-l-4 border-primary text-foreground shadow-lg shadow-primary/10'
-                : 'bg-card border-border text-foreground'
-            }`}
-          >
-            <div className="flex flex-col text-left pr-3">
-              <span className="font-bold text-sm tracking-tight mb-0.5">{t.title}</span>
-              <span className="text-xs text-muted-foreground leading-relaxed">{t.message}</span>
-            </div>
-            <button
-              onClick={() => removeToast(t.id)}
-              className="rounded-full p-1 hover:bg-background/20 transition-colors flex-shrink-0 text-muted-foreground hover:text-foreground"
+        {/* Toast Notification Container */}
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none p-4 sm:p-0">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className={`pointer-events-auto flex items-start justify-between p-4 rounded-2xl shadow-2xl border backdrop-blur-md transition-all animate-in slide-in-from-bottom-5 duration-300 ${
+                t.type === 'success' || t.type === 'warning' || t.type === 'error'
+                  ? 'bg-card border-l-4 border-primary text-foreground shadow-lg shadow-primary/10'
+                  : 'bg-card border-border text-foreground'
+              }`}
             >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
+              <div className="flex flex-col text-left pr-3">
+                <span className="font-bold text-sm tracking-tight mb-0.5">{t.title}</span>
+                <span className="text-xs text-muted-foreground leading-relaxed">{t.message}</span>
+              </div>
+              <button
+                onClick={() => removeToast(t.id)}
+                className="rounded-full p-1 hover:bg-background/20 transition-colors flex-shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </SidebarExpandedContext.Provider>
   );
 };

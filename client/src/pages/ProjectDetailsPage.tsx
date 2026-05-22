@@ -7,10 +7,12 @@ import { ArrowLeft, Calendar, Clock, Edit, Trash2, Plus, Settings } from 'lucide
 import { Modal } from '../Components/WrapperComponents/Modal';
 import { Input, Select, Textarea } from '../Components/WrapperComponents/Input';
 import { Button } from '../Components/WrapperComponents/Button';
+import { usePermission } from '../hooks/usePermission';
 
 export const ProjectDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const [project, setProject] = useState<any>(null);
   const [sprints, setSprints] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -198,7 +200,7 @@ export const ProjectDetailsPage = () => {
     }
   };
 
-  if (!project) return <div className="p-6 text-slate-400 bg-slate-950 min-h-screen">Loading project details...</div>;
+  if (!project) return <div className="p-6 text-muted-foreground bg-background min-h-screen">Loading project details...</div>;
 
   // Determine assignable members
   const assignableMembers = [...(project.teamMemberIds || [])];
@@ -215,67 +217,71 @@ export const ProjectDetailsPage = () => {
   const selectedSprintObj = sprints.find(s => s._id === selectedSprintId);
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 p-6 text-left">
+    <div className="flex flex-col h-full bg-background p-6 text-left animate-in fade-in duration-300">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center">
           <button 
             onClick={() => navigate('/projects')}
-            className="mr-4 p-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg transition-colors border border-slate-800"
+            className="mr-4 p-2 bg-card hover:bg-muted text-foreground rounded-lg transition-colors border border-border"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">{project.name}</h1>
-            <div className="flex flex-wrap items-center text-slate-400 text-sm mt-1 gap-3">
+            <h1 className="text-2xl font-bold text-foreground">{project.name}</h1>
+            <div className="flex flex-wrap items-center text-muted-foreground text-sm mt-1 gap-3 font-medium">
               <span className={`px-2 py-0.5 rounded border text-xs font-semibold ${
-                project.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                project.status === 'PLANNING' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                project.status === 'ON_HOLD' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                'bg-slate-800 text-slate-400 border-slate-700'
+                project.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                project.status === 'PLANNING' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                project.status === 'ON_HOLD' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                'bg-muted text-muted-foreground border-border'
               }`}>
                 {project.status}
               </span>
               <span className="flex items-center">
-                <Calendar className="w-4 h-4 mr-1 text-slate-500" />
+                <Calendar className="w-4 h-4 mr-1 text-muted-foreground" />
                 {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}
               </span>
-              <span className="text-slate-500">|</span>
-              <span>Client: <strong className="text-slate-300">{project.clientName}</strong></span>
-              <span className="text-slate-500">|</span>
-              <span>Budget: <strong className="text-indigo-400">${project.budget?.toLocaleString()}</strong></span>
+              <span className="text-muted-foreground">|</span>
+              <span>Client: <strong className="text-foreground">{project.clientName}</strong></span>
+              <span className="text-muted-foreground">|</span>
+              <span>Budget: <strong className="text-primary">${project.budget?.toLocaleString()}</strong></span>
             </div>
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsEditProjectOpen(true)}
-            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg border border-slate-800 transition-colors text-sm font-medium"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Project
-          </button>
-          <button
-            onClick={handleDeleteProject}
-            className="flex items-center px-3 py-1.5 bg-red-950/20 hover:bg-red-950/40 text-red-400 rounded-lg border border-red-500/20 transition-colors text-sm font-medium"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </button>
+          {hasPermission('PROJECTS', 'edit') && (
+            <button
+              onClick={() => setIsEditProjectOpen(true)}
+              className="flex items-center px-3 py-1.5 bg-card hover:bg-muted text-foreground rounded-lg border border-border transition-colors text-sm font-medium shadow-sm"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Project
+            </button>
+          )}
+          {hasPermission('PROJECTS', 'delete') && (
+            <button
+              onClick={handleDeleteProject}
+              className="flex items-center px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg border border-destructive/20 transition-colors text-sm font-medium"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
       {/* Toolbar / Sprints Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-card border border-border p-4 rounded-xl shadow-sm">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center">
-            <span className="text-sm font-medium text-slate-400 mr-2">Sprint:</span>
+            <span className="text-sm font-semibold text-muted-foreground mr-2">Sprint:</span>
             <select
               value={selectedSprintId}
               onChange={(e) => setSelectedSprintId(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+              className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-primary transition-colors cursor-pointer font-medium"
             >
               <option value="backlog">Backlog / All Tasks</option>
               {sprints.map((sprint) => (
@@ -286,46 +292,48 @@ export const ProjectDetailsPage = () => {
             </select>
           </div>
 
-          {selectedSprintId !== 'backlog' && (
+          {selectedSprintId !== 'backlog' && hasPermission('PROJECTS', 'edit') && (
             <button
               onClick={openEditSprintModal}
-              className="p-2 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-300 border border-slate-800 rounded-lg transition-colors"
+              className="p-2 bg-background hover:bg-muted text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors"
               title="Edit Sprint Settings"
             >
               <Settings className="w-4 h-4" />
             </button>
           )}
 
-          <button
-            onClick={() => setIsCreateSprintOpen(true)}
-            className="flex items-center text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-2 rounded-lg border border-indigo-500/10 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            New Sprint
-          </button>
+          {hasPermission('PROJECTS', 'edit') && (
+            <button
+              onClick={() => setIsCreateSprintOpen(true)}
+              className="flex items-center text-xs font-bold text-primary hover:text-primary/95 bg-primary/10 hover:bg-primary/20 px-3 py-2 rounded-lg border border-primary/20 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              New Sprint
+            </button>
+          )}
         </div>
 
         {/* Sprint Info Banner */}
         {selectedSprintObj ? (
-          <div className="text-xs text-slate-400 flex flex-wrap items-center gap-3">
+          <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-3 font-medium">
             <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
               {new Date(selectedSprintObj.startDate).toLocaleDateString()} - {new Date(selectedSprintObj.endDate).toLocaleDateString()}
             </span>
             {selectedSprintObj.goal && (
               <>
-                <span className="text-slate-700">•</span>
-                <span className="italic text-slate-300">"{selectedSprintObj.goal}"</span>
+                <span className="text-muted-foreground">•</span>
+                <span className="italic text-foreground">"{selectedSprintObj.goal}"</span>
               </>
             )}
           </div>
         ) : (
-          <div className="text-xs text-slate-500 italic">Showing all board tasks</div>
+          <div className="text-xs text-muted-foreground italic font-medium">Showing all board tasks</div>
         )}
       </div>
 
       {/* Kanban Board Area */}
-      <div className="flex-1 bg-slate-900/50 rounded-xl border border-slate-800 p-4 overflow-hidden min-h-[500px]">
+      <div className="flex-1   overflow-hidden min-h-[500px]">
         <KanbanBoard 
           projectId={project._id} 
           selectedSprintId={selectedSprintId}

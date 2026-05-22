@@ -22,7 +22,6 @@ import {
   Briefcase,
   FolderTree,
   X,
-  Key,
   Fingerprint,
   Globe,
   Eye,

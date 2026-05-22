@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { io } from 'socket.io-client';
-import { Plus, Trash2, Calendar, Award, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Calendar, Award } from 'lucide-react';
 import { projectApi } from '../../api_service/projectApi';
 import { Modal } from '../WrapperComponents/Modal';
 import { Input, Select, Textarea } from '../WrapperComponents/Input';
 import { Button } from '../WrapperComponents/Button';
+import { usePermission } from '../../hooks/usePermission';
 
 const COLUMNS = ['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED'];
 
@@ -36,6 +37,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   sprints,
   teamMembers 
 }) => {
+  const { hasPermission } = usePermission();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -217,11 +219,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'CRITICAL': return 'bg-red-500/10 text-red-400 border border-red-500/20';
-      case 'HIGH': return 'bg-orange-500/10 text-orange-400 border border-orange-500/20';
-      case 'MEDIUM': return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
-      case 'LOW': return 'bg-slate-800 text-slate-400 border border-slate-700';
-      default: return 'bg-slate-800 text-slate-400 border border-slate-700';
+      case 'CRITICAL': return 'bg-red-500/10 text-red-500 border border-red-500/20';
+      case 'HIGH': return 'bg-orange-500/10 text-orange-500 border border-orange-500/20';
+      case 'MEDIUM': return 'bg-amber-500/10 text-amber-500 border border-amber-500/20';
+      case 'LOW': return 'bg-muted text-muted-foreground border border-border';
+      default: return 'bg-muted text-muted-foreground border border-border';
     }
   };
 
@@ -231,19 +233,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         {COLUMNS.map((status) => {
           const filteredTasks = getTasksByStatus(status);
           return (
-            <div key={status} className="flex-1 min-w-[300px] max-w-[380px] bg-slate-900/40 rounded-xl p-4 border border-slate-800/80 flex flex-col h-full max-h-[80vh]">
-              <h3 className="font-semibold text-slate-300 mb-4 flex items-center justify-between">
+            <div key={status} className="flex-1 min-w-[300px] max-w-[380px] bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col h-full max-h-[80vh]">
+              <h3 className="font-semibold text-foreground mb-4 flex items-center justify-between">
                 <span>{status.replace('_', ' ')}</span>
                 <div className="flex items-center gap-2">
-                  <span className="bg-slate-800 text-slate-400 text-xs py-0.5 px-2 rounded-full">
+                  <span className="bg-muted text-muted-foreground text-xs py-0.5 px-2 rounded-full font-bold">
                     {filteredTasks.length}
                   </span>
-                  <button 
-                    onClick={() => handleOpenCreateModal(status as any)}
-                    className="p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                  {hasPermission('PROJECTS', 'edit') && (
+                    <button 
+                      onClick={() => handleOpenCreateModal(status as any)}
+                      className="p-1 hover:bg-muted text-muted-foreground hover:text-foreground rounded transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </h3>
               
@@ -253,21 +257,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className={`flex-1 min-h-[200px] overflow-y-auto pr-1 transition-colors rounded-lg ${
-                      snapshot.isDraggingOver ? 'bg-slate-800/20' : ''
+                      snapshot.isDraggingOver ? 'bg-muted/50' : ''
                     }`}
                   >
                     {filteredTasks.map((task, index) => (
-                      <Draggable key={task._id} draggableId={task._id} index={index}>
+                      <Draggable key={task._id} draggableId={task._id} index={index} isDragDisabled={!hasPermission('PROJECTS', 'edit')}>
                         {(provided, snapshot) => (
                           <div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             onClick={() => handleOpenEditModal(task)}
-                            className={`mb-3 p-4 bg-slate-900 border transition-all cursor-pointer rounded-xl group ${
+                            className={`mb-3 p-4  border transition-all cursor-pointer bg-[#F75F0A] rounded-xl group ${
                               snapshot.isDragging 
-                                ? 'border-indigo-500 shadow-xl shadow-indigo-500/20 rotate-1 scale-[1.02] bg-slate-850' 
-                                : 'border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                                ? 'border-primary shadow-xl shadow-primary/20 rotate-1 scale-[1.02]' 
+                                : 'border-border hover:border-muted-foreground/30 hover:bg-muted/10'
                             }`}
                           >
                             <div className="flex justify-between items-start gap-2 mb-2">
@@ -275,32 +279,32 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 {task.priority}
                               </span>
                               {task.storyPoints !== undefined && task.storyPoints > 0 && (
-                                <span className="flex items-center text-[10px] text-indigo-400 font-medium bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/10">
+                                <span className="flex items-center text-[10px] text-primary font-semibold bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
                                   <Award className="w-3 h-3 mr-0.5" />
                                   {task.storyPoints} pts
                                 </span>
                               )}
                             </div>
                             
-                            <h4 className="text-slate-200 font-medium text-sm mb-2 group-hover:text-indigo-300 transition-colors line-clamp-2">{task.title}</h4>
+                            <h4 className="text-foreground font-medium text-sm mb-2 group-hover:text-primary transition-colors line-clamp-2">{task.title}</h4>
                             
                             {task.description && (
-                              <p className="text-slate-400 text-xs line-clamp-2 mb-3 leading-relaxed">{task.description}</p>
+                              <p className="text-muted-foreground text-xs line-clamp-2 mb-3 leading-relaxed">{task.description}</p>
                             )}
                             
-                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/80">
+                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
                               {task.dueDate && (
-                                <div className="flex items-center text-[10px] text-slate-500">
-                                  <Calendar className="w-3 h-3 mr-1" />
+                                <div className="flex items-center text-[10px] text-muted-foreground">
+                                  <Calendar className="w-3.5 h-3.5 mr-1" />
                                   {new Date(task.dueDate).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
                                 </div>
                               )}
                               {task.assignedTo && (
-                                <div className="flex items-center text-[10px] text-slate-400 ml-auto gap-1.5 bg-slate-950 px-2 py-1 rounded-full border border-slate-800/60">
-                                  <div className="w-4 h-4 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-[8px] font-bold border border-indigo-500/30 uppercase">
+                                <div className="flex items-center text-[10px] text-muted-foreground ml-auto gap-1.5 bg-background px-2 py-1 rounded-full border border-border">
+                                  <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[8px] font-bold border border-primary/30 uppercase">
                                     {task.assignedTo.fullName.charAt(0)}
                                   </div>
-                                  <span>{task.assignedTo.fullName}</span>
+                                  <span className="font-medium">{task.assignedTo.fullName}</span>
                                 </div>
                               )}
                             </div>
@@ -331,6 +335,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             onChange={(e) => setTaskTitle(e.target.value)}
             placeholder="Implement user login form"
             required
+            disabled={!hasPermission('PROJECTS', 'edit')}
           />
 
           <Textarea 
@@ -338,6 +343,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             value={taskDesc}
             onChange={(e) => setTaskDesc(e.target.value)}
             placeholder="Add detailed steps or acceptance criteria..."
+            disabled={!hasPermission('PROJECTS', 'edit')}
           />
 
           <div className="grid grid-cols-2 gap-4">
@@ -346,6 +352,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               value={assignedToId}
               onChange={(e) => setAssignedToId(e.target.value)}
               required
+              disabled={!hasPermission('PROJECTS', 'edit')}
             >
               <option value="">Select Assignee</option>
               {teamMembers.map((member) => (
@@ -365,6 +372,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 { value: 'CRITICAL', label: 'Critical' }
               ]}
               required
+              disabled={!hasPermission('PROJECTS', 'edit')}
             />
           </div>
 
@@ -380,11 +388,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 { value: 'COMPLETED', label: 'Completed' }
               ]}
               required
+              disabled={!hasPermission('PROJECTS', 'edit')}
             />
             <Select 
               label="Sprint"
               value={taskSprintId}
               onChange={(e) => setTaskSprintId(e.target.value)}
+              disabled={!hasPermission('PROJECTS', 'edit')}
             >
               <option value="backlog">Backlog (No Sprint)</option>
               {sprints.map((sprint) => (
@@ -402,17 +412,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               value={storyPoints}
               onChange={(e) => setStoryPoints(Number(e.target.value))}
               placeholder="e.g. 3"
+              disabled={!hasPermission('PROJECTS', 'edit')}
             />
             <Input 
               label="Due Date"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              disabled={!hasPermission('PROJECTS', 'edit')}
             />
           </div>
 
           <div className="flex justify-between gap-3 pt-4 border-t border-border mt-6">
-            {activeTask ? (
+            {activeTask && hasPermission('PROJECTS', 'edit') ? (
               <button
                 type="button"
                 onClick={handleDeleteTask}
@@ -429,9 +441,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" isLoading={isSubmitting}>
-                {activeTask ? 'Save Task' : 'Create Task'}
-              </Button>
+              {hasPermission('PROJECTS', 'edit') && (
+                <Button type="submit" isLoading={isSubmitting}>
+                  {activeTask ? 'Save Task' : 'Create Task'}
+                </Button>
+              )}
             </div>
           </div>
         </form>
