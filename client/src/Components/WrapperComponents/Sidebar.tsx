@@ -8,18 +8,27 @@ import {
   CreditCard,
   BarChart3,
   ShieldCheck,
+  Shield,
   Settings,
   Wallet,
   Bell,
   Sun,
   Moon,
   LogOut,
+  ListTodo,
+  Network,
+  GitBranch,
+  FolderOpen,
+  Receipt,
+  MessageSquare
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { employeeApi } from '../../api_service/employeeApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useModuleStore } from '../../store/useModuleStore.js';
+import { usePermission } from '../../hooks/usePermission';
 import type { Role } from '../../types';
 import ESLogo from '../../assets/ES_Logo.png';
 
@@ -32,6 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, role, logout } = useAuthStore();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore();
   const { theme, toggleTheme } = useThemeStore();
+  const { moduleRoutes, enabledModules } = useModuleStore();
+  const { hasPermission } = usePermission();
   const [showNotifs, setShowNotifs] = useState(false);
   const navigate = useNavigate();
 
@@ -45,7 +56,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const roleColors: Record<Role, string> = {
     ADMIN: 'bg-primary/10 text-primary border-primary/20',
+    MANAGER: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
     HR: 'bg-foreground/10 text-foreground border-border',
+    TEAM_LEAD: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
     EMPLOYEE: 'bg-muted text-muted-foreground border-border',
   };
 
@@ -72,20 +85,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
-    { name: 'Employees', path: '/employees', icon: Users, roles: ['ADMIN', 'HR'] },
-    { name: 'Attendance History', path: '/attendance', icon: CalendarCheck, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
-    { name: 'Leave / WFH / Perms', path: '/leave-wfh', icon: Palmtree, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
-    { name: 'Task & Daily Reports', path: '/task-reports', icon: BarChart3, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
-    { name: 'Payroll', path: '/payroll', icon: CreditCard, roles: ['ADMIN', 'HR', 'EMPLOYEE'] },
-    { name: 'Finance & Maintenance', path: '/finance', icon: Wallet, roles: ['ADMIN', 'HR'] },
-    { name: 'Reports & Analytics', path: '/reports', icon: BarChart3, roles: ['ADMIN', 'HR'] },
-    { name: 'Audit Logs', path: '/audit-logs', icon: ShieldCheck, roles: ['ADMIN'] },
-    { name: 'Settings', path: '/settings', icon: Settings, roles: ['ADMIN'] },
-  ];
+  const getIcon = (path: string) => {
+    switch (path) {
+      case '/dashboard': return LayoutDashboard;
+      case '/employees': return Users;
+      case '/attendance': return CalendarCheck;
+      case '/leave-wfh': return Palmtree;
+      case '/task-reports': return BarChart3;
+      case '/payroll': return CreditCard;
+      case '/finance': return Wallet;
+      case '/reports': return BarChart3;
+      case '/audit-logs': return ShieldCheck;
+      case '/settings': return Settings;
+      case '/settings/leave-policy': return Shield;
+      case '/lifecycle': return ListTodo;
+      case '/organization': return Network;
+      case '/workflows': return GitBranch;
+      case '/self-service': return Receipt;
+      case '/documents': return FolderOpen;
+      default: return LayoutDashboard;
+    }
+  };
 
-  const filteredItems = navItems.filter((item) => role && item.roles.includes(role));
+  const compiledItems = moduleRoutes
+    .filter(route => enabledModules.includes(route.moduleCode))
+    .map(route => ({
+      name: route.displayName,
+      path: route.routePath,
+      icon: getIcon(route.routePath),
+      moduleCode: route.moduleCode,
+    }));
+
+  const filteredItems = compiledItems.filter((item) => hasPermission(item.moduleCode, 'view'));
+
 
   return (
     <>
@@ -149,7 +181,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             {/* Notification Bell */}
             <div className="relative flex-1">
               <button
-                onClick={() => setShowNotifs(!showNotifs)}
+                onClick={() => {
+                  navigate('/notifications');
+                  onClose();
+                }}
                 className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all text-xs font-medium relative"
                 title="Notifications"
               >
@@ -229,6 +264,49 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               </NavLink>
             );
           })}
+          
+          {/* Hardcoded Projects Link */}
+          <NavLink
+            to="/chat"
+            onClick={onClose}
+            className={({ isActive }) =>
+              `flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${isActive
+                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`
+            }
+          >
+            <MessageSquare className="h-5 w-5" />
+            <span>Chat</span>
+          </NavLink>
+
+          <NavLink
+            to="/projects"
+            onClick={onClose}
+            className={({ isActive }) =>
+              `flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${isActive
+                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`
+            }
+          >
+            <ListTodo className="h-5 w-5" />
+            <span>Projects</span>
+          </NavLink>
+
+          <NavLink
+            to="/recruitment"
+            onClick={onClose}
+            className={({ isActive }) =>
+              `flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${isActive
+                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`
+            }
+          >
+            <Users className="h-5 w-5" />
+            <span>Recruitment ATS</span>
+          </NavLink>
         </div>
 
         {/* Mobile-only Logout Button at Bottom of Screen */}

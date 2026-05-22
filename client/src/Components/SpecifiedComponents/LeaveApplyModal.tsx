@@ -63,7 +63,11 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
 
   const applyMutation = useMutation({
     mutationFn: async (values: LeaveFormValues) => {
-      const empId = user?.employeeId || user?._id || 'emp-dev-001';
+      const empId = user?.employeeId || user?._id;
+
+      if (!empId) {
+        throw new Error('Employee profile not found. Please contact HR.');
+      }
 
       if (values.leaveType === 'WFH') {
         return wfhApi.applyWFH({
@@ -73,25 +77,33 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
           expectedTasks: values.expectedTasks || 'Standard daily tasks',
         });
       } else if (values.leaveType === 'Permission') {
+        // Calculate hours from time inputs (do NOT send hardcoded value)
+        const startParts = (values.startTime || '10:00').split(':').map(Number);
+        const endParts = (values.endTime || '13:00').split(':').map(Number);
+        const startMinutes = startParts[0] * 60 + startParts[1];
+        const endMinutes = endParts[0] * 60 + endParts[1];
+        const calculatedHours = parseFloat(((endMinutes - startMinutes) / 60).toFixed(2));
+        
+        if (calculatedHours <= 0) {
+          throw new Error('End time must be after start time.');
+        }
+
         return permissionApi.applyPermission({
           employeeId: empId,
           date: values.startDate,
           startTime: values.startTime || '10:00',
           endTime: values.endTime || '13:00',
-          totalHours: 3, // Monthly max 3
+          totalHours: calculatedHours, // Calculated from times, validated server-side too
           reason: values.reason,
         });
       } else {
-        const start = new Date(values.startDate).getTime();
-        const end = new Date(values.endDate).getTime();
-        const totalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
-
         return leaveApi.applyLeave({
           employeeId: empId,
           leaveType: values.leaveType as any,
           startDate: values.startDate,
           endDate: values.endDate,
-          totalDays,
+          // Note: totalDays is recalculated server-side — this is just a hint
+          totalDays: Math.max(1, Math.ceil((new Date(values.endDate).getTime() - new Date(values.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1),
           reason: values.reason,
         });
       }
@@ -121,10 +133,10 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
           {...register('leaveType')}
           error={errors.leaveType?.message}
           options={[
-            { value: 'Casual Leave', label: 'Casual Leave (2 Paid / Month)' },
+            { value: 'Casual Leave', label: 'Casual Leave' },
             { value: 'Sick Leave', label: 'Sick Leave' },
-            { value: 'WFH', label: 'Work From Home (1 / Month)' },
-            { value: 'Permission', label: 'Permission Hours (Max 3 hrs / Month)' },
+            { value: 'WFH', label: 'Work From Home (WFH)' },
+            { value: 'Permission', label: 'Permission Hours' },
           ]}
         />
 

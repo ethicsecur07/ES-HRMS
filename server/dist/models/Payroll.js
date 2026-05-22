@@ -36,15 +36,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Payroll = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const payrollSchema = new mongoose_1.Schema({
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     employeeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee', required: true },
     month: { type: String, required: true, index: true },
     baseSalary: { type: Number, required: true },
-    deductions: { type: Number, default: 0 },
+    overtime: { type: Number, default: 0 },
     bonus: { type: Number, default: 0 },
+    reimbursements: { type: Number, default: 0 },
+    tax: { type: Number, default: 0 },
+    leaveDeductions: { type: Number, default: 0 },
+    deductions: { type: Number, default: 0 },
     finalSalary: { type: Number, required: true },
     paidStatus: { type: String, enum: ['PAID', 'PENDING', 'PROCESSING'], default: 'PENDING' },
     paymentDate: { type: Date },
     payslipUrl: { type: String },
 }, { timestamps: true });
+const softDeletePlugin_js_1 = require("../utils/softDeletePlugin.js");
 payrollSchema.index({ employeeId: 1, month: 1 }, { unique: true });
+payrollSchema.plugin(softDeletePlugin_js_1.softDeletePlugin);
 exports.Payroll = mongoose_1.default.model('Payroll', payrollSchema);

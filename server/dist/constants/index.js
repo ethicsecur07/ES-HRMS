@@ -3,7 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEPARTMENTS = exports.LEAVE_TYPES = exports.APPROVAL_STATUS = exports.ATTENDANCE_TYPES = exports.ROLES = void 0;
 exports.ROLES = {
     ADMIN: 'ADMIN',
+    MANAGER: 'MANAGER',
     HR: 'HR',
+    TEAM_LEAD: 'TEAM_LEAD',
     EMPLOYEE: 'EMPLOYEE',
 };
 exports.ATTENDANCE_TYPES = {

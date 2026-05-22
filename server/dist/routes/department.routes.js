@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const department_controller_js_1 = require("../controllers/department.controller.js");
+const auth_middleware_js_1 = require("../middlewares/auth.middleware.js");
+const rbacGuard_js_1 = require("../middlewares/rbacGuard.js");
+const validate_middleware_js_1 = require("../middlewares/validate.middleware.js");
+const department_validation_js_1 = require("../validations/department.validation.js");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_js_1.authenticate);
+router.get('/', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'view'), department_controller_js_1.getDepartments);
+router.get('/:id', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'view'), department_controller_js_1.getDepartmentById);
+router.post('/', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'create'), (0, validate_middleware_js_1.validateRequest)(department_validation_js_1.createDepartmentSchema), department_controller_js_1.createDepartment);
+router.put('/:id', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'edit'), (0, validate_middleware_js_1.validateRequest)(department_validation_js_1.updateDepartmentSchema), department_controller_js_1.updateDepartment);
+router.delete('/:id', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'delete'), department_controller_js_1.deleteDepartment);
+exports.default = router;

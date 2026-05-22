@@ -36,11 +36,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Notification = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const notificationSchema = new mongoose_1.Schema({
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     recipientId: { type: String, required: true, index: true },
     title: { type: String, required: true },
     message: { type: String, required: true },
-    type: { type: String, required: true },
+    channel: { type: String, enum: ['IN_APP', 'EMAIL', 'SMS', 'PUSH', 'WHATSAPP'], required: true },
+    type: { type: String, required: true, default: 'GENERAL' },
+    templateId: { type: String },
+    payload: { type: mongoose_1.Schema.Types.Mixed },
+    status: { type: String, enum: ['PENDING', 'SENT', 'FAILED'], default: 'PENDING' },
+    errorMessage: { type: String },
+    expiresAt: { type: Date },
     read: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
 }, { timestamps: true });
+notificationSchema.index({ organizationId: 1, recipientId: 1, status: 1 });
 exports.Notification = mongoose_1.default.model('Notification', notificationSchema);

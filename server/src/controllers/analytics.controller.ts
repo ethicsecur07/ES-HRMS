@@ -1,11 +1,16 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Employee } from '../models/Employee.js';
 import { Attendance } from '../models/Attendance.js';
 import { Leave } from '../models/Leave.js';
 import { Payroll } from '../models/Payroll.js';
 import { AuditLog } from '../models/AuditLog.js';
 import { TaskReport } from '../models/TaskReport.js';
+import { Organization } from '../models/Organization.js';
 import { DEPARTMENTS } from '../constants/index.js';
+import { AuthRequest } from '../types/index.js';
+import { LeaveAnalyticsService } from '../domains/leave-engine/services/LeaveAnalyticsService.js';
+
 
 const countTasks = (text?: string): number => {
   if (!text || text.trim() === '' || text.trim().toLowerCase() === 'none' || text.trim().toLowerCase() === 'n/a' || text.trim() === '-') return 0;
@@ -14,18 +19,25 @@ const countTasks = (text?: string): number => {
 
 export const getDashboardStats = async (req: Request, res: Response): Promise<void> => {
   try {
+    const authReq = req as AuthRequest;
+    const orgId = authReq.user?.organizationId;
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing' });
+      return;
+    }
     const today = new Date().toISOString().split('T')[0];
 
-    const totalEmployees = await Employee.countDocuments({ isActive: true });
-    const presentToday = await Attendance.countDocuments({ date: today, status: 'OFFICE' });
-    const wfhToday = await Attendance.countDocuments({ date: today, status: 'WFH' });
-    const absentToday = totalEmployees - (presentToday + wfhToday);
+    const totalEmployees = await Employee.countDocuments({ isActive: true, organizationId: orgId });
+    const presentToday = await Attendance.countDocuments({ date: today, status: 'OFFICE', organizationId: orgId });
+    const wfhToday = await Attendance.countDocuments({ date: today, status: 'WFH', organizationId: orgId });
+    const absentToday = Math.max(0, totalEmployees - (presentToday + wfhToday));
 
-    const pendingLeaves = await Leave.countDocuments({ status: 'PENDING' });
+    // Accurate pending approvals: Leave + WFH + Permission
+    const pendingApprovalCounts = await LeaveAnalyticsService.getPendingApprovalCount(orgId);
 
     const currentMonth = new Date().toISOString().slice(0, 7);
     const payrollResult = await Payroll.aggregate([
-      { $match: { month: currentMonth } },
+      { $match: { month: currentMonth, organizationId: new mongoose.Types.ObjectId(orgId) } },
       { $group: { _id: null, totalCost: { $sum: '$finalSalary' } } },
     ]);
     const monthlyPayrollCost = payrollResult[0]?.totalCost || 0;
@@ -41,7 +53,10 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       last6DaysStr.push({ dateStr, dayName });
     }
 
-    const recentAttendance = await Attendance.find({ date: { $in: last6DaysStr.map(d => d.dateStr) } });
+    const recentAttendance = await Attendance.find({
+      date: { $in: last6DaysStr.map(d => d.dateStr) },
+      organizationId: orgId,
+    });
     
     for (const { dateStr, dayName } of last6DaysStr) {
       const present = recentAttendance.filter(a => a.date === dateStr && a.status === 'OFFICE').length;
@@ -50,8 +65,8 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
     }
 
     // Calculate Department Productivity & Overall Productivity using ONLY DB Data
-    const activeEmployees = await Employee.find({ isActive: true });
-    const allTaskReports = await TaskReport.find();
+    const activeEmployees = await Employee.find({ isActive: true, organizationId: orgId });
+    const allTaskReports = await TaskReport.find({ organizationId: orgId });
 
     let totalCompanyEfficiencySum = 0;
     let totalCompanyReportsCount = 0;
@@ -96,7 +111,8 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       presentToday,
       wfhToday,
       absentToday,
-      pendingApprovals: pendingLeaves,
+      pendingApprovals: pendingApprovalCounts.total,
+      pendingApprovalBreakdown: pendingApprovalCounts, // leaves, wfh, permissions
       monthlyPayrollCost,
       attendanceTrends,
       departmentBreakdown,
@@ -109,7 +125,10 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
 
 export const getAuditLogs = async (req: Request, res: Response): Promise<void> => {
   try {
-    const auditLogs = await AuditLog.find().sort({ timestamp: -1 }).limit(100);
+    const authReq = req as AuthRequest;
+    const auditLogs = await AuditLog.find({ organizationId: authReq.user?.organizationId })
+      .sort({ timestamp: -1 })
+      .limit(100);
     res.status(200).json({ auditLogs });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -117,20 +136,48 @@ export const getAuditLogs = async (req: Request, res: Response): Promise<void> =
 };
 
 export const getSettings = async (req: Request, res: Response): Promise<void> => {
-  const settingsData = {
-    companyName: 'EthicSecur SofTec',
-    adminEmail: 'Official@ethicsecur.com',
-    monthlyLeaveLimit: 2,
-    monthlyWFHLimit: 1,
-    monthlyPermissionHours: 3,
-    officeWiFiIPs: ['192.168.29.50', '192.168.29.55', '127.0.0.1', '::1'],
-  };
-  res.status(200).json({
-    ...settingsData,
-    settings: settingsData,
-  });
+  try {
+    const authReq = req as AuthRequest;
+    const org = await Organization.findById(authReq.user?.organizationId);
+    if (!org) {
+      res.status(404).json({ message: 'Organization not found' });
+      return;
+    }
+    const settingsData = {
+      companyName: org.name,
+      monthlyLeaveLimit: org.settings?.monthlyLeaveLimit || 2,
+      monthlyWFHLimit: org.settings?.monthlyWFHLimit || 1,
+      monthlyPermissionHours: org.settings?.monthlyPermissionHours || 3,
+      officeWiFiIPs: org.settings?.allowedIPs || ['127.0.0.1', '::1'],
+    };
+    res.status(200).json({
+      ...settingsData,
+      settings: settingsData,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const updateSettings = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ message: 'Settings updated successfully', settings: req.body });
+  try {
+    const authReq = req as AuthRequest;
+    const org = await Organization.findById(authReq.user?.organizationId);
+    if (!org) {
+      res.status(404).json({ message: 'Organization not found' });
+      return;
+    }
+    const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, officeWiFiIPs } = req.body;
+    if (companyName) org.name = companyName;
+    org.settings = {
+      monthlyLeaveLimit: Number(monthlyLeaveLimit) || org.settings?.monthlyLeaveLimit || 2,
+      monthlyWFHLimit: Number(monthlyWFHLimit) || org.settings?.monthlyWFHLimit || 1,
+      monthlyPermissionHours: Number(monthlyPermissionHours) || org.settings?.monthlyPermissionHours || 3,
+      allowedIPs: officeWiFiIPs || org.settings?.allowedIPs || ['127.0.0.1', '::1'],
+    };
+    await org.save();
+    res.status(200).json({ message: 'Settings updated successfully', settings: req.body });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 };

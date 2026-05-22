@@ -5,7 +5,7 @@ const Finance_js_1 = require("../models/Finance.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const getFinanceSummary = async (req, res) => {
     try {
-        const records = await Finance_js_1.Finance.find().sort({ date: -1, createdAt: -1 });
+        const records = await Finance_js_1.Finance.find({ organizationId: req.user?.organizationId }).sort({ date: -1, createdAt: -1 });
         let totalAllocated = 0;
         let totalSpent = 0;
         records.forEach((r) => {
@@ -35,6 +35,7 @@ const addFinanceRecord = async (req, res) => {
         const { type, amount, categoryOrReason, description, date } = req.body;
         const loggedBy = req.user ? `${req.user.email} (${req.user.role})` : 'System';
         const record = await Finance_js_1.Finance.create({
+            organizationId: req.user?.organizationId,
             type,
             amount: Number(amount),
             categoryOrReason,
@@ -42,7 +43,7 @@ const addFinanceRecord = async (req, res) => {
             date,
             loggedBy,
         });
-        await (0, auditLog_service_js_1.createAuditLog)(type === 'ALLOCATION' ? 'FINANCE_ALLOCATION' : 'FINANCE_EXPENSE', req.user?.email || 'System', 'FINANCE', type, `${type === 'ALLOCATION' ? 'Allocated budget' : 'Logged expense'}: $${amount} for ${categoryOrReason}`);
+        await (0, auditLog_service_js_1.createAuditLog)(type === 'ALLOCATION' ? 'FINANCE_ALLOCATION' : 'FINANCE_EXPENSE', req.user?.email || 'System', 'FINANCE', type, `${type === 'ALLOCATION' ? 'Allocated budget' : 'Logged expense'}: $${amount} for ${categoryOrReason}`, req.user?.organizationId);
         res.status(201).json({ record });
     }
     catch (error) {

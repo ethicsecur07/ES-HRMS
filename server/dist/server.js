@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const http_1 = __importDefault(require("http"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const mongoose_1 = __importDefault(require("mongoose"));
 const app_js_1 = require("./app.js");
 const db_js_1 = require("./config/db.js");
 const seed_js_1 = require("./config/seed.js");
@@ -12,6 +13,7 @@ const cloudinary_js_1 = require("./config/cloudinary.js");
 const socketHandler_js_1 = require("./sockets/socketHandler.js");
 const cronJobs_js_1 = require("./jobs/cronJobs.js");
 const logger_js_1 = require("./utils/logger.js");
+const subscribers_js_1 = require("./events/subscribers.js");
 dotenv_1.default.config();
 const startServer = async () => {
     const app = (0, app_js_1.createApp)();
@@ -19,8 +21,10 @@ const startServer = async () => {
     // Initialize Core Services
     await (0, db_js_1.connectDB)();
     await (0, seed_js_1.seedDatabase)();
+    await (0, seed_js_1.syncRolePermissions)(new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79000'));
     (0, cloudinary_js_1.configureCloudinary)();
     (0, socketHandler_js_1.initSockets)(server);
+    (0, subscribers_js_1.registerSubscribers)();
     (0, cronJobs_js_1.initCronJobs)();
     const PORT = process.env.PORT || 5000;
     server.listen(Number(PORT), '0.0.0.0', () => {

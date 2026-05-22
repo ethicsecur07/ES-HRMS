@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const designation_controller_js_1 = require("../controllers/designation.controller.js");
+const auth_middleware_js_1 = require("../middlewares/auth.middleware.js");
+const rbacGuard_js_1 = require("../middlewares/rbacGuard.js");
+const validate_middleware_js_1 = require("../middlewares/validate.middleware.js");
+const designation_validation_js_1 = require("../validations/designation.validation.js");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_js_1.authenticate);
+router.get('/', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'view'), designation_controller_js_1.getDesignations);
+router.get('/:id', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'view'), designation_controller_js_1.getDesignationById);
+router.post('/', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'create'), (0, validate_middleware_js_1.validateRequest)(designation_validation_js_1.createDesignationSchema), designation_controller_js_1.createDesignation);
+router.put('/:id', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'edit'), (0, validate_middleware_js_1.validateRequest)(designation_validation_js_1.updateDesignationSchema), designation_controller_js_1.updateDesignation);
+router.delete('/:id', (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'delete'), designation_controller_js_1.deleteDesignation);
+exports.default = router;

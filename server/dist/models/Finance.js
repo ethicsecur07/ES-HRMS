@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Finance = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const financeSchema = new mongoose_1.Schema({
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     type: { type: String, enum: ['ALLOCATION', 'EXPENSE'], required: true },
     amount: { type: Number, required: true },
     categoryOrReason: { type: String, required: true },

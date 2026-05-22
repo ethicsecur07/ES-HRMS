@@ -3,9 +3,9 @@ import { Finance } from '../models/Finance.js';
 import { createAuditLog } from '../services/auditLog.service.js';
 import { AuthRequest } from '../types/index.js';
 
-export const getFinanceSummary = async (req: Request, res: Response): Promise<void> => {
+export const getFinanceSummary = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const records = await Finance.find().sort({ date: -1, createdAt: -1 });
+    const records = await Finance.find({ organizationId: req.user?.organizationId }).sort({ date: -1, createdAt: -1 });
 
     let totalAllocated = 0;
     let totalSpent = 0;
@@ -37,6 +37,7 @@ export const addFinanceRecord = async (req: AuthRequest, res: Response): Promise
     const loggedBy = req.user ? `${req.user.email} (${req.user.role})` : 'System';
 
     const record = await Finance.create({
+      organizationId: req.user?.organizationId,
       type,
       amount: Number(amount),
       categoryOrReason,
@@ -50,7 +51,8 @@ export const addFinanceRecord = async (req: AuthRequest, res: Response): Promise
       req.user?.email || 'System',
       'FINANCE',
       type,
-      `${type === 'ALLOCATION' ? 'Allocated budget' : 'Logged expense'}: $${amount} for ${categoryOrReason}`
+      `${type === 'ALLOCATION' ? 'Allocated budget' : 'Logged expense'}: $${amount} for ${categoryOrReason}`,
+      req.user?.organizationId
     );
 
     res.status(201).json({ record });

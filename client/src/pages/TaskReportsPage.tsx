@@ -25,7 +25,7 @@ export const TaskReportsPage: React.FC = () => {
 
   const { data: employees } = useQuery({
     queryKey: ['employees'],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll().then(res => res.employees),
     enabled: role === 'ADMIN' || role === 'HR',
   });
 

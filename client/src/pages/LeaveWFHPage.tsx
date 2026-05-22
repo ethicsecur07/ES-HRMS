@@ -4,6 +4,7 @@ import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
 import { permissionApi } from '../api_service/permissionApi';
 import { employeeApi } from '../api_service/employeeApi';
+import { leaveBalanceApi } from '../api_service/leavePolicyApi';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
@@ -15,7 +16,7 @@ import { WFHRequestModal } from '../Components/SpecifiedComponents/WFHRequestMod
 import { PermissionRequestModal } from '../Components/SpecifiedComponents/PermissionRequestModal';
 import type { LeaveRequest, PermissionRequest } from '../types';
 import { formatDate } from '../utils/formatters';
-import { Palmtree, Laptop, Clock, PlusCircle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info, FileText } from 'lucide-react';
+import { Calendar, Plus, Palmtree, Laptop, Clock, FileText, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 
 export const LeaveWFHPage: React.FC = () => {
   const { role, user } = useAuthStore();
@@ -44,11 +45,19 @@ export const LeaveWFHPage: React.FC = () => {
   const { data: wfh, isLoading: wfhLoading } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll });
   const { data: perms, isLoading: permsLoading } = useQuery({ queryKey: ['permissions'], queryFn: permissionApi.getAll });
 
+  const { data: leaveBalances = [] } = useQuery({
+    queryKey: ['myLeaveBalances'],
+    queryFn: leaveBalanceApi.getMyBalances,
+  });
+
   const { data: employeeProfile } = useQuery({
     queryKey: ['employeeProfile', user?.employeeId],
     queryFn: () => employeeApi.getById(user?.employeeId as string),
     enabled: !!user?.employeeId,
   });
+
+  // Helper to find balance for a type
+  const getBalance = (type: string) => leaveBalances.find(b => b.leaveType === type);
 
   const queryClient = useQueryClient();
   const { addToast } = useNotificationStore();
@@ -59,6 +68,18 @@ export const LeaveWFHPage: React.FC = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leaves'] });
       addToast('Leave Request Updated', `Request has been ${variables.status.toLowerCase()}.`, 'success');
+    },
+  });
+
+  const cancelLeaveMutation = useMutation({
+    mutationFn: (id: string) => leaveApi.cancelLeave(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leaves'] });
+      queryClient.invalidateQueries({ queryKey: ['myLeaveBalances'] });
+      addToast('Leave Cancelled', 'Your leave request has been cancelled.', 'success');
+    },
+    onError: (err: any) => {
+      addToast('Cancel Failed', err.response?.data?.message || 'Could not cancel leave.', 'error');
     },
   });
 
@@ -220,40 +241,51 @@ export const LeaveWFHPage: React.FC = () => {
           {row.totalDays === 1 || row.startDate === row.endDate
             ? formatDate(row.startDate)
             : `${formatDate(row.startDate)} to ${formatDate(row.endDate)} (${row.totalDays} days)`}
+          {row.isHalfDay && <span className="ml-1 text-[10px] text-amber-600 font-bold">(Half-Day)</span>}
         </span>
       ),
     },
     { header: 'Reason', accessor: 'reason', className: 'text-xs italic' },
     { header: 'Status', accessor: (row: LeaveRequest) => getStatusBadge(row.status) },
-    ...(role === 'ADMIN' || role === 'HR'
-      ? [
-          {
-            header: 'Actions',
-            accessor: (row: LeaveRequest) =>
-              row.status === 'PENDING' ? (
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => leaveMutation.mutate({ id: row._id, status: 'REJECTED' })}
-                    isLoading={leaveMutation.isPending}
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => leaveMutation.mutate({ id: row._id, status: 'APPROVED' })}
-                    isLoading={leaveMutation.isPending}
-                  >
-                    Approve
-                  </Button>
-                </div>
-              ) : (
-                <span className="text-xs text-muted-foreground italic">Processed</span>
-              ),
-          },
-        ]
-      : []),
+    {
+      header: 'Actions',
+      accessor: (row: LeaveRequest) => (
+        <div className="flex items-center gap-2">
+          {/* ADMIN/HR approve/reject */}
+          {(role === 'ADMIN' || role === 'HR') && row.status === 'PENDING' && (
+            <>
+              <Button size="sm" variant="destructive"
+                onClick={() => leaveMutation.mutate({ id: row._id, status: 'REJECTED' })}
+                isLoading={leaveMutation.isPending}
+              >
+                Reject
+              </Button>
+              <Button size="sm"
+                onClick={() => leaveMutation.mutate({ id: row._id, status: 'APPROVED' })}
+                isLoading={leaveMutation.isPending}
+              >
+                Approve
+              </Button>
+            </>
+          )}
+          {/* Employee / Admin can cancel PENDING or APPROVED leaves */}
+          {(row.status === 'PENDING' || row.status === 'APPROVED') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => cancelLeaveMutation.mutate(row._id)}
+              isLoading={cancelLeaveMutation.isPending}
+              className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+            >
+              Cancel
+            </Button>
+          )}
+          {row.status === 'REJECTED' || row.status === 'CANCELLED' ? (
+            <span className="text-xs text-muted-foreground italic">Closed</span>
+          ) : null}
+        </div>
+      ),
+    },
   ];
 
   const wfhColumns = [
@@ -391,7 +423,7 @@ export const LeaveWFHPage: React.FC = () => {
         {role === 'EMPLOYEE' && (
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button size="sm" onClick={() => setShowLeaveModal(true)} className="bg-primary text-white font-bold tracking-wider shadow-md shadow-primary/20">
-              <PlusCircle className="w-4 h-4 mr-1.5" /> Apply Leave
+              <Plus className="w-4 h-4 mr-1.5" /> Apply Leave
             </Button>
             <Button size="sm" onClick={() => setShowWFHModal(true)} className="bg-foreground text-background hover:bg-foreground/90 font-bold tracking-wider shadow-md">
               <Laptop className="w-4 h-4 mr-1.5" /> Request WFH
@@ -413,7 +445,7 @@ export const LeaveWFHPage: React.FC = () => {
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
-          <CalendarIcon className="w-4 h-4" /> Calendar & Balances
+          <Calendar className="w-4 h-4" /> Calendar & Balances
         </button>
         <button
           onClick={() => setActivePageTab('HISTORY')}
@@ -436,39 +468,92 @@ export const LeaveWFHPage: React.FC = () => {
               <Info className="w-4 h-4 text-primary" />
               Your Balance Allowances
             </h3>
-            
-            <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-              <div className="absolute right-3 top-3 opacity-10">
-                <Palmtree className="w-12 h-12 text-primary" />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Casual / Sick Leaves</p>
-              <h4 className="text-3xl font-black text-foreground">{employeeProfile?.leaveBalance ?? 2} <span className="text-xs font-semibold text-muted-foreground">days</span></h4>
-              <p className="text-[10px] text-muted-foreground mt-2">Resets monthly (Allocated: 2 days / month)</p>
-            </Card>
 
-            <Card className="border-l-4 border-l-foreground p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-              <div className="absolute right-3 top-3 opacity-10">
-                <Laptop className="w-12 h-12 text-foreground" />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Work From Home (WFH)</p>
-              <h4 className="text-3xl font-black text-foreground">{employeeProfile?.wfhBalance ?? 1} <span className="text-xs font-semibold text-muted-foreground">days</span></h4>
-              <p className="text-[10px] text-muted-foreground mt-2">Resets monthly (Allocated: 1 day / month)</p>
-            </Card>
+            {/* Casual Leave Balance */}
+            {(() => {
+              const b = getBalance('Casual Leave');
+              return (
+                <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+                  <div className="absolute right-3 top-3 opacity-10">
+                    <Palmtree className="w-12 h-12 text-primary" />
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Casual / Sick Leaves</p>
+                  <h4 className="text-3xl font-black text-foreground">
+                    {b ? b.balance : (employeeProfile?.leaveBalance ?? 0)}{' '}
+                    <span className="text-xs font-semibold text-muted-foreground">days left</span>
+                  </h4>
+                  {b && (
+                    <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
+                      <span>Allocated: <strong>{b.allocated}</strong></span>
+                      <span>Used: <strong>{b.used}</strong></span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground mt-2">Resets monthly ({b?.monthlyAllowance ?? 2} days/month)</p>
+                </Card>
+              );
+            })()}
 
-            <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-              <div className="absolute right-3 top-3 opacity-10">
-                <Clock className="w-12 h-12 text-primary" />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Permission Hours</p>
-              <h4 className="text-3xl font-black text-foreground">{employeeProfile?.permissionHoursBalance ?? 3} <span className="text-xs font-semibold text-muted-foreground">hrs</span></h4>
-              <p className="text-[10px] text-muted-foreground mt-2">Resets monthly (Allocated: 3 hrs / month)</p>
-            </Card>
+            {/* WFH Balance */}
+            {(() => {
+              const b = getBalance('WFH');
+              return (
+                <Card className="border-l-4 border-l-foreground p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+                  <div className="absolute right-3 top-3 opacity-10">
+                    <Laptop className="w-12 h-12 text-foreground" />
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Work From Home (WFH)</p>
+                  <h4 className="text-3xl font-black text-foreground">
+                    {b ? b.balance : (employeeProfile?.wfhBalance ?? 0)}{' '}
+                    <span className="text-xs font-semibold text-muted-foreground">days left</span>
+                  </h4>
+                  {b && (
+                    <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
+                      <span>Allocated: <strong>{b.allocated}</strong></span>
+                      <span>Used: <strong>{b.used}</strong></span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground mt-2">Resets monthly ({b?.monthlyAllowance ?? 1} day/month)</p>
+                </Card>
+              );
+            })()}
+
+            {/* Permission Balance */}
+            {(() => {
+              const b = getBalance('Permission');
+              const limit = b?.permissionConversionHours ?? 3;
+              const used = b?.used ?? (employeeProfile?.permissionHoursBalance !== undefined ? limit - employeeProfile.permissionHoursBalance : 0);
+              const remaining = b ? b.balance : (employeeProfile?.permissionHoursBalance ?? limit);
+              const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+              return (
+                <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+                  <div className="absolute right-3 top-3 opacity-10">
+                    <Clock className="w-12 h-12 text-primary" />
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Permission Hours</p>
+                  <h4 className="text-3xl font-black text-foreground">
+                    {remaining.toFixed ? remaining.toFixed(1) : remaining}{' '}
+                    <span className="text-xs font-semibold text-muted-foreground">hrs left</span>
+                  </h4>
+                  {/* Progress bar */}
+                  <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-rose-500' : pct >= 75 ? 'bg-amber-500' : 'bg-primary'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">{pct}% used of {limit} hr monthly limit</p>
+                  {pct >= 100 && (
+                    <p className="text-[10px] text-rose-600 font-bold mt-1">⚠ Limit reached — next approval may trigger half-day deduction</p>
+                  )}
+                </Card>
+              );
+            })()}
           </div>
 
           {/* Interactive Calendar (Right 2 Columns) */}
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <CalendarIcon className="w-4 h-4 text-primary" />
+              <Calendar className="w-4 h-4 text-primary" />
               Interactive Leave & WFH Calendar
             </h3>
 
@@ -541,7 +626,7 @@ export const LeaveWFHPage: React.FC = () => {
               {/* Selected Date Event List */}
               <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border space-y-2.5">
                 <h5 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border/60 pb-1.5">
-                  <CalendarIcon className="w-3.5 h-3.5 text-primary" />
+                  <Calendar className="w-3.5 h-3.5 text-primary" />
                   Schedule for {formatDate(selectedCalendarDate)}
                 </h5>
                 

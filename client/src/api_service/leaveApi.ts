@@ -16,4 +16,9 @@ export const leaveApi = {
     const response = await axiosInstance.put<{ leaveRequest: LeaveRequest }>(`/leaves/${id}/status`, { status, rejectionReason });
     return response.data.leaveRequest;
   },
+
+  cancelLeave: async (id: string) => {
+    const response = await axiosInstance.post<{ message: string; leaveRequest: LeaveRequest }>(`/leaves/${id}/cancel`);
+    return response.data;
+  },
 };

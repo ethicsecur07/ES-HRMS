@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TaskReport = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const taskReportSchema = new mongoose_1.Schema({
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     employeeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee', required: true },
     date: { type: String, required: true, index: true },
     inProgressTasks: { type: String, required: true },

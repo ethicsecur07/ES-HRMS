@@ -1,12 +1,14 @@
 import http from 'http';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import { createApp } from './app.js';
 import { connectDB } from './config/db.js';
-import { seedDatabase } from './config/seed.js';
+import { seedDatabase, syncRolePermissions } from './config/seed.js';
 import { configureCloudinary } from './config/cloudinary.js';
 import { initSockets } from './sockets/socketHandler.js';
 import { initCronJobs } from './jobs/cronJobs.js';
 import { logger } from './utils/logger.js';
+import { registerSubscribers } from './events/subscribers.js';
 
 dotenv.config();
 
@@ -17,9 +19,12 @@ const startServer = async () => {
   // Initialize Core Services
   await connectDB();
   await seedDatabase();
+  await syncRolePermissions(new mongoose.Types.ObjectId('605c72ef1f77bcf86cd79000'));
   configureCloudinary();
   initSockets(server);
+  registerSubscribers();
   initCronJobs();
+
 
   const PORT = process.env.PORT || 5000;
 

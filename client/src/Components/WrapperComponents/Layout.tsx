@@ -9,18 +9,28 @@ import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useModuleStore } from '../../store/useModuleStore.js';
 import { X } from 'lucide-react';
 
 export const Layout: React.FC = () => {
   const { toasts, removeToast, addNotification } = useNotificationStore();
-  const { role, user } = useAuthStore();
+  const { role, user, isAuthenticated, token } = useAuthStore();
+  const fetchModulesAndRoutes = useModuleStore(state => state.fetchModulesAndRoutes);
+  
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetchModulesAndRoutes();
+    }
+  }, [isAuthenticated, token, fetchModulesAndRoutes]);
+
   const queryClient = useQueryClient();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   // Fetch requests to populate notifications on load
   const isPrivileged = role === 'ADMIN' || role === 'HR';
-  const { data: leaves } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll, enabled: !!role });
-  const { data: wfh } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll, enabled: !!role });
-  const { data: perms } = useQuery({ queryKey: ['permissions'], queryFn: permissionApi.getAll, enabled: !!role });
+  const { data: leaves } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll, enabled: !!role && !!token });
+  const { data: wfh } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll, enabled: !!role && !!token });
+  const { data: perms } = useQuery({ queryKey: ['permissions'], queryFn: permissionApi.getAll, enabled: !!role && !!token });
   
   const injectedNotifs = React.useRef(new Set<string>());
 
@@ -148,6 +158,7 @@ export const Layout: React.FC = () => {
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
+      auth: { token }
     });
 
     socket.on('connect', () => {
@@ -156,8 +167,25 @@ export const Layout: React.FC = () => {
         socket.emit('join_room', role);
       }
       if (user?._id) {
-        socket.emit('join_room', user._id);
+        socket.emit('join_room', `user_${user._id}`);
       }
+    });
+
+    socket.on('new_notification', (notif: any) => {
+      useNotificationStore.getState().addToast(
+        notif.title || 'Live Notification',
+        notif.message || 'New update received from HRMS server.',
+        'info'
+      );
+      useNotificationStore.getState().addNotification(notif);
+    });
+
+    socket.on('receive_message', () => {
+      useNotificationStore.getState().addToast(
+        'New Message',
+        'You received a new chat message.',
+        'info'
+      );
     });
 
     socket.on('receive_notification', (data: { _id?: string; title: string; message: string; type?: string; recipientId?: string }) => {

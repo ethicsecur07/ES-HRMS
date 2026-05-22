@@ -7,14 +7,18 @@ import { AuthRequest } from '../types/index.js';
 
 export const submitTaskReport = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const taskReport = await TaskReport.create(req.body);
+    const taskReport = await TaskReport.create({
+      ...req.body,
+      organizationId: req.user?.organizationId,
+    });
 
     await createAuditLog(
       'TASK_REPORT_SUBMIT',
       req.user?.email || 'Employee',
       'TASK',
       taskReport.id,
-      `Submitted daily task report for ${taskReport.date}`
+      `Submitted daily task report for ${taskReport.date}`,
+      req.user?.organizationId
     );
 
     res.status(201).json({ taskReport });
@@ -26,13 +30,13 @@ export const submitTaskReport = async (req: AuthRequest, res: Response): Promise
 export const getTaskReports = async (req: Request, res: Response): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    let query: any = {};
+    const query: any = { organizationId: authReq.user?.organizationId };
 
     if (authReq.user && authReq.user.role === 'EMPLOYEE') {
-      const user = await User.findById(authReq.user.id);
+      const user = await User.findOne({ _id: authReq.user.id, organizationId: authReq.user.organizationId });
       let employeeId = user?.employeeId;
       if (user && !employeeId) {
-        const employee = await Employee.findOne({ email: user.email });
+        const employee = await Employee.findOne({ email: user.email, organizationId: authReq.user.organizationId });
         if (employee) {
           employeeId = employee._id;
         }
@@ -54,7 +58,11 @@ export const getTaskReports = async (req: Request, res: Response): Promise<void>
 
 export const getEmployeeTasks = async (req: Request, res: Response): Promise<void> => {
   try {
-    const taskReports = await TaskReport.find({ employeeId: req.params.employeeId }).sort({ date: -1 });
+    const authReq = req as AuthRequest;
+    const taskReports = await TaskReport.find({
+      employeeId: req.params.employeeId,
+      organizationId: authReq.user?.organizationId,
+    }).sort({ date: -1 });
     res.status(200).json({ taskReports });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

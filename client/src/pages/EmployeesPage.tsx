@@ -5,64 +5,31 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { employeeApi } from '../api_service/employeeApi';
+import { departmentApi } from '../api_service/departmentApi';
+import { designationApi } from '../api_service/designationApi';
 import { authApi } from '../api_service/authApi';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
-import { Input, Select, Textarea } from '../Components/WrapperComponents/Input';
+import { Input, Textarea } from '../Components/WrapperComponents/Input';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Employee } from '../types';
 import { formatCurrency } from '../utils/formatters';
-import { PlusCircle, Edit, Trash2, PhoneCall, Eye, Camera, Loader2 } from 'lucide-react';
-
-const DESIGNATIONS_BY_DEPARTMENT: Record<string, { value: string; label: string }[]> = {
-  Developers: [
-    { value: 'Full Stack Developer', label: 'Full Stack Developer' },
-    { value: 'Backend Developer', label: 'Backend Developer' },
-    { value: 'Frontend Developer', label: 'Frontend Developer' },
-    { value: 'UI UX Developer', label: 'UI UX Developer' },
-  ],
-  Designers: [
-    { value: 'UI/UX Designer', label: 'UI/UX Designer' },
-    { value: 'Graphic Designer', label: 'Graphic Designer' },
-    { value: 'Web Designer', label: 'Web Designer' },
-    { value: 'Motion Designer', label: 'Motion Designer' },
-  ],
-  BDE: [
-    { value: 'Business Development Executive', label: 'Business Development Executive' },
-    { value: 'Business Development Manager', label: 'Business Development Manager' },
-    { value: 'Sales Executive', label: 'Sales Executive' },
-    { value: 'Senior BDE', label: 'Senior BDE' },
-  ],
-  DME: [
-    { value: 'Digital Marketing Executive', label: 'Digital Marketing Executive' },
-    { value: 'SEO Specialist', label: 'SEO Specialist' },
-    { value: 'Social Media Manager', label: 'Social Media Manager' },
-    { value: 'Content Creator', label: 'Content Creator' },
-  ],
-  Internship: [
-    { value: 'Web Development Intern', label: 'Web Development Intern' },
-    { value: 'UI/UX Design Intern', label: 'UI/UX Design Intern' },
-    { value: 'Software Engineering Intern', label: 'Software Engineering Intern' },
-    { value: 'Marketing Intern', label: 'Marketing Intern' },
-  ],
-};
+import { PlusCircle, Edit, Trash2, PhoneCall, Eye, Camera, Loader2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const baseEmployeeSchema = z.object({
   id: z.string().optional(),
-  employeeCode: z.string()
-    .min(1, 'Employee Code is required')
-    .regex(/^[A-Z]{2,5}-\d+$/, 'Employee Code must start with 2-5 uppercase letters followed by a hyphen and numbers (e.g., EMP-573)'),
+  employeeCode: z.string().min(1, 'Employee Code is required'),
   fullName: z.string()
     .min(3, 'Full name must be at least 3 characters')
     .regex(/^[a-zA-Z\s]+$/, 'Full name must contain only letters and spaces'),
   email: z.string().min(1, 'Work Email is required').email('Invalid email address'),
   password: z.string().optional(),
   phone: z.string().regex(/^\+?[0-9\s-]{10,20}$/, 'Phone number must be a valid number (10 to 20 digits, spaces/hyphens allowed)'),
-  department: z.enum(['Developers', 'Designers', 'BDE', 'DME', 'Internship']),
-  designation: z.string().min(1, 'Designation is required'),
+  departmentId: z.string().min(1, 'Department is required'),
+  designationId: z.string().min(1, 'Designation is required'),
   joiningDate: z.string().min(1, 'Joining date is required'),
   salary: z.coerce.number().min(0, 'Salary cannot be negative'),
   address: z.string().min(5, 'Residential Address must be at least 5 characters'),
@@ -73,12 +40,20 @@ const baseEmployeeSchema = z.object({
     .min(2, 'Relationship is required')
     .regex(/^[a-zA-Z\s]+$/, 'Relationship must contain only letters and spaces'),
   emergencyContactPhone: z.string().regex(/^\+?[0-9\s-]{10,20}$/, 'Emergency contact phone must be a valid number (10 to 20 digits, spaces/hyphens allowed)'),
+  // Bank details
+  bankName: z.string().optional(),
+  accountName: z.string().optional(),
+  accountNumber: z.string().optional(),
+  ifscCode: z.string().optional(),
+  branchName: z.string().optional(),
+  // Tax details
+  panNumber: z.string().optional(),
+  taxRegime: z.enum(['OLD', 'NEW', '']).optional(),
 });
 
 const employeeSchema = baseEmployeeSchema.superRefine((data, ctx) => {
   // Validate password strength depending on onboarding/editing context
   if (!data.id) {
-    // Create mode: password is required and must be strong
     if (!data.password || data.password.trim() === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -102,7 +77,6 @@ const employeeSchema = baseEmployeeSchema.superRefine((data, ctx) => {
       }
     }
   } else {
-    // Edit mode: password is optional, but if entered, it must be strong
     if (data.password && data.password.trim() !== '') {
       if (data.password.length < 6) {
         ctx.addIssue({
@@ -120,15 +94,6 @@ const employeeSchema = baseEmployeeSchema.superRefine((data, ctx) => {
       }
     }
   }
-
-  // Minimum salary validation for regular employees (non-interns)
-  if (data.department !== 'Internship' && data.salary < 10000) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Minimum salary is 10,000 for regular employees',
-      path: ['salary'],
-    });
-  }
 });
 
 type EmployeeFormValues = z.infer<typeof baseEmployeeSchema>;
@@ -139,28 +104,48 @@ export const EmployeesPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string>('');
   const [isUploadingImg, setIsUploadingImg] = useState(false);
+  const [formTab, setFormTab] = useState<'general' | 'professional' | 'emergency' | 'bank_tax'>('general');
 
-  // Advanced Filter States
-  const [nameFilter, setNameFilter] = useState('');
-  const [deptFilter, setDeptFilter] = useState('All');
+  // Filters & Pagination State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDeptId, setSelectedDeptId] = useState('All');
+  const [selectedDesigId, setSelectedDesigId] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState('Active');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const navigate = useNavigate();
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
 
-  const { data: employees, isLoading } = useQuery({
-    queryKey: ['employees'],
-    queryFn: employeeApi.getAll,
+  // Load dynamic Departments & Designations
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments'],
+    queryFn: departmentApi.getAll,
   });
 
-  const filteredEmployees = useMemo(() => {
-    if (!employees) return [];
-    return employees.filter(emp => {
-      const matchName = emp.fullName.toLowerCase().includes(nameFilter.toLowerCase());
-      const matchDept = deptFilter === 'All' || emp.department === deptFilter;
-      return matchName && matchDept;
-    });
-  }, [employees, nameFilter, deptFilter]);
+  const { data: designations = [] } = useQuery({
+    queryKey: ['designations'],
+    queryFn: () => designationApi.getAll(),
+  });
+
+  // Fetch employees with pagination, search, and filters
+  const { data: employeesData, isLoading } = useQuery({
+    queryKey: ['employees', searchQuery, selectedDeptId, selectedDesigId, selectedStatus, currentPage],
+    queryFn: () =>
+      employeeApi.getAll({
+        search: searchQuery || undefined,
+        departmentId: selectedDeptId !== 'All' ? selectedDeptId : undefined,
+        designationId: selectedDesigId !== 'All' ? selectedDesigId : undefined,
+        isActive: selectedStatus === 'Active' ? 'true' : selectedStatus === 'Inactive' ? 'false' : undefined,
+        page: currentPage,
+        limit: itemsPerPage,
+      }),
+  });
+
+  const employees = employeesData?.employees || [];
+  const totalEmployees = employeesData?.total || 0;
+  const totalPages = Math.ceil(totalEmployees / itemsPerPage);
 
   const {
     register,
@@ -173,45 +158,27 @@ export const EmployeesPage: React.FC = () => {
     resolver: zodResolver(employeeSchema),
   });
 
-  const editingEmployee = useMemo(() => {
-    if (!editingId || !employees) return null;
-    return employees.find(emp => emp._id === editingId) || null;
-  }, [editingId, employees]);
+  const selectedDeptIdWatch = watch('departmentId');
 
-  const getDesignationOptions = (dept: string) => {
-    const options = DESIGNATIONS_BY_DEPARTMENT[dept] || [];
-    if (editingEmployee && editingEmployee.department === dept && editingEmployee.designation) {
-      if (!options.some(opt => opt.value === editingEmployee.designation)) {
-        return [{ value: editingEmployee.designation, label: editingEmployee.designation }, ...options];
-      }
-    }
-    return options;
-  };
+  // Filter designations for the selected department
+  const filteredDesignations = useMemo(() => {
+    if (!selectedDeptIdWatch) return [];
+    return designations.filter(
+      (d: any) =>
+        (d.departmentId?._id || d.departmentId) === selectedDeptIdWatch && d.isActive
+    );
+  }, [selectedDeptIdWatch, designations]);
 
-  const selectedDept = watch('department');
-
-  // Reset designation if department changes to a department that doesn't support the current designation
+  // Autocomplete designation choice if department changes
   useEffect(() => {
-    if (selectedDept) {
-      const options = getDesignationOptions(selectedDept);
-      const currentDesig = watch('designation');
-      
-      // If we are currently editing and the selected department is the employee's original department,
-      // and the current designation is not set or matches the original designation, do not reset it.
-      if (
-        editingEmployee &&
-        selectedDept === editingEmployee.department &&
-        (!currentDesig || currentDesig === editingEmployee.designation)
-      ) {
-        return;
-      }
-
-      const isValid = options.some(o => o.value === currentDesig);
-      if (!isValid && options.length > 0) {
-        setValue('designation', options[0].value);
+    if (selectedDeptIdWatch) {
+      const currentDesigId = watch('designationId');
+      const isValid = filteredDesignations.some((d) => d._id === currentDesigId);
+      if (!isValid && filteredDesignations.length > 0) {
+        setValue('designationId', filteredDesignations[0]._id);
       }
     }
-  }, [selectedDept, setValue, watch, editingEmployee]);
+  }, [selectedDeptIdWatch, filteredDesignations, setValue, watch]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -221,7 +188,7 @@ export const EmployeesPage: React.FC = () => {
     try {
       const url = await authApi.uploadImage(file);
       setProfileImage(url);
-      addToast('Image Uploaded', 'Profile photo uploaded successfully to Cloudinary.', 'success');
+      addToast('Image Uploaded', 'Profile photo uploaded successfully.', 'success');
     } catch (error: any) {
       addToast('Upload Failed', error.message || 'Could not upload image.', 'error');
     } finally {
@@ -229,16 +196,32 @@ export const EmployeesPage: React.FC = () => {
     }
   };
 
+  const handleGenerateCode = async () => {
+    try {
+      const nextCode = await employeeApi.getNextEmployeeCode();
+      setValue('employeeCode', nextCode);
+      addToast('Code Generated', `Suggested employee code: ${nextCode}`, 'success');
+    } catch (error: any) {
+      addToast('Error', 'Failed to generate next employee code.', 'error');
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: (values: EmployeeFormValues) => {
+      // Find corresponding department name & designation name for backwards-compatibility strings
+      const targetDept = departments.find((d) => d._id === values.departmentId);
+      const targetDesig = designations.find((d) => d._id === values.designationId);
+
       const data = {
         employeeCode: values.employeeCode,
         fullName: values.fullName,
         email: values.email,
         password: values.password || 'EthicSec@2026',
         phone: values.phone,
-        department: values.department,
-        designation: values.designation,
+        department: targetDept?.name || 'Developers',
+        designation: targetDesig?.name || 'Staff',
+        departmentId: values.departmentId,
+        designationId: values.designationId,
         joiningDate: values.joiningDate,
         profileImage,
         salary: values.salary,
@@ -248,7 +231,19 @@ export const EmployeesPage: React.FC = () => {
           relationship: values.emergencyContactRel,
           phone: values.emergencyContactPhone,
         },
+        bankDetails: {
+          bankName: values.bankName || '',
+          accountName: values.accountName || '',
+          accountNumber: values.accountNumber || '',
+          ifscCode: values.ifscCode || '',
+          branchName: values.branchName || '',
+        },
+        taxDetails: {
+          panNumber: values.panNumber || '',
+          taxRegime: (values.taxRegime || '') as "" | "OLD" | "NEW",
+        },
       };
+
       if (editingId) {
         return employeeApi.update(editingId, data);
       }
@@ -257,17 +252,26 @@ export const EmployeesPage: React.FC = () => {
     onSuccess: (resData: any) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       if (!editingId && resData?.generatedPassword) {
-        addToast('Employee Onboarded & Account Created', `Credentials: Email: ${resData.employee?.email || ''} | Password: ${resData.generatedPassword}`, 'success');
+        addToast(
+          'Employee Onboarded',
+          `Credentials provisioned. Email: ${resData.employee?.email || ''} | Password: ${resData.generatedPassword}`,
+          'success'
+        );
       } else {
-        addToast(editingId ? 'Employee Updated' : 'Employee Onboarded', 'Directory updated successfully.', 'success');
+        addToast(
+          editingId ? 'Employee Updated' : 'Employee Onboarded',
+          'Employee directory updated successfully.',
+          'success'
+        );
       }
       reset();
       setShowModal(false);
       setEditingId(null);
       setProfileImage('');
+      setFormTab('general');
     },
-    onError: () => {
-      addToast('Error', 'Failed to save employee data.', 'error');
+    onError: (error: any) => {
+      addToast('Error', error.response?.data?.message || 'Failed to save employee data.', 'error');
     },
   });
 
@@ -275,7 +279,7 @@ export const EmployeesPage: React.FC = () => {
     mutationFn: employeeApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      addToast('Employee Removed', 'Record and user account permanently deleted.', 'info');
+      addToast('Employee Removed', 'Record deactivated and system access revoked.', 'info');
     },
     onError: (error: any) => {
       addToast('Delete Failed', error.response?.data?.message || error.message || 'Failed to delete employee.', 'error');
@@ -291,14 +295,31 @@ export const EmployeesPage: React.FC = () => {
     setValue('email', emp.email);
     setValue('password', '');
     setValue('phone', emp.phone);
-    setValue('department', emp.department as any);
-    setValue('designation', emp.designation);
-    setValue('joiningDate', emp.joiningDate ? emp.joiningDate.split('T')[0] : '');
+    setValue(
+      'departmentId',
+      typeof emp.departmentId === 'object' ? emp.departmentId?._id : (emp.departmentId || '')
+    );
+    setValue(
+      'designationId',
+      typeof emp.designationId === 'object' ? emp.designationId?._id : (emp.designationId || '')
+    );
+    setValue(emp.joiningDate ? 'joiningDate' : 'joiningDate', emp.joiningDate ? emp.joiningDate.split('T')[0] : '');
     setValue('salary', emp.salary);
     setValue('address', emp.address);
     setValue('emergencyContactName', emp.emergencyContact.name);
     setValue('emergencyContactRel', emp.emergencyContact.relationship);
     setValue('emergencyContactPhone', emp.emergencyContact.phone);
+    // Bank details
+    setValue('bankName', emp.bankDetails?.bankName || '');
+    setValue('accountName', emp.bankDetails?.accountName || '');
+    setValue('accountNumber', emp.bankDetails?.accountNumber || '');
+    setValue('ifscCode', emp.bankDetails?.ifscCode || '');
+    setValue('branchName', emp.bankDetails?.branchName || '');
+    // Tax details
+    setValue('panNumber', emp.taxDetails?.panNumber || '');
+    setValue('taxRegime', emp.taxDetails?.taxRegime || '');
+
+    setFormTab('general');
     setShowModal(true);
   };
 
@@ -307,12 +328,21 @@ export const EmployeesPage: React.FC = () => {
     setProfileImage('');
     reset({
       id: '',
-      employeeCode: `EMP-${Date.now().toString().slice(-3)}`,
+      employeeCode: '',
       joiningDate: new Date().toISOString().split('T')[0],
-      department: 'Developers',
-      password: 'EthicSec@2026',
+      departmentId: departments[0]?._id || '',
+      designationId: '',
+      password: '',
       salary: 0,
+      bankName: '',
+      accountName: '',
+      accountNumber: '',
+      ifscCode: '',
+      branchName: '',
+      panNumber: '',
+      taxRegime: '',
     });
+    setFormTab('general');
     setShowModal(true);
   };
 
@@ -320,21 +350,29 @@ export const EmployeesPage: React.FC = () => {
     {
       header: 'Employee',
       accessor: (row: Employee) => (
-        <div 
+        <div
           onClick={() => navigate(`/employees/${row._id}`)}
           className="flex items-center gap-3 cursor-pointer group"
           title="Click to view Employee Details"
         >
           {row.profileImage ? (
-            <img src={row.profileImage} alt="" className="w-10 h-10 rounded-xl object-cover border border-border flex-shrink-0 group-hover:border-primary transition-colors" />
+            <img
+              src={row.profileImage}
+              alt=""
+              className="w-10 h-10 rounded-xl object-cover border border-border flex-shrink-0 group-hover:border-primary transition-colors"
+            />
           ) : (
             <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0 uppercase group-hover:border-primary transition-colors">
               {row.fullName.charAt(0)}
             </div>
           )}
           <div>
-            <p className="font-bold text-xs text-foreground group-hover:text-primary transition-colors">{row.fullName}</p>
-            <p className="text-[10px] text-muted-foreground font-mono group-hover:text-foreground transition-colors">{row.employeeCode} | {row.email}</p>
+            <p className="font-bold text-xs text-foreground group-hover:text-primary transition-colors">
+              {row.fullName}
+            </p>
+            <p className="text-[10px] text-muted-foreground font-mono group-hover:text-foreground transition-colors">
+              {row.employeeCode} | {row.email}
+            </p>
           </div>
         </div>
       ),
@@ -343,14 +381,21 @@ export const EmployeesPage: React.FC = () => {
       header: 'Department',
       accessor: (row: Employee) => (
         <span className="px-2.5 py-1 rounded-md bg-muted text-xs font-bold text-foreground border border-border">
-          {row.department}
+          {(typeof row.departmentId === 'object' ? row.departmentId?.name : null) || row.department}
         </span>
       ),
     },
-    { header: 'Designation', accessor: 'designation', className: 'text-xs font-semibold' },
+    {
+      header: 'Designation',
+      accessor: (row: Employee) => (
+        <span className="text-xs font-semibold">{(typeof row.designationId === 'object' ? row.designationId?.name : null) || row.designation}</span>
+      ),
+    },
     {
       header: 'Salary',
-      accessor: (row: Employee) => <span className="text-xs font-mono font-bold text-primary">{formatCurrency(row.salary)}</span>,
+      accessor: (row: Employee) => (
+        <span className="text-xs font-mono font-bold text-primary">{formatCurrency(row.salary)}</span>
+      ),
     },
     {
       header: 'Emergency Contact',
@@ -367,10 +412,10 @@ export const EmployeesPage: React.FC = () => {
       header: 'Actions',
       accessor: (row: Employee) => (
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => navigate(`/employees/${row._id}`)}>
+          <Button size="sm" variant="outline" onClick={() => navigate(`/employees/${row._id}`)} title="View Details">
             <Eye className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => handleEdit(row)}>
+          <Button size="sm" variant="outline" onClick={() => handleEdit(row)} title="Edit Employee">
             <Edit className="w-4 h-4" />
           </Button>
           {(role === 'ADMIN' || role === 'HR') && (
@@ -378,11 +423,11 @@ export const EmployeesPage: React.FC = () => {
               size="sm"
               variant="destructive"
               onClick={() => {
-                if (window.confirm(`Are you sure you want to permanently delete the account for ${row.fullName}?`)) {
+                if (window.confirm(`Are you sure you want to delete the account for ${row.fullName}?`)) {
                   deleteMutation.mutate(row._id);
                 }
               }}
-              title="Delete Employee & User Account"
+              title="Deactivate/Delete Employee"
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -394,8 +439,8 @@ export const EmployeesPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Card className="animate-pulse h-96 bg-muted/20">
-        <div />
+      <Card className="animate-pulse h-96 bg-muted/20 flex items-center justify-center">
+        <div className="text-muted-foreground">Loading employee directory...</div>
       </Card>
     );
   }
@@ -406,7 +451,7 @@ export const EmployeesPage: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight">Employee Directory</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Manage company workforce, emergency contacts, and compensation packages
+            Manage company workforce, dynamic organization structures, bank details, and profiles.
           </p>
         </div>
         <Button onClick={handleAddNew} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
@@ -417,155 +462,345 @@ export const EmployeesPage: React.FC = () => {
 
       <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6">
         {/* Advanced Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
+        <div className="flex flex-col xl:flex-row items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
           <div className="flex-1 w-full">
             <Input
-              placeholder="Search employees by name..."
-              value={nameFilter}
-              onChange={(e) => setNameFilter(e.target.value)}
+              placeholder="Search employees by name, code, or email..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
             />
           </div>
-          <div className="w-full sm:w-64">
-            <Select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              options={[
-                { value: 'All', label: 'All Departments' },
-                { value: 'Developers', label: 'Developers' },
-                { value: 'Designers', label: 'Designers' },
-                { value: 'BDE', label: 'BDE (Business Development)' },
-                { value: 'DME', label: 'DME (Digital Marketing)' },
-                { value: 'Internship', label: 'Internship' },
-              ]}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full xl:w-auto flex-shrink-0">
+            <select
+              value={selectedDeptId}
+              onChange={(e) => {
+                setSelectedDeptId(e.target.value);
+                setSelectedDesigId('All');
+                setCurrentPage(1);
+              }}
+              className="px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:outline-none"
+            >
+              <option value="All">All Departments</option>
+              {departments.map((dept: any) => (
+                <option key={dept._id} value={dept._id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedDesigId}
+              onChange={(e) => {
+                setSelectedDesigId(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:outline-none"
+              disabled={selectedDeptId === 'All'}
+            >
+              <option value="All">All Designations</option>
+              {designations
+                .filter((d: any) => (d.departmentId?._id || d.departmentId) === selectedDeptId)
+                .map((desig: any) => (
+                  <option key={desig._id} value={desig._id}>
+                    {desig.name}
+                  </option>
+                ))}
+            </select>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:outline-none"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Active">Active Only</option>
+              <option value="Inactive">Inactive Only</option>
+            </select>
           </div>
         </div>
 
-        <TableWrapper
-          columns={columns}
-          data={filteredEmployees}
-        />
+        <TableWrapper columns={columns} data={employees} />
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-border pt-4 mt-4">
+            <span className="text-xs text-muted-foreground">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+              {Math.min(currentPage * itemsPerPage, totalEmployees)} of {totalEmployees} employees
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Onboard / Edit Modal */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? 'Edit Employee Record' : 'Onboard New Employee'} maxWidth="max-w-2xl">
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editingId ? 'Edit Employee Record' : 'Onboard New Employee'}
+        maxWidth="max-w-2xl"
+      >
+        {/* Form Wizard Navigation */}
+        <div className="flex border-b border-border mb-4 px-4 bg-muted/20">
+          {(['general', 'professional', 'emergency', 'bank_tax'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setFormTab(tab)}
+              className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+                formTab === tab ? 'border-primary text-primary font-extrabold' : 'border-transparent text-muted-foreground'
+              }`}
+            >
+              {tab.replace('_', ' & ')}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSubmit((v) => createMutation.mutate(v))} className="space-y-4 text-left px-4">
-          {/* Profile Image Upload Box */}
-          <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-            <div className="relative group w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden flex-shrink-0">
-              {profileImage ? (
-                <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <Camera className="w-6 h-6 text-primary opacity-60" />
-              )}
-              <label className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" title="Upload Cloudinary Profile Image">
-                <Camera className="w-5 h-5 text-white" />
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-              </label>
-              {isUploadingImg && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+          {formTab === 'general' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              {/* Profile Image Upload Box */}
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border">
+                <div className="relative group w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden flex-shrink-0">
+                  {profileImage ? (
+                    <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-primary opacity-60" />
+                  )}
+                  <label
+                    className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    title="Upload Profile Image"
+                  >
+                    <Camera className="w-5 h-5 text-white" />
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                  </label>
+                  {isUploadingImg && (
+                    <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    </div>
+                  )}
                 </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground">Profile Photograph</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Click the image box to upload a high-fidelity profile picture
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1 relative">
+                  <Input label="Employee Code *" {...register('employeeCode')} error={errors.employeeCode?.message} />
+                  <button
+                    type="button"
+                    onClick={handleGenerateCode}
+                    className="absolute right-2 top-8 text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 text-[10px] font-bold"
+                    title="Auto-generate sequential code"
+                  >
+                    <Sparkles className="w-3 h-3" /> Auto Gen
+                  </button>
+                </div>
+
+                <Input
+                  label="Full Name *"
+                  {...register('fullName')}
+                  error={errors.fullName?.message}
+                  onKeyPress={(e) => {
+                    if (!/^[a-zA-Z\s]$/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                />
+                <Input label="Work Email *" type="email" {...register('email')} error={errors.email?.message} />
+                <Input
+                  label={editingId ? 'New Login Password (Optional)' : 'Login Password *'}
+                  type="text"
+                  {...register('password')}
+                  error={errors.password?.message}
+                  placeholder={editingId ? 'Leave blank to keep unchanged' : 'Default: EthicSec@2026'}
+                />
+                <Input
+                  label="Phone Number *"
+                  {...register('phone')}
+                  error={errors.phone?.message}
+                  onKeyPress={(e) => {
+                    if (!/^[0-9\s+-]$/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                />
+              </div>
+              <Textarea label="Residential Address *" {...register('address')} error={errors.address?.message} />
+            </div>
+          )}
+
+          {formTab === 'professional' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department *</label>
+                  <select
+                    {...register('departmentId')}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none transition-all"
+                  >
+                    <option value="" disabled>Select Department</option>
+                    {departments.map((dept: any) => (
+                      <option key={dept._id} value={dept._id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.departmentId && <p className="text-xs text-red-500 font-bold mt-1">{errors.departmentId.message}</p>}
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Designation *</label>
+                  <select
+                    {...register('designationId')}
+                    disabled={!selectedDeptIdWatch}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none transition-all disabled:opacity-50"
+                  >
+                    <option value="" disabled>Select Designation</option>
+                    {filteredDesignations.map((desig: any) => (
+                      <option key={desig._id} value={desig._id}>
+                        {desig.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.designationId && <p className="text-xs text-red-500 font-bold mt-1">{errors.designationId.message}</p>}
+                </div>
+
+                <Input label="Joining Date *" type="date" {...register('joiningDate')} error={errors.joiningDate?.message} />
+                <Input label="Monthly Base Salary (INR) *" type="number" {...register('salary')} error={errors.salary?.message} />
+              </div>
+            </div>
+          )}
+
+          {formTab === 'emergency' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Input
+                  label="Contact Name *"
+                  {...register('emergencyContactName')}
+                  error={errors.emergencyContactName?.message}
+                  onKeyPress={(e) => {
+                    if (!/^[a-zA-Z\s]$/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                />
+                <Input
+                  label="Relationship *"
+                  {...register('emergencyContactRel')}
+                  error={errors.emergencyContactRel?.message}
+                  onKeyPress={(e) => {
+                    if (!/^[a-zA-Z\s]$/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                />
+                <Input
+                  label="Contact Phone *"
+                  {...register('emergencyContactPhone')}
+                  error={errors.emergencyContactPhone?.message}
+                  onKeyPress={(e) => {
+                    if (!/^[0-9\s+-]$/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {formTab === 'bank_tax' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                  Bank Account Specifications
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input label="Bank Name" {...register('bankName')} error={errors.bankName?.message} />
+                  <Input label="Account Holder Name" {...register('accountName')} error={errors.accountName?.message} />
+                  <Input label="Account Number" {...register('accountNumber')} error={errors.accountNumber?.message} />
+                  <Input label="IFSC Code" {...register('ifscCode')} error={errors.ifscCode?.message} />
+                </div>
+                <Input label="Branch Name" {...register('branchName')} error={errors.branchName?.message} />
+              </div>
+
+              <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                  Taxation & PAN Details
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input label="PAN Card Number" {...register('panNumber')} error={errors.panNumber?.message} />
+                  <div className="space-y-1 text-left">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Income Tax Regime</label>
+                    <select
+                      {...register('taxRegime')}
+                      className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none transition-all"
+                    >
+                      <option value="">Select Regime (Optional)</option>
+                      <option value="NEW">New Tax Regime</option>
+                      <option value="OLD">Old Tax Regime</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center pt-4 border-t border-border mt-6">
+            <span className="text-xs text-muted-foreground">
+              {formTab === 'general' && 'Next: Professional Details'}
+              {formTab === 'professional' && 'Next: Emergency Contact'}
+              {formTab === 'emergency' && 'Next: Bank & Tax'}
+              {formTab === 'bank_tax' && 'Ready to Submit'}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" type="button" onClick={() => setShowModal(false)}>
+                Cancel
+              </Button>
+              {formTab !== 'bank_tax' ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (formTab === 'general') setFormTab('professional');
+                    else if (formTab === 'professional') setFormTab('emergency');
+                    else if (formTab === 'emergency') setFormTab('bank_tax');
+                  }}
+                >
+                  Next Section
+                </Button>
+              ) : (
+                <Button type="submit" isLoading={isSubmitting || createMutation.isPending}>
+                  {editingId ? 'Save Changes' : 'Onboard Staff'}
+                </Button>
               )}
             </div>
-            <div>
-              <p className="text-sm font-bold text-foreground">Profile Photograph</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Click the image box to upload a high-fidelity profile picture via Cloudinary</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Employee Code *" {...register('employeeCode')} error={errors.employeeCode?.message} />
-            <Input 
-              label="Full Name *" 
-              {...register('fullName')} 
-              error={errors.fullName?.message} 
-              onKeyPress={(e) => {
-                if (!/^[a-zA-Z\s]$/.test(e.key)) {
-                  e.preventDefault();
-                }
-              }}
-            />
-            <Input label="Work Email *" type="email" {...register('email')} error={errors.email?.message} />
-            <Input label="Login Password *" type="text" {...register('password')} error={errors.password?.message} placeholder="Default: EthicSec@2026" />
-            <Input 
-              label="Phone Number *" 
-              {...register('phone')} 
-              error={errors.phone?.message} 
-              onKeyPress={(e) => {
-                if (!/^[0-9\s+-]$/.test(e.key)) {
-                  e.preventDefault();
-                }
-              }}
-            />
-            <Select
-              label="Department *"
-              {...register('department')}
-              error={errors.department?.message}
-              options={[
-                { value: 'Developers', label: 'Developers' },
-                { value: 'Designers', label: 'Designers' },
-                { value: 'BDE', label: 'BDE (Business Development)' },
-                { value: 'DME', label: 'DME (Digital Marketing)' },
-                { value: 'Internship', label: 'Internship' },
-              ]}
-            />
-            <Select
-              label="Designation *"
-              {...register('designation')}
-              error={errors.designation?.message}
-              options={getDesignationOptions(selectedDept)}
-              disabled={!selectedDept}
-            />
-            <Input label="Joining Date *" type="date" {...register('joiningDate')} error={errors.joiningDate?.message} />
-            <Input label={selectedDept === 'Internship' ? 'Monthly Base Salary (INR) (Optional)' : 'Monthly Base Salary (INR) *'} type="number" {...register('salary')} error={errors.salary?.message} />
-          </div>
-
-          <Textarea label="Residential Address *" {...register('address')} error={errors.address?.message} />
-
-          <div className="p-4 rounded-xl bg-muted/50 border border-border space-y-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Emergency Contact Information</span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Input 
-                label="Contact Name *" 
-                {...register('emergencyContactName')} 
-                error={errors.emergencyContactName?.message} 
-                onKeyPress={(e) => {
-                  if (!/^[a-zA-Z\s]$/.test(e.key)) {
-                    e.preventDefault();
-                  }
-                }}
-              />
-              <Input 
-                label="Relationship *" 
-                {...register('emergencyContactRel')} 
-                error={errors.emergencyContactRel?.message} 
-                onKeyPress={(e) => {
-                  if (!/^[a-zA-Z\s]$/.test(e.key)) {
-                    e.preventDefault();
-                  }
-                }}
-              />
-              <Input 
-                label="Contact Phone *" 
-                {...register('emergencyContactPhone')} 
-                error={errors.emergencyContactPhone?.message} 
-                onKeyPress={(e) => {
-                  if (!/^[0-9\s+-]$/.test(e.key)) {
-                    e.preventDefault();
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" type="button" onClick={() => setShowModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={isSubmitting || createMutation.isPending}>
-              {editingId ? 'Save Changes' : 'Onboard Staff'}
-            </Button>
           </div>
         </form>
       </Modal>

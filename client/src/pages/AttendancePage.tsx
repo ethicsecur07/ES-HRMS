@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { attendanceApi } from '../api_service/attendanceApi';
 import { employeeApi } from '../api_service/employeeApi';
+import { axiosInstance } from '../api_service/axiosInstance';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
@@ -12,7 +13,7 @@ import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Attendance } from '../types';
 import { exportAttendanceExcel } from '../utils/exportUtils';
 import { formatDate } from '../utils/formatters';
-import { CalendarCheck, Download, Wifi, Edit } from 'lucide-react';
+import { CalendarCheck, Download, Wifi, Edit, AlertTriangle, Clock, Users, Laptop } from 'lucide-react';
 
 export const AttendancePage: React.FC = () => {
   const { role } = useAuthStore();
@@ -35,7 +36,7 @@ export const AttendancePage: React.FC = () => {
 
   const { data: employees, isLoading: empLoading } = useQuery({
     queryKey: ['employees'],
-    queryFn: employeeApi.getAll,
+    queryFn: () => employeeApi.getAll().then(res => res.employees),
   });
 
   const filteredAttendances = useMemo(() => {
@@ -94,6 +95,33 @@ export const AttendancePage: React.FC = () => {
     });
   };
 
+  // Overtime approval mutation (Admin/HR only)
+  const approvOvertimeMutation = useMutation({
+    mutationFn: async (attendanceId: string) => {
+      await axiosInstance.post(`/attendance/overtime/approve/${attendanceId}`, { approved: true });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendances'] });
+      addToast('Overtime Approved', 'Overtime hours approved successfully.', 'success');
+    },
+    onError: (err: any) => {
+      addToast('Error', err.response?.data?.message || 'Could not approve overtime.', 'error');
+    },
+  });
+
+  // Summary stats (Admin/HR)
+  const stats = useMemo(() => {
+    if (!filteredAttendances.length) return { present: 0, late: 0, wfh: 0, absent: 0 };
+    const today = new Date().toISOString().split('T')[0];
+    const todayRecords = filteredAttendances.filter(a => a.date === today);
+    return {
+      present: todayRecords.filter(a => a.status === 'OFFICE' || a.status === 'WFH').length,
+      late: todayRecords.filter(a => a.isLate).length,
+      wfh: todayRecords.filter(a => a.status === 'WFH').length,
+      absent: todayRecords.filter(a => a.status === 'LEAVE').length,
+    };
+  }, [filteredAttendances]);
+
   const columns = [
     {
       header: 'Employee',
@@ -133,11 +161,18 @@ export const AttendancePage: React.FC = () => {
     {
       header: 'Status / Type',
       accessor: (row: Attendance) => (
-        <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${
-          row.status === 'OFFICE' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-foreground/10 text-foreground border-border'
-        }`}>
-          {row.status}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${
+            row.status === 'OFFICE' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-foreground/10 text-foreground border-border'
+          }`}>
+            {row.status}
+          </span>
+          {row.isLate && (
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-700">
+              LATE
+            </span>
+          )}
+        </div>
       ),
     },
     {
@@ -165,9 +200,23 @@ export const AttendancePage: React.FC = () => {
           {
             header: 'Actions',
             accessor: (row: Attendance) => (
-              <Button size="sm" variant="outline" onClick={() => handleEditClick(row)}>
-                <Edit className="w-4 h-4 mr-1" /> Edit
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleEditClick(row)}>
+                  <Edit className="w-4 h-4 mr-1" /> Edit
+                </Button>
+                {/* Overtime approval for records with pending overtime */}
+                {row.overtime && !row.overtime.isApproved && row.workingHours && row.workingHours > 8 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => approvOvertimeMutation.mutate(row._id)}
+                    isLoading={approvOvertimeMutation.isPending}
+                    className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                  >
+                    ✓ OT
+                  </Button>
+                )}
+              </div>
             ),
           },
         ]
@@ -205,6 +254,26 @@ export const AttendancePage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Summary Stats (Admin/HR today) */}
+      {(role === 'ADMIN' || role === 'HR') && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Present Today', value: stats.present, icon: <Users className="w-5 h-5" />, color: 'text-primary border-primary/20 bg-primary/5' },
+            { label: 'Late Today', value: stats.late, icon: <AlertTriangle className="w-5 h-5" />, color: 'text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-700' },
+            { label: 'WFH Today', value: stats.wfh, icon: <Laptop className="w-5 h-5" />, color: 'text-purple-600 border-purple-200 bg-purple-50 dark:bg-purple-900/10 dark:border-purple-700' },
+            { label: 'On Leave', value: stats.absent, icon: <Clock className="w-5 h-5" />, color: 'text-rose-600 border-rose-200 bg-rose-50 dark:bg-rose-900/10 dark:border-rose-700' },
+          ].map((stat) => (
+            <Card key={stat.label} className={`flex items-center gap-4 p-4 border ${stat.color} transition-all hover:shadow-md`}>
+              <div className={`${stat.color} opacity-80`}>{stat.icon}</div>
+              <div>
+                <p className="text-2xl font-black">{stat.value}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6">
         {/* Advanced Filter Bar */}

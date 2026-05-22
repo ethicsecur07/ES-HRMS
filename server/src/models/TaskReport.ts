@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ITaskReport extends Document {
+  organizationId: mongoose.Types.ObjectId;
   employeeId: mongoose.Types.ObjectId;
   date: string; // YYYY-MM-DD
   inProgressTasks: string;
@@ -13,6 +14,7 @@ export interface ITaskReport extends Document {
 
 const taskReportSchema = new Schema<ITaskReport>(
   {
+    organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
     date: { type: String, required: true, index: true },
     inProgressTasks: { type: String, required: true },

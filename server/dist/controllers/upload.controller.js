@@ -3,9 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadImage = exports.upload = void 0;
+exports.uploadDocument = exports.uploadImage = exports.upload = void 0;
 const cloudinary_1 = require("cloudinary");
 const multer_1 = __importDefault(require("multer"));
+const s3_js_1 = require("../utils/s3.js");
 const storage = multer_1.default.memoryStorage();
 exports.upload = (0, multer_1.default)({ storage });
 const uploadImage = async (req, res) => {
@@ -27,3 +28,17 @@ const uploadImage = async (req, res) => {
     }
 };
 exports.uploadImage = uploadImage;
+const uploadDocument = async (req, res) => {
+    if (!req.file) {
+        res.status(400).json({ message: 'No file uploaded' });
+        return;
+    }
+    try {
+        const url = await (0, s3_js_1.uploadFileToS3)(req.file.buffer, req.file.originalname, req.file.mimetype);
+        res.status(200).json({ url });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+exports.uploadDocument = uploadDocument;

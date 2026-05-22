@@ -12,6 +12,7 @@ interface AuthState {
   logout: () => void;
   updateUser: (user: Partial<User>) => void;
   setDemoUser: (role: Role) => void;
+  setToken: (token: string) => void;
 }
 
 const DEMO_USERS: Record<Role, User> = {
@@ -23,11 +24,28 @@ const DEMO_USERS: Record<Role, User> = {
     isActive: true,
     lastLogin: new Date().toISOString(),
   },
+  MANAGER: {
+    _id: '605c72ef1f77bcf86cd79404',
+    name: 'Siddharth',
+    email: 'siddharth@ethicsecur.com',
+    role: 'MANAGER',
+    isActive: true,
+    lastLogin: new Date().toISOString(),
+  },
   HR: {
     _id: '605c72ef1f77bcf86cd79202',
     name: 'Oviya',
     email: 'oviya@ethicsecur.com',
     role: 'HR',
+    isActive: true,
+    lastLogin: new Date().toISOString(),
+  },
+  TEAM_LEAD: {
+    _id: '605c72ef1f77bcf86cd79505',
+    name: 'Karthik',
+    email: 'karthik@ethicsecur.com',
+    role: 'TEAM_LEAD',
+    employeeId: '605c72ef1f77bcf86cd79002',
     isActive: true,
     lastLogin: new Date().toISOString(),
   },
@@ -80,9 +98,19 @@ export const useAuthStore = create<AuthState>()(
           role: role,
           isAuthenticated: true,
         }),
+
+      setToken: (token: string) => set({ token }),
     }),
     {
       name: 'es-hrms-auth',
+      // Secure token handling: Do NOT persist the access token in localStorage
+      partialize: (state) => ({
+        user: state.user,
+        role: state.role,
+        isAuthenticated: state.isAuthenticated,
+        // Only persist demo tokens, never real access tokens
+        token: state.token?.startsWith('demo-jwt-token') ? state.token : null,
+      }),
     }
   )
 );

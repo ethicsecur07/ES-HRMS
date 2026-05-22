@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_js_1 = require("../middlewares/auth.middleware.js");
+const expense_controller_js_1 = require("../controllers/expense.controller.js");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_js_1.authenticate);
+router.post('/', expense_controller_js_1.createExpense);
+router.get('/', expense_controller_js_1.getExpenses);
+router.post('/workflow/:id/approve', expense_controller_js_1.approveExpense);
+router.post('/workflow/:id/reject', expense_controller_js_1.rejectExpense);
+exports.default = router;
