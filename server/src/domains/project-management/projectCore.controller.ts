@@ -18,7 +18,7 @@ export const createProject = async (req: RBACRequest, res: Response, next: NextF
 export const getProjects = async (req: RBACRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const projects = await Project.find({ organizationId: req.user?.organizationId })
-      .populate('allocatedManagerId', 'fullName email')
+      .populate('allocatedManagerId', 'name email')
       .sort({ createdAt: -1 });
     res.json({ projects });
   } catch (err) {
@@ -29,7 +29,7 @@ export const getProjects = async (req: RBACRequest, res: Response, next: NextFun
 export const getProjectDetails = async (req: RBACRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const project = await Project.findOne({ _id: req.params.projectId, organizationId: req.user?.organizationId })
-      .populate('allocatedManagerId', 'fullName email')
+      .populate('allocatedManagerId', 'name email')
       .populate('teamMemberIds', 'fullName email');
     if (!project) {
       res.status(404).json({ message: 'Project not found' });

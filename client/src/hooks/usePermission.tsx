@@ -48,27 +48,22 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const hasPermission = useCallback(
     (moduleCode: string, action: keyof PermissionActions): boolean => {
-      // Admin bypasses all checks
-      if (user?.role === 'ADMIN') return true;
-
       const modPerm = permissions[moduleCode];
       if (!modPerm) return false;
 
       return !!modPerm.actions[action];
     },
-    [permissions, user?.role]
+    [permissions]
   );
 
   const isFieldRestricted = useCallback(
     (moduleCode: string, field: string): boolean => {
-      if (user?.role === 'ADMIN') return false;
-
       const modPerm = permissions[moduleCode];
       if (!modPerm) return false;
 
       return modPerm.restrictedFields.includes(field);
     },
-    [permissions, user?.role]
+    [permissions]
   );
 
   const refetchPermissions = useCallback(async () => {

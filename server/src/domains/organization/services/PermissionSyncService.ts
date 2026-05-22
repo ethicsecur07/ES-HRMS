@@ -117,6 +117,8 @@ export class PermissionSyncService {
         'DOCUMENTS',
         'PROJECTS',
         'RECRUITMENT',
+        'CHAT',
+        'NOTIFICATIONS',
       ];
 
       const employeeSelfServiceModules = [
@@ -128,6 +130,8 @@ export class PermissionSyncService {
         'WORKFLOW',
         'SELF_SERVICE',
         'DOCUMENTS',
+        'CHAT',
+        'NOTIFICATIONS',
       ];
 
       // Modules accessible to TEAM_LEAD (view-only for project tracking)

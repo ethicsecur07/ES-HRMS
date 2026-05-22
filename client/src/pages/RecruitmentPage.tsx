@@ -8,6 +8,7 @@ import type { Candidate, RecruitmentStage } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Button } from '../Components/WrapperComponents/Button';
+import { usePermission } from '../hooks/usePermission';
 import { Input } from '../Components/WrapperComponents/Input';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import { 
@@ -45,8 +46,9 @@ const STAGE_COLORS: Record<RecruitmentStage, string> = {
 };
 
 export const RecruitmentPage: React.FC = () => {
-  const { role, token } = useAuthStore();
+  const { token } = useAuthStore();
   const { addToast } = useNotificationStore();
+  const { hasPermission } = usePermission();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -177,7 +179,7 @@ export const RecruitmentPage: React.FC = () => {
               className="w-full bg-background text-foreground border border-border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
-          {(role === 'ADMIN' || role === 'HR') && (
+          {hasPermission('RECRUITMENT', 'create') && (
             <Button onClick={() => setShowAddModal(true)} className="shrink-0 flex items-center gap-1.5 shadow-md">
               <Plus className="w-4 h-4" /> Add Candidate
             </Button>
@@ -207,7 +209,7 @@ export const RecruitmentPage: React.FC = () => {
                       }`}
                     >
                       {candidatesByStage[stage]?.map((candidate, index) => (
-                        <Draggable key={candidate._id} draggableId={candidate._id} index={index}>
+                        <Draggable key={candidate._id} draggableId={candidate._id} index={index} isDragDisabled={!hasPermission('RECRUITMENT', 'edit')}>
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}

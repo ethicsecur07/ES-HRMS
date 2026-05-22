@@ -23,6 +23,10 @@ const DEFAULT_MODULE_CODES = [
   'SETTINGS',
   'SELF_SERVICE',
   'DOCUMENTS',
+  'PROJECTS',
+  'RECRUITMENT',
+  'CHAT',
+  'NOTIFICATIONS',
 ];
 
 const DEFAULT_MODULES = [
@@ -42,6 +46,10 @@ const DEFAULT_MODULES = [
   { name: 'System Settings', code: 'SETTINGS', version: '1.0.0', isActive: true },
   { name: 'Self Service Center', code: 'SELF_SERVICE', version: '1.0.0', isActive: true },
   { name: 'Document Management', code: 'DOCUMENTS', version: '1.0.0', isActive: true },
+  { name: 'Projects & Tasks', code: 'PROJECTS', version: '1.0.0', isActive: true },
+  { name: 'ATS Recruitment', code: 'RECRUITMENT', version: '1.0.0', isActive: true },
+  { name: 'Internal Chat', code: 'CHAT', version: '1.0.0', isActive: true },
+  { name: 'System Notifications', code: 'NOTIFICATIONS', version: '1.0.0', isActive: true },
 ];
 
 const DEFAULT_ROUTES = [
@@ -59,6 +67,10 @@ const DEFAULT_ROUTES = [
   { moduleCode: 'SETTINGS', routePath: '/settings', displayName: 'Settings', order: 12 },
   { moduleCode: 'SELF_SERVICE', routePath: '/self-service', displayName: 'Self Service', order: 13 },
   { moduleCode: 'DOCUMENTS', routePath: '/documents', displayName: 'Documents', order: 14 },
+  { moduleCode: 'PROJECTS', routePath: '/projects', displayName: 'Projects', order: 15 },
+  { moduleCode: 'RECRUITMENT', routePath: '/recruitment', displayName: 'Recruitment', order: 16 },
+  { moduleCode: 'CHAT', routePath: '/chat', displayName: 'Chat', order: 17 },
+  { moduleCode: 'NOTIFICATIONS', routePath: '/notifications', displayName: 'Notifications', order: 18 },
 ];
 
 // Helper to ensure core Modules and ModuleRoutes exist in database

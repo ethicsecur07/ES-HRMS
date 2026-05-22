@@ -6,6 +6,7 @@ import { employeeApi } from '../../api_service/employeeApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useSidebarExpanded } from './Sidebar';
 import type { Role } from '../../types';
 import ESLogo from '../../assets/ES_Logo.png';
 
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const { user, role, logout, updateUser } = useAuthStore();
   const { notifications, markAsRead, markAllAsRead, clearNotifications } = useNotificationStore();
   const { theme, toggleTheme } = useThemeStore();
+  const { expanded } = useSidebarExpanded();
   const [showNotifs, setShowNotifs] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -95,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   };
 
   return (
-    <header className="h-20 bg-card border-b border-border flex items-center justify-between px-4 sm:px-8 fixed top-0 left-0 right-0 lg:left-64 z-20 backdrop-blur-md bg-opacity-95 dark:bg-opacity-90 shadow-sm">
+    <header className={`h-20 bg-card border-b border-border flex items-center justify-between px-4 sm:px-8 fixed top-0 right-0 z-20 backdrop-blur-md bg-opacity-95 dark:bg-opacity-90 shadow-sm transition-all duration-300 ease-in-out left-0 ${expanded ? 'lg:left-64' : 'lg:left-16'}`}>
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Mobile Brand Display */}
         <div className="flex items-center gap-3 lg:hidden">
