@@ -40,7 +40,7 @@ export interface MatrixUpdateRequest {
 export const authPermissionApi = {
   getMatrix: async () => {
     const response = await axiosInstance.get<{ success: boolean; data: MatrixResponse }>('/auth-permissions/matrix');
-    return response.data.data;
+    return response.data as unknown as MatrixResponse;
   },
 
   updateMatrix: async (updates: MatrixUpdateRequest[]) => {
@@ -52,7 +52,7 @@ export const authPermissionApi = {
     const response = await axiosInstance.get<{ success: boolean; data: PermissionData[] }>(`/auth-permissions/overrides`, {
       params: { userId },
     });
-    return response.data.data;
+    return response.data as unknown as PermissionData[];
   },
 
   upsertUserOverride: async (data: {
@@ -78,6 +78,11 @@ export const authPermissionApi = {
       success: boolean;
       data: Record<string, { actions: PermissionActions; restrictedFields: string[]; policyCondition: any }>;
     }>('/auth-permissions/my-permissions');
-    return response.data.data;
+    return response.data as unknown as Record<string, { actions: PermissionActions; restrictedFields: string[]; policyCondition: any }>;
+  },
+
+  syncPermissions: async () => {
+    const response = await axiosInstance.post<{ success: boolean; message: string }>('/auth-permissions/sync');
+    return response.data;
   },
 };

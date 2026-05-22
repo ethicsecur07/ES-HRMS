@@ -205,6 +205,7 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
         role: user.role,
         email: user.email,
         organizationId: org._id.toString(),
+        employeeId: user.employeeId?.toString(),
         mfaPending: true,
       });
 
@@ -239,6 +240,7 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       role: user.role,
       email: user.email,
       organizationId: org._id.toString(),
+      employeeId: user.employeeId?.toString(),
     });
 
     await LoginRiskService.recordEvent({
@@ -323,6 +325,7 @@ export const verifyMFA = async (req: AuthRequest, res: Response): Promise<void> 
       role: req.user!.role,
       email: req.user!.email,
       organizationId: req.user!.organizationId,
+      employeeId: req.user!.employeeId,
     });
 
     res.status(200).json({ success: true, data: { verified: true, token } });
@@ -353,6 +356,7 @@ export const verifyRecoveryCode = async (req: AuthRequest, res: Response): Promi
       role: req.user!.role,
       email: req.user!.email,
       organizationId: req.user!.organizationId,
+      employeeId: req.user!.employeeId,
     });
 
     res.status(200).json({ success: true, data: { verified: true, token } });

@@ -52,6 +52,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     queryKey: ['employeeProfile', user?.employeeId],
     queryFn: () => employeeApi.getById(user?.employeeId as string),
     enabled: !!user?.employeeId,
+    retry: false,
+    throwOnError: false,
   });
 
   React.useEffect(() => {

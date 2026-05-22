@@ -1,4 +1,5 @@
 import { Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { HRDocument } from '../models/HRDocument.js';
 import { Employee } from '../models/Employee.js';
 import { AuthRequest } from '../types/index.js';
@@ -11,8 +12,13 @@ export const getDocuments = async (req: AuthRequest, res: Response, next: NextFu
     const query: any = { organizationId: orgId };
 
     if (role === 'EMPLOYEE') {
-      query.employeeId = employeeId;
-    } else if (req.query.employeeId) {
+      if (employeeId && mongoose.Types.ObjectId.isValid(employeeId)) {
+        query.employeeId = employeeId;
+      } else {
+        res.status(400).json({ message: 'Invalid or missing employee context in session.' });
+        return;
+      }
+    } else if (req.query.employeeId && mongoose.Types.ObjectId.isValid(req.query.employeeId as string)) {
       query.employeeId = req.query.employeeId;
     }
 
@@ -40,6 +46,11 @@ export const uploadDocument = async (req: AuthRequest, res: Response, next: Next
     const finalTargetEmpId = role === 'EMPLOYEE' ? userEmpId : targetEmpId;
     if (!finalTargetEmpId) {
       res.status(400).json({ message: 'Employee ID is required.' });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(finalTargetEmpId)) {
+      res.status(400).json({ message: 'Invalid employee ID format.' });
       return;
     }
 
@@ -82,6 +93,11 @@ export const addDocumentVersion = async (req: AuthRequest, res: Response, next: 
     const { id } = req.params;
     const { fileUrl } = req.body;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ message: 'Invalid document ID format.' });
+      return;
+    }
+
     if (!fileUrl) {
       res.status(400).json({ message: 'File URL is required.' });
       return;
@@ -121,6 +137,11 @@ export const downloadDocument = async (req: AuthRequest, res: Response, next: Ne
     const orgId = req.user?.organizationId;
     const { employeeId, role } = req.user || {};
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ message: 'Invalid document ID format.' });
+      return;
+    }
 
     const document = await HRDocument.findOne({ _id: id, organizationId: orgId });
     if (!document) {

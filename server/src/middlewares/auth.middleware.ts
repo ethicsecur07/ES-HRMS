@@ -38,7 +38,8 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
           id: dbUser.id,
           role: dbUser.role,
           email: dbUser.email,
-          organizationId: dbUser.organizationId.toString()
+          organizationId: dbUser.organizationId.toString(),
+          employeeId: dbUser.employeeId?.toString()
         };
         return next();
       } else {

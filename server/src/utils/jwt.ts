@@ -9,6 +9,7 @@ export interface TokenPayload {
   role: string;
   email: string;
   organizationId: string;
+  employeeId?: string;
   mfaPending?: boolean;
   sessionId?: string;
   isImpersonated?: boolean;

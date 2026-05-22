@@ -15,12 +15,12 @@ export interface RoleData {
 export const roleApi = {
   getAll: async () => {
     const response = await axiosInstance.get<{ success: boolean; data: RoleData[] }>('/roles');
-    return response.data.data;
+    return response.data as unknown as RoleData[];
   },
 
   getById: async (id: string) => {
     const response = await axiosInstance.get<{ success: boolean; data: RoleData }>(`/roles/${id}`);
-    return response.data.data;
+    return response.data as unknown as RoleData;
   },
 
   create: async (data: Omit<RoleData, '_id' | 'slug' | 'createdAt' | 'updatedAt'>) => {

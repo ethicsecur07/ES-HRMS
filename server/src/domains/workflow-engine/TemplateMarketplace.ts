@@ -61,12 +61,22 @@ export class TemplateMarketplace {
     const tpl = this.getMarketplaceTemplates().find(t => t.code === templateCode);
     if (!tpl) throw new Error("Template not found in marketplace");
 
+    // Auto-compute next available version to avoid unique index conflict
+    const latestVersion = await WorkflowTemplate.findOne({
+      organizationId: new mongoose.Types.ObjectId(organizationId),
+      triggerEvent: tpl.triggerEvent,
+    }).sort({ version: -1 });
+
+    const nextVersion = latestVersion ? latestVersion.version + 1 : 1;
+
     const newTemplate = new WorkflowTemplate({
       organizationId: new mongoose.Types.ObjectId(organizationId),
       name: tpl.name,
       triggerEvent: tpl.triggerEvent,
       nodes: tpl.nodes,
-      isActive: true
+      version: nextVersion,
+      isPublished: true,
+      isActive: true,
     });
 
     await newTemplate.save();

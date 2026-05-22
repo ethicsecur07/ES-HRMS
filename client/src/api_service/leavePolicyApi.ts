@@ -59,11 +59,11 @@ export const leavePolicyApi = {
 export const leaveBalanceApi = {
   getMyBalances: async (): Promise<LeaveBalanceSummary[]> => {
     const response = await axiosInstance.get<{ balances: LeaveBalanceSummary[] }>('/v2/leave/balance/me');
-    return response.data.balances;
+    return response.data?.balances ?? [];
   },
 
   getEmployeeBalances: async (empId: string): Promise<LeaveBalanceSummary[]> => {
     const response = await axiosInstance.get<{ balances: LeaveBalanceSummary[] }>(`/v2/leave/balance/${empId}`);
-    return response.data.balances;
+    return response.data?.balances ?? [];
   },
 };

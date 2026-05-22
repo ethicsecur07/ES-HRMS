@@ -21,7 +21,7 @@ export const getConversation = async (req: Request, res: Response): Promise<void
       { read: true }
     );
 
-    res.status(200).json({ success: true, messages });
+    res.status(200).json({ data: { messages } });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -56,7 +56,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       type: 'CHAT'
     });
 
-    res.status(201).json({ success: true, message });
+    res.status(201).json({ data: message });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
   }

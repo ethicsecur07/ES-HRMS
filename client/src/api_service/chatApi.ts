@@ -9,6 +9,6 @@ export const chatApi = {
 
   sendMessage: async (receiverId: string, content: string): Promise<ChatMessage> => {
     const res = await axiosInstance.post('/chat', { receiverId, content });
-    return res.data.message;
+    return res.data;
   }
 };

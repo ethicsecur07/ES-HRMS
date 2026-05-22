@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import { EmployeeService } from '../services/employee.service.js';
 import { AuthRequest } from '../types/index.js';
 
@@ -52,6 +53,11 @@ export const getEmployeeById = async (req: AuthRequest, res: Response): Promise<
   try {
     const { id } = req.params;
     const { organizationId, employeeId, role } = req.user || {};
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ message: 'Invalid employee ID format.' });
+      return;
+    }
 
     if (!organizationId) {
       res.status(400).json({ message: 'Organization context is missing.' });
@@ -109,6 +115,11 @@ export const updateEmployee = async (req: AuthRequest, res: Response): Promise<v
   try {
     const { id } = req.params;
     const orgId = req.user?.organizationId;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ message: 'Invalid employee ID format.' });
+      return;
+    }
     const emailForAudit = req.user?.email || 'System';
 
     if (!orgId) {
@@ -128,6 +139,11 @@ export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<v
   try {
     const { id } = req.params;
     const orgId = req.user?.organizationId;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ message: 'Invalid employee ID format.' });
+      return;
+    }
     const emailForAudit = req.user?.email || 'System';
 
     if (!orgId) {
