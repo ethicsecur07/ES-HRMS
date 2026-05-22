@@ -5,6 +5,9 @@ import { getIO } from '../../sockets/socketHandler.js';
 
 export const createTask = async (req: RBACRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (!req.body.sprintId || req.body.sprintId === '' || req.body.sprintId === 'backlog') {
+      delete req.body.sprintId;
+    }
     const task = await Task.create({
       ...req.body,
       projectId: req.params.projectId,
@@ -78,6 +81,9 @@ export const updateTaskStatus = async (req: RBACRequest, res: Response, next: Ne
 
 export const updateTask = async (req: RBACRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (!req.body.sprintId || req.body.sprintId === '' || req.body.sprintId === 'backlog') {
+      req.body.sprintId = null;
+    }
     const task = await Task.findOneAndUpdate(
       { _id: req.params.taskId, projectId: req.params.projectId, organizationId: req.user?.organizationId },
       req.body,

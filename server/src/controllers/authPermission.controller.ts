@@ -24,6 +24,8 @@ const DEFAULT_MODULES = [
   'DOCUMENTS',
   'PROJECTS',
   'RECRUITMENT',
+  'CHAT',
+  'NOTIFICATIONS',
 ];
 
 /**

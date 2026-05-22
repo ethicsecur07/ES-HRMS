@@ -2,7 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { io } from 'socket.io-client';
+import { Plus, Trash2, Calendar, Award, AlertCircle } from 'lucide-react';
 import { projectApi } from '../../api_service/projectApi';
+import { Modal } from '../WrapperComponents/Modal';
+import { Input, Select, Textarea } from '../WrapperComponents/Input';
+import { Button } from '../WrapperComponents/Button';
 
 const COLUMNS = ['TODO', 'IN_PROGRESS', 'REVIEW', 'COMPLETED'];
 
@@ -10,26 +14,54 @@ interface Task {
   _id: string;
   title: string;
   description?: string;
-  status: string;
-  assignedTo?: { fullName: string; profileImage?: string };
+  status: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  assignedTo?: { _id: string; fullName: string; profileImage?: string };
+  sprintId?: string;
+  sprintName?: string;
+  storyPoints?: number;
+  dueDate?: string;
 }
 
 interface KanbanBoardProps {
   projectId: string;
+  selectedSprintId: string;
+  sprints: any[];
+  teamMembers: any[];
 }
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ 
+  projectId, 
+  selectedSprintId, 
+  sprints,
+  teamMembers 
+}) => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTask, setActiveTask] = useState<Task | null>(null); // null means "Create mode"
+
+  // Task Form State
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDesc, setTaskDesc] = useState('');
+  const [taskStatus, setTaskStatus] = useState<'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED'>('TODO');
+  const [taskPriority, setTaskPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
+  const [assignedToId, setAssignedToId] = useState('');
+  const [taskSprintId, setTaskSprintId] = useState('');
+  const [storyPoints, setStoryPoints] = useState(0);
+  const [dueDate, setDueDate] = useState('');
+
+  const fetchTasks = async () => {
+    try {
+      // Fetch all tasks for the project; we filter by sprint on the client
+      const data = await projectApi.getTasks(projectId);
+      setTasks(data.tasks || []);
+    } catch (error) {
+      console.error('Failed to fetch tasks', error);
+    }
+  };
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const data = await projectApi.getTasks(projectId);
-        setTasks(data.tasks);
-      } catch (error) {
-        console.error('Failed to fetch tasks', error);
-      }
-    };
     fetchTasks();
 
     const envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -48,7 +80,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     });
 
     newSocket.on('task_created', (newTask: Task) => {
-      setTasks(prev => [...prev, newTask]);
+      setTasks(prev => {
+        if (prev.some(t => t._id === newTask._id)) return prev;
+        return [...prev, newTask];
+      });
     });
 
     newSocket.on('task_updated', (updatedTask: Task) => {
@@ -58,8 +93,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     newSocket.on('task_deleted', ({ taskId }) => {
       setTasks(prev => prev.filter(t => t._id !== taskId));
     });
-
-
 
     return () => {
       newSocket.disconnect();
@@ -75,7 +108,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
       return;
     }
 
-    const newStatus = destination.droppableId;
+    const newStatus = destination.droppableId as any;
     
     // Optimistic UI update
     setTasks(prev => 
@@ -87,74 +120,322 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     } catch (error) {
       console.error('Failed to update task status', error);
       // Revert on failure
-      const data = await projectApi.getTasks(projectId);
-      setTasks(data.tasks);
+      fetchTasks();
     }
   };
 
+  // Filter tasks based on selected sprint
   const getTasksByStatus = (status: string) => {
-    return tasks.filter(t => t.status === status);
+    return tasks.filter(t => {
+      if (t.status !== status) return false;
+      if (selectedSprintId === 'backlog') {
+        return !t.sprintId; // Show backlog tasks (no sprint assigned)
+      }
+      return t.sprintId === selectedSprintId;
+    });
+  };
+
+  const handleOpenCreateModal = (columnStatus: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED') => {
+    setActiveTask(null);
+    setTaskTitle('');
+    setTaskDesc('');
+    setTaskStatus(columnStatus);
+    setTaskPriority('MEDIUM');
+    setAssignedToId('');
+    setTaskSprintId(selectedSprintId === 'backlog' ? '' : selectedSprintId);
+    setStoryPoints(0);
+    setDueDate('');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (task: Task) => {
+    setActiveTask(task);
+    setTaskTitle(task.title);
+    setTaskDesc(task.description || '');
+    setTaskStatus(task.status);
+    setTaskPriority(task.priority);
+    setAssignedToId(task.assignedTo?._id || '');
+    setTaskSprintId(task.sprintId || '');
+    setStoryPoints(task.storyPoints || 0);
+    setDueDate(task.dueDate || '');
+    setIsModalOpen(true);
+  };
+
+  const handleSaveTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle || !assignedToId) {
+      alert('Task Title and Assignee are required.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        title: taskTitle,
+        description: taskDesc,
+        status: taskStatus,
+        priority: taskPriority,
+        assignedTo: assignedToId,
+        sprintId: taskSprintId || 'backlog', // Backend controller will sanitize empty values
+        storyPoints,
+        dueDate
+      };
+
+      if (activeTask) {
+        // Edit mode
+        await projectApi.updateTask(projectId, activeTask._id, payload);
+      } else {
+        // Create mode
+        await projectApi.createTask(projectId, payload);
+      }
+      setIsModalOpen(false);
+      fetchTasks();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Failed to save task');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!activeTask) return;
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+
+    setIsSubmitting(true);
+    try {
+      await projectApi.deleteTask(projectId, activeTask._id);
+      setIsModalOpen(false);
+      fetchTasks();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Failed to delete task');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'CRITICAL': return 'bg-red-500/10 text-red-400 border border-red-500/20';
+      case 'HIGH': return 'bg-orange-500/10 text-orange-400 border border-orange-500/20';
+      case 'MEDIUM': return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+      case 'LOW': return 'bg-slate-800 text-slate-400 border border-slate-700';
+      default: return 'bg-slate-800 text-slate-400 border border-slate-700';
+    }
   };
 
   return (
-    <div className="flex h-full gap-6 overflow-x-auto pb-4">
+    <div className="flex h-full gap-6 overflow-x-auto pb-4 text-left">
       <DragDropContext onDragEnd={onDragEnd}>
-        {COLUMNS.map((status) => (
-          <div key={status} className="flex-1 min-w-[300px] bg-slate-900/50 rounded-xl p-4 border border-slate-800 flex flex-col">
-            <h3 className="font-semibold text-slate-300 mb-4 flex items-center justify-between">
-              {status.replace('_', ' ')}
-              <span className="bg-slate-800 text-slate-400 text-xs py-0.5 px-2 rounded-full">
-                {getTasksByStatus(status).length}
-              </span>
-            </h3>
-            
-            <Droppable droppableId={status}>
-              {(provided, snapshot) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className={`flex-1 min-h-[200px] transition-colors rounded-lg ${
-                    snapshot.isDraggingOver ? 'bg-slate-800/50' : ''
-                  }`}
-                >
-                  {getTasksByStatus(status).map((task, index) => (
-                    <Draggable key={task._id} draggableId={task._id} index={index}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className={`mb-3 p-4 bg-slate-800 rounded-lg border transition-all ${
-                            snapshot.isDragging 
-                              ? 'border-indigo-500 shadow-lg shadow-indigo-500/20 rotate-2 scale-105' 
-                              : 'border-slate-700 hover:border-slate-600'
-                          }`}
-                        >
-                          <h4 className="text-slate-200 font-medium mb-2">{task.title}</h4>
-                          {task.description && (
-                            <p className="text-slate-400 text-sm line-clamp-2 mb-3">{task.description}</p>
-                          )}
-                          <div className="flex items-center justify-between mt-auto">
-                            {task.assignedTo && (
-                              <div className="flex items-center text-xs text-slate-400">
-                                <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 mr-2 border border-indigo-500/30">
-                                  {task.assignedTo.fullName.charAt(0)}
-                                </div>
-                                {task.assignedTo.fullName}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+        {COLUMNS.map((status) => {
+          const filteredTasks = getTasksByStatus(status);
+          return (
+            <div key={status} className="flex-1 min-w-[300px] max-w-[380px] bg-slate-900/40 rounded-xl p-4 border border-slate-800/80 flex flex-col h-full max-h-[80vh]">
+              <h3 className="font-semibold text-slate-300 mb-4 flex items-center justify-between">
+                <span>{status.replace('_', ' ')}</span>
+                <div className="flex items-center gap-2">
+                  <span className="bg-slate-800 text-slate-400 text-xs py-0.5 px-2 rounded-full">
+                    {filteredTasks.length}
+                  </span>
+                  <button 
+                    onClick={() => handleOpenCreateModal(status as any)}
+                    className="p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
-              )}
-            </Droppable>
-          </div>
-        ))}
+              </h3>
+              
+              <Droppable droppableId={status}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`flex-1 min-h-[200px] overflow-y-auto pr-1 transition-colors rounded-lg ${
+                      snapshot.isDraggingOver ? 'bg-slate-800/20' : ''
+                    }`}
+                  >
+                    {filteredTasks.map((task, index) => (
+                      <Draggable key={task._id} draggableId={task._id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            onClick={() => handleOpenEditModal(task)}
+                            className={`mb-3 p-4 bg-slate-900 border transition-all cursor-pointer rounded-xl group ${
+                              snapshot.isDragging 
+                                ? 'border-indigo-500 shadow-xl shadow-indigo-500/20 rotate-1 scale-[1.02] bg-slate-850' 
+                                : 'border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-2 mb-2">
+                              <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full uppercase tracking-wider ${getPriorityColor(task.priority)}`}>
+                                {task.priority}
+                              </span>
+                              {task.storyPoints !== undefined && task.storyPoints > 0 && (
+                                <span className="flex items-center text-[10px] text-indigo-400 font-medium bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/10">
+                                  <Award className="w-3 h-3 mr-0.5" />
+                                  {task.storyPoints} pts
+                                </span>
+                              )}
+                            </div>
+                            
+                            <h4 className="text-slate-200 font-medium text-sm mb-2 group-hover:text-indigo-300 transition-colors line-clamp-2">{task.title}</h4>
+                            
+                            {task.description && (
+                              <p className="text-slate-400 text-xs line-clamp-2 mb-3 leading-relaxed">{task.description}</p>
+                            )}
+                            
+                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/80">
+                              {task.dueDate && (
+                                <div className="flex items-center text-[10px] text-slate-500">
+                                  <Calendar className="w-3 h-3 mr-1" />
+                                  {new Date(task.dueDate).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+                                </div>
+                              )}
+                              {task.assignedTo && (
+                                <div className="flex items-center text-[10px] text-slate-400 ml-auto gap-1.5 bg-slate-950 px-2 py-1 rounded-full border border-slate-800/60">
+                                  <div className="w-4 h-4 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-[8px] font-bold border border-indigo-500/30 uppercase">
+                                    {task.assignedTo.fullName.charAt(0)}
+                                  </div>
+                                  <span>{task.assignedTo.fullName}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </div>
+          );
+        })}
       </DragDropContext>
+
+      {/* Task Creation & Edit Modal */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={activeTask ? 'Edit Task Details' : 'Create New Task'}
+        maxWidth="max-w-lg"
+      >
+        <form onSubmit={handleSaveTask} className="space-y-4 text-left">
+          <Input 
+            label="Task Title *"
+            value={taskTitle}
+            onChange={(e) => setTaskTitle(e.target.value)}
+            placeholder="Implement user login form"
+            required
+          />
+
+          <Textarea 
+            label="Description"
+            value={taskDesc}
+            onChange={(e) => setTaskDesc(e.target.value)}
+            placeholder="Add detailed steps or acceptance criteria..."
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <Select 
+              label="Assigned To *"
+              value={assignedToId}
+              onChange={(e) => setAssignedToId(e.target.value)}
+              required
+            >
+              <option value="">Select Assignee</option>
+              {teamMembers.map((member) => (
+                <option key={member._id} value={member._id}>
+                  {member.fullName}
+                </option>
+              ))}
+            </Select>
+            <Select 
+              label="Priority *"
+              value={taskPriority}
+              onChange={(e) => setTaskPriority(e.target.value as any)}
+              options={[
+                { value: 'LOW', label: 'Low' },
+                { value: 'MEDIUM', label: 'Medium' },
+                { value: 'HIGH', label: 'High' },
+                { value: 'CRITICAL', label: 'Critical' }
+              ]}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Select 
+              label="Status *"
+              value={taskStatus}
+              onChange={(e) => setTaskStatus(e.target.value as any)}
+              options={[
+                { value: 'TODO', label: 'To Do' },
+                { value: 'IN_PROGRESS', label: 'In Progress' },
+                { value: 'REVIEW', label: 'Review' },
+                { value: 'COMPLETED', label: 'Completed' }
+              ]}
+              required
+            />
+            <Select 
+              label="Sprint"
+              value={taskSprintId}
+              onChange={(e) => setTaskSprintId(e.target.value)}
+            >
+              <option value="backlog">Backlog (No Sprint)</option>
+              {sprints.map((sprint) => (
+                <option key={sprint._id} value={sprint._id}>
+                  {sprint.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input 
+              label="Story Points"
+              type="number"
+              value={storyPoints}
+              onChange={(e) => setStoryPoints(Number(e.target.value))}
+              placeholder="e.g. 3"
+            />
+            <Input 
+              label="Due Date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-between gap-3 pt-4 border-t border-border mt-6">
+            {activeTask ? (
+              <button
+                type="button"
+                onClick={handleDeleteTask}
+                className="flex items-center text-red-500 hover:text-red-400 px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors mr-auto font-medium text-sm border border-transparent hover:border-red-500/10"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Task
+              </button>
+            ) : (
+              <div />
+            )}
+            
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" isLoading={isSubmitting}>
+                {activeTask ? 'Save Task' : 'Create Task'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

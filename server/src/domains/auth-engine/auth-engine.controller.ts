@@ -5,7 +5,7 @@ import { MFAService } from './services/MFAService.js';
 import { DeviceManagementService } from './services/DeviceManagementService.js';
 import { LoginRiskService } from './services/LoginRiskService.js';
 import { SessionPolicyService } from './services/SessionPolicyService.js';
-import { IdentityProvider, ProviderType } from './models/IdentityProvider.js';
+import { OrganizationAuthConfig, ProviderType } from '../../models/OrganizationAuthConfig.js';
 import { User } from '../../models/User.js';
 import { Organization } from '../../models/Organization.js';
 import { generateToken } from '../../utils/jwt.js';
@@ -36,7 +36,7 @@ export const getOrgProviders = async (req: Request, res: Response): Promise<void
     res.status(200).json({
       success: true,
       data: providers.map((p: any) => ({
-        type: p.providerType,
+        type: p.provider,
         name: p.displayName,
         isPrimary: p.isPrimary,
       })),
@@ -59,9 +59,10 @@ export const initiateSSO = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    const providerKey = (providerType || '').toUpperCase() === 'SAML2' ? 'SAML' : (providerType || '').toUpperCase();
     const provider = await ProviderRegistry.getProviderByType(
       org._id.toString(),
-      providerType.toUpperCase() as ProviderType
+      providerKey as ProviderType
     );
     if (!provider) {
       res.status(404).json({ success: false, message: `Provider ${providerType} not configured for this organization` });
@@ -96,9 +97,10 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    const providerKey = (providerType || 'SAML').toUpperCase() === 'SAML2' ? 'SAML' : (providerType || 'SAML').toUpperCase();
     const provider = await ProviderRegistry.getProviderByType(
       org._id.toString(),
-      (providerType || 'SAML2').toUpperCase() as ProviderType
+      providerKey as ProviderType
     );
     if (!provider) {
       res.status(404).json({ success: false, message: 'Provider not configured' });
@@ -325,7 +327,7 @@ export const verifyMFA = async (req: AuthRequest, res: Response): Promise<void> 
       role: req.user!.role,
       email: req.user!.email,
       organizationId: req.user!.organizationId,
-      employeeId: req.user!.employeeId,
+      employeeId: (req.user as any).employeeId,
     });
 
     res.status(200).json({ success: true, data: { verified: true, token } });
@@ -356,7 +358,7 @@ export const verifyRecoveryCode = async (req: AuthRequest, res: Response): Promi
       role: req.user!.role,
       email: req.user!.email,
       organizationId: req.user!.organizationId,
-      employeeId: req.user!.employeeId,
+      employeeId: (req.user as any).employeeId,
     });
 
     res.status(200).json({ success: true, data: { verified: true, token } });
@@ -478,13 +480,20 @@ export const listProviders = async (req: AuthRequest, res: Response): Promise<vo
  */
 export const registerProvider = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const provider = await ProviderRegistry.registerProvider(req.user!.organizationId, req.body);
+    const providerData = { ...req.body };
+    if (providerData.providerType && !providerData.provider) {
+      providerData.provider = providerData.providerType;
+    }
+    if (providerData.provider === 'SAML2') {
+      providerData.provider = 'SAML';
+    }
+    const provider = await ProviderRegistry.registerProvider(req.user!.organizationId, providerData);
     await createAuditLog(
       'IDP_REGISTERED',
       req.user!.email,
       'AUTH',
       'Identity Provider',
-      `Registered ${provider.providerType} provider`,
+      `Registered ${provider.provider} provider`,
       req.user!.organizationId
     );
     res.status(201).json({ success: true, data: provider });
@@ -499,9 +508,10 @@ export const registerProvider = async (req: AuthRequest, res: Response): Promise
  */
 export const removeProvider = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const providerKey = req.params.providerType.toUpperCase() === 'SAML2' ? 'SAML' : req.params.providerType.toUpperCase();
     const removed = await ProviderRegistry.removeProvider(
       req.user!.organizationId,
-      req.params.providerType.toUpperCase() as ProviderType
+      providerKey as ProviderType
     );
     if (!removed) {
       res.status(404).json({ success: false, message: 'Provider not found' });

@@ -24,6 +24,10 @@ const fallbackModuleRoutes: ModuleRouteData[] = [
   { moduleCode: 'AUDIT_LOGS', routePath: '/audit-logs', displayName: 'Audit Logs', order: 12 },
   { moduleCode: 'SELF_SERVICE', routePath: '/self-service', displayName: 'Self Service', order: 14 },
   { moduleCode: 'DOCUMENTS', routePath: '/documents', displayName: 'Documents', order: 15 },
+  { moduleCode: 'PROJECTS', routePath: '/projects', displayName: 'Projects', order: 16 },
+  { moduleCode: 'RECRUITMENT', routePath: '/recruitment', displayName: 'Recruitment', order: 17 },
+  { moduleCode: 'CHAT', routePath: '/chat', displayName: 'Chat', order: 18 },
+  { moduleCode: 'NOTIFICATIONS', routePath: '/notifications', displayName: 'Notifications', order: 19 },
 ];
 
 const mergeKnownRoutes = (routes: ModuleRouteData[]) => {
