@@ -225,7 +225,19 @@ export class EmployeeService {
       .skip(skipNum)
       .limit(limitNum);
 
-    return { employees, total, page: pageNum, limit: limitNum };
+    const employeeIds = employees.map(emp => emp._id);
+    const users = await User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId');
+    const userMap = new Map(users.map(u => [u.employeeId?.toString(), u._id.toString()]));
+
+    const enrichedEmployees = employees.map(emp => {
+      const empObj = emp.toObject();
+      return {
+        ...empObj,
+        userId: userMap.get(emp._id.toString()) || null
+      };
+    });
+
+    return { employees: enrichedEmployees, total, page: pageNum, limit: limitNum };
   }
 
   /**
@@ -238,7 +250,12 @@ export class EmployeeService {
     if (!employee) {
       throw new Error('Employee not found');
     }
-    return employee;
+    const user = await User.findOne({ employeeId: employee._id, organizationId: orgId }).select('_id');
+    const empObj = employee.toObject();
+    return {
+      ...empObj,
+      userId: user?._id.toString() || null
+    };
   }
 
   /**

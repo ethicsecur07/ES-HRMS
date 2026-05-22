@@ -9,7 +9,13 @@ export const getRedisClient = async (): Promise<RedisClientType<any, any> | null
     return client;
   }
   try {
-    client = createClient({ url: redisUrl });
+    client = createClient({ 
+      url: redisUrl,
+      socket: {
+        connectTimeout: 1500, // 1.5 seconds max wait time
+        reconnectStrategy: false // Fail fast if Redis is not running locally
+      }
+    });
     client.on('error', (err: any) => console.error('Redis Client Error', err));
     await client.connect();
     console.log('✅ Connected to Redis');

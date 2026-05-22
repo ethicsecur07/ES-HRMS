@@ -50,6 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     queryKey: ['employeeProfile', user?.employeeId],
     queryFn: () => employeeApi.getById(user?.employeeId as string),
     enabled: !!user?.employeeId,
+    retry: false,
+    throwOnError: false,
   });
 
   const profileImg = user?.profileImage || employeeData?.profileImage;

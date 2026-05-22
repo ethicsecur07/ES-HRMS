@@ -6,7 +6,7 @@ import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input } from '../Components/WrapperComponents/Input';
-import { Settings, ShieldCheck, Users, Save, ShieldAlert, FileJson, AlertTriangle, Plus, Trash2, Search, Sparkles } from 'lucide-react';
+import { Settings, ShieldCheck, Users, Save, ShieldAlert, FileJson, AlertTriangle, Plus, Trash2, Search, Sparkles, RefreshCw } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const ACTIONS_LIST: (keyof PermissionActions)[] = ['view', 'create', 'edit', 'delete', 'approve', 'assign', 'export'];
@@ -130,6 +130,22 @@ export const PermissionPage: React.FC = () => {
       };
     });
   };
+
+  // Sync Permissions Mutation
+  const syncPermissionsMutation = useMutation({
+    mutationFn: authPermissionApi.syncPermissions,
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: ['permissionMatrix'] });
+        addToast('Permissions Synced', 'All role permissions have been refreshed including PROJECTS and RECRUITMENT modules.', 'success');
+      } else {
+        addToast('Sync Failed', data.message || 'Failed to sync permissions', 'error');
+      }
+    },
+    onError: (err: any) => {
+      addToast('Sync Error', err.response?.data?.message || 'Could not sync permissions', 'error');
+    },
+  });
 
   // Matrix Update Mutation
   const updateMatrixMutation = useMutation({
@@ -263,6 +279,16 @@ export const PermissionPage: React.FC = () => {
             Configure company global policies, office WiFi whitelisting for IP attendance, and admin preferences
           </p>
         </div>
+        <Button
+          onClick={() => syncPermissionsMutation.mutate()}
+          isLoading={syncPermissionsMutation.isPending}
+          variant="outline"
+          className="flex items-center gap-1.5 text-xs font-bold border-primary/30 text-primary hover:bg-primary/10"
+          title="Re-sync all role permissions to include new modules (PROJECTS, RECRUITMENT, etc.)"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Sync Default Permissions
+        </Button>
       </div>
 
       {/* Settings Navigation Tabs */}

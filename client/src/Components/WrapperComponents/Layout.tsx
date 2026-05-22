@@ -186,6 +186,7 @@ export const Layout: React.FC = () => {
         'You received a new chat message.',
         'info'
       );
+      queryClient.invalidateQueries({ queryKey: ['chat'] });
     });
 
     socket.on('receive_notification', (data: { _id?: string; title: string; message: string; type?: string; recipientId?: string }) => {

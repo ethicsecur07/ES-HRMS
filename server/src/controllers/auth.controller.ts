@@ -95,6 +95,7 @@ async function createSessionAndRespond(
     role: user.role,
     email: user.email,
     organizationId: org._id.toString(),
+    employeeId: user.employeeId?.toString(),
     sessionId: sessionId.toString(),
   });
 
@@ -335,6 +336,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         role: user.role,
         email: user.email,
         organizationId: org._id.toString(),
+        employeeId: user.employeeId?.toString(),
         mfaPending: true,
       });
 
@@ -552,6 +554,7 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
       role: user.role,
       email: user.email,
       organizationId: user.organizationId.toString(),
+      employeeId: user.employeeId?.toString(),
       sessionId: session._id.toString(),
     });
 
@@ -749,6 +752,7 @@ export const impersonate = async (req: AuthRequest, res: Response): Promise<void
       role: targetUser.role,
       email: targetUser.email,
       organizationId: targetUser.organizationId.toString(),
+      employeeId: targetUser.employeeId?.toString(),
       isImpersonated: true,
       originalAdminId: req.user.id,
     });

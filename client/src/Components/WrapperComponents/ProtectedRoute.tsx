@@ -12,17 +12,19 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
   const { isAuthenticated, role } = useAuthStore();
   const { enabledModules, moduleRoutes } = useModuleStore();
-  const { hasPermission, isLoading: isPermissionLoading } = usePermission();
+  const { permissions, hasPermission, isLoading: isPermissionLoading } = usePermission();
   const location = useLocation();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // If permissions are still loading, show a premium loading indicator
-  if (isPermissionLoading) {
+  const hasPermissionsLoaded = Object.keys(permissions || {}).length > 0;
+
+  // Only show the loading indicator if we are loading AND we don't have cached permissions yet
+  if (isPermissionLoading && !hasPermissionsLoaded) {
     return (
-      <div className="flex items-center justify-center h-screen  text-indigo-400 font-semibold">
+      <div className="flex items-center justify-center h-screen text-indigo-400 font-semibold">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-xs tracking-wider uppercase text-slate-400">Verifying Access...</p>
@@ -32,7 +34,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) 
   }
 
   if (allowedRoles && role && !allowedRoles.includes(role)) {
-    return <Navigate to="/dashboard" replace />;
+    if (location.pathname !== '/dashboard') return <Navigate to="/dashboard" replace />;
   }
 
   // Find the most specific (longest) module route that matches the current pathname
@@ -56,12 +58,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) 
 
   if (matchedRoute) {
     if (enabledModules.length > 0 && !enabledModules.includes(matchedRoute.moduleCode)) {
-      return <Navigate to="/dashboard" replace />;
+      if (location.pathname !== '/dashboard') return <Navigate to="/dashboard" replace />;
     }
     
     // Dynamic permission check for the module
     if (!hasPermission(matchedRoute.moduleCode, 'view')) {
-      return <Navigate to="/dashboard" replace />;
+      if (location.pathname !== '/dashboard') return <Navigate to="/dashboard" replace />;
     }
   }
 

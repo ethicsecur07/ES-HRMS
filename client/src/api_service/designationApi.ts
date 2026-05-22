@@ -6,12 +6,12 @@ export const designationApi = {
     const response = await axiosInstance.get<{ success: boolean; data: Designation[] }>('/designations', {
       params: { departmentId },
     });
-    return response.data.data;
+    return response.data as unknown as Designation[];
   },
 
   getById: async (id: string) => {
     const response = await axiosInstance.get<{ success: boolean; data: Designation }>(`/designations/${id}`);
-    return response.data.data;
+    return response.data as unknown as Designation;
   },
 
   create: async (data: Omit<Designation, '_id' | 'createdAt' | 'updatedAt' | 'isActive'>) => {

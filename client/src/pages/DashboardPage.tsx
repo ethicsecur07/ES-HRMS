@@ -26,8 +26,10 @@ export const DashboardPage: React.FC = () => {
 
   const { data: myEmployee } = useQuery({
     queryKey: ['myEmployee', user?.employeeId],
-    queryFn: () => employeeApi.getById(user?.employeeId || 'emp-dev-001'),
-    enabled: role === 'EMPLOYEE',
+    queryFn: () => employeeApi.getById(user?.employeeId as string),
+    enabled: role === 'EMPLOYEE' && !!user?.employeeId,
+    retry: false,
+    throwOnError: false,
   });
 
   const { data: myTasks } = useQuery({
