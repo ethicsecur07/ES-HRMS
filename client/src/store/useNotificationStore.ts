@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { NotificationItem } from '../types';
+import { io, Socket } from 'socket.io-client';
+import { notificationApi } from '../api_service/notificationApi';
 
 interface Toast {
   id: string;
@@ -21,17 +23,63 @@ interface NotificationState {
   removeToast: (id: string) => void;
   clearNotifications: () => void;
   logoutClear: () => void;
+  initializeSocket: (token: string) => void;
+  fetchNotifications: () => Promise<void>;
+  socket: Socket | null;
 }
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
 
 export const useNotificationStore = create<NotificationState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       notifications: INITIAL_NOTIFICATIONS,
       toasts: [],
-      unreadCount: INITIAL_NOTIFICATIONS.filter((n) => !n.read).length,
+      unreadCount: 0,
       clearedNotificationIds: [],
+      socket: null,
+
+      fetchNotifications: async () => {
+        try {
+          const notifs = await notificationApi.getNotifications();
+          set({ 
+            notifications: notifs,
+            unreadCount: notifs.filter(n => !n.read).length
+          });
+        } catch (err) {
+          console.error('Failed to fetch notifications:', err);
+        }
+      },
+
+      initializeSocket: (token) => {
+        const state = get();
+        if (state.socket) return; // Already connected
+
+        const getSocketUrl = () => {
+          const envApiUrl = import.meta.env.VITE_API_URL;
+          if (envApiUrl && !envApiUrl.includes('localhost')) {
+            return envApiUrl.replace('/api', '');
+          }
+          return `${window.location.protocol}//${window.location.hostname}:5000`;
+        };
+        const socketUrl = getSocketUrl();
+        const socket = io(socketUrl, {
+          transports: ['websocket', 'polling'],
+          autoConnect: true,
+          auth: { token }
+        });
+
+        socket.on('connect', () => {
+          console.log('Notification socket connected');
+        });
+
+        socket.on('new_notification', (notif: NotificationItem) => {
+          get().addNotification(notif);
+          get().addToast(notif.title, notif.message, 'info');
+        });
+
+        set({ socket });
+      },
 
       addNotification: (notif) =>
         set((state) => {
@@ -52,20 +100,32 @@ export const useNotificationStore = create<NotificationState>()(
           };
         }),
 
-      markAsRead: (id) =>
-        set((state) => {
-          const updated = state.notifications.map((n) => (n._id === id ? { ...n, read: true } : n));
-          return {
-            notifications: updated,
-            unreadCount: updated.filter((n) => !n.read).length,
-          };
-        }),
+      markAsRead: async (id) => {
+        try {
+          await notificationApi.markAsRead(id);
+          set((state) => {
+            const updated = state.notifications.map((n) => (n._id === id ? { ...n, read: true } : n));
+            return {
+              notifications: updated,
+              unreadCount: updated.filter((n) => !n.read).length,
+            };
+          });
+        } catch (err) {
+          console.error('Failed to mark as read', err);
+        }
+      },
 
-      markAllAsRead: () =>
-        set((state) => ({
-          notifications: state.notifications.map((n) => ({ ...n, read: true })),
-          unreadCount: 0,
-        })),
+      markAllAsRead: async () => {
+        try {
+          await notificationApi.markAllAsRead();
+          set((state) => ({
+            notifications: state.notifications.map((n) => ({ ...n, read: true })),
+            unreadCount: 0,
+          }));
+        } catch (err) {
+          console.error('Failed to mark all as read', err);
+        }
+      },
 
       addToast: (title, message, type = 'info') => {
         const id = `toast-${Date.now()}`;
@@ -89,13 +149,19 @@ export const useNotificationStore = create<NotificationState>()(
           };
         }),
 
-      logoutClear: () =>
+      logoutClear: () => {
+        const { socket } = get();
+        if (socket) {
+          socket.disconnect();
+        }
         set({
           notifications: INITIAL_NOTIFICATIONS,
           toasts: [],
           unreadCount: 0,
           clearedNotificationIds: [],
-        }),
+          socket: null
+        });
+      },
     }),
     {
       name: 'es-hrms-notifications',

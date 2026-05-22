@@ -35,13 +35,13 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Employee = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-const index_js_1 = require("../constants/index.js");
 const employeeSchema = new mongoose_1.Schema({
-    employeeCode: { type: String, required: true, unique: true },
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
+    employeeCode: { type: String, required: true },
     fullName: { type: String, required: true },
-    email: { type: String, required: true, unique: true, lowercase: true },
+    email: { type: String, required: true, lowercase: true },
     phone: { type: String, required: true },
-    department: { type: String, enum: Object.values(index_js_1.DEPARTMENTS), required: true },
+    department: { type: String, required: true },
     designation: { type: String, required: true },
     joiningDate: { type: Date, required: true },
     profileImage: { type: String },
@@ -56,5 +56,39 @@ const employeeSchema = new mongoose_1.Schema({
     wfhBalance: { type: Number, default: 1 },
     permissionHoursBalance: { type: Number, default: 3 },
     isActive: { type: Boolean, default: true },
+    branchId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Branch', index: true },
+    costCenterId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'CostCenter', index: true },
+    primaryManagerId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee', index: true },
+    designationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Designation', index: true },
+    departmentId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Department', index: true },
+    confirmationDate: { type: Date },
+    terminationDate: { type: Date },
+    customFields: { type: Map, of: mongoose_1.Schema.Types.Mixed, default: {} },
+    bankDetails: {
+        bankName: { type: String, default: '' },
+        accountName: { type: String, default: '' },
+        accountNumber: { type: String, default: '' },
+        ifscCode: { type: String, default: '' },
+        branchName: { type: String, default: '' },
+    },
+    taxDetails: {
+        panNumber: { type: String, default: '' },
+        taxRegime: { type: String, enum: ['OLD', 'NEW', ''], default: '' },
+    },
 }, { timestamps: true });
+employeeSchema.index({ organizationId: 1, employeeCode: 1 }, { unique: true });
+employeeSchema.index({ organizationId: 1, email: 1 }, { unique: true });
+const softDeletePlugin_js_1 = require("../utils/softDeletePlugin.js");
+const User_js_1 = require("./User.js");
+employeeSchema.plugin(softDeletePlugin_js_1.softDeletePlugin);
+// Cascade Soft Delete: When an Employee is soft-deleted, their User login is revoked
+employeeSchema.pre('save', async function (next) {
+    if (this.isModified('isDeleted') && this.isDeleted === true) {
+        const user = await User_js_1.User.findOne({ employeeId: this._id });
+        if (user && typeof user.softDelete === 'function') {
+            await user.softDelete();
+        }
+    }
+    next();
+});
 exports.Employee = mongoose_1.default.model('Employee', employeeSchema);

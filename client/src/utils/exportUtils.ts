@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import type { Payroll, Attendance, TaskReport } from '../types';
 import { formatDate, formatCurrency } from './formatters';
@@ -81,4 +82,44 @@ export const exportProductivityExcel = (tasks: TaskReport[]) => {
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Productivity Reports');
 
   XLSX.writeFile(workbook, 'Employee_Productivity_Report.xlsx');
+};
+
+export const exportToExcel = (data: any[], filename: string) => {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Report');
+  XLSX.writeFile(workbook, `${filename}.xlsx`);
+};
+
+export const exportToCSV = (data: any[], filename: string) => {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+  const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${filename}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+export const exportToPDF = async (elementId: string, filename: string) => {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+  
+  try {
+    const canvas = await html2canvas(element, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    
+    pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
+    pdf.save(`${filename}.pdf`);
+  } catch (err) {
+    console.error('PDF generation failed', err);
+  }
 };

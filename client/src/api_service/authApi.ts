@@ -2,8 +2,13 @@ import { axiosInstance } from './axiosInstance';
 import type { User } from '../types';
 
 export const authApi = {
-  login: async (credentials: { email: string; password?: string; role?: string }) => {
-    const response = await axiosInstance.post<{ user: User; token: string }>('/auth/login', credentials);
+  login: async (credentials: { email: string; password?: string; role?: string; tenantSlug?: string }) => {
+    const response = await axiosInstance.post<{ user: User; token: string; mfaRequired?: boolean; mfaToken?: string }>('/auth/login', credentials);
+    return response.data;
+  },
+
+  verifyMfa: async (data: { mfaToken: string; code: string }) => {
+    const response = await axiosInstance.post<{ user: User; token: string }>('/auth/mfa/verify', data);
     return response.data;
   },
 

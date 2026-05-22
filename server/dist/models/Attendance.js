@@ -36,7 +36,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Attendance = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const index_js_1 = require("../constants/index.js");
+const softDeletePlugin_js_1 = require("../utils/softDeletePlugin.js");
+const breakSchema = new mongoose_1.Schema({
+    breakStart: { type: Date, required: true },
+    breakEnd: { type: Date },
+    durationMinutes: { type: Number, default: 0 },
+    type: { type: String, enum: ['LUNCH', 'TEA', 'PERSONAL'], default: 'LUNCH' }
+});
 const attendanceSchema = new mongoose_1.Schema({
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     employeeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee', required: true },
     date: { type: String, required: true, index: true },
     loginTime: { type: Date, required: true },
@@ -49,7 +57,36 @@ const attendanceSchema = new mongoose_1.Schema({
     taskSubmitted: { type: Boolean, default: false },
     locationVerified: { type: Boolean, default: true },
     overrideReason: { type: String },
+    // Advanced Attendance Engine
+    biometricId: { type: String },
+    deviceId: { type: String },
+    geoFence: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+        withinGeoFence: { type: Boolean, default: true },
+        distanceFromCenter: { type: Number, default: 0 }
+    },
+    faceVerification: {
+        verified: { type: Boolean, default: false },
+        confidence: { type: Number, default: 0 },
+        faceImage: { type: String }
+    },
+    breaks: [breakSchema],
+    overtime: {
+        hours: { type: Number, default: 0 },
+        isApproved: { type: Boolean, default: false },
+        approvedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' }
+    },
+    shiftId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Shift' },
+    anomaly: {
+        isAnomaly: { type: Boolean, default: false, index: true },
+        anomalyType: { type: String, enum: ['GEO_BREACH', 'MISSING_OUT', 'UNUSUAL_HOURS', 'BREAK_EXCESS'] },
+        description: { type: String },
+        isResolved: { type: Boolean, default: false },
+        resolvedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' }
+    }
 }, { timestamps: true });
 // Prevent duplicate attendance per day
 attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
+attendanceSchema.plugin(softDeletePlugin_js_1.softDeletePlugin);
 exports.Attendance = mongoose_1.default.model('Attendance', attendanceSchema);

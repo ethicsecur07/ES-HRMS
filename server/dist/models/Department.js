@@ -36,9 +36,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Department = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const departmentSchema = new mongoose_1.Schema({
-    name: { type: String, required: true, unique: true },
-    code: { type: String, required: true, unique: true },
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
+    name: { type: String, required: true },
+    code: { type: String, required: true },
     headOfDepartment: { type: String },
     isActive: { type: Boolean, default: true },
 }, { timestamps: true });
+const softDeletePlugin_js_1 = require("../utils/softDeletePlugin.js");
+departmentSchema.index({ organizationId: 1, name: 1 }, { unique: true });
+departmentSchema.index({ organizationId: 1, code: 1 }, { unique: true });
+departmentSchema.plugin(softDeletePlugin_js_1.softDeletePlugin);
 exports.Department = mongoose_1.default.model('Department', departmentSchema);

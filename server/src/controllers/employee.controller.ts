@@ -1,31 +1,81 @@
-import { Request, Response } from 'express';
-import { Employee } from '../models/Employee.js';
-import { User } from '../models/User.js';
-import { Attendance } from '../models/Attendance.js';
-import { Leave } from '../models/Leave.js';
-import { Payroll } from '../models/Payroll.js';
-import { Permission } from '../models/Permission.js';
-import { TaskReport } from '../models/TaskReport.js';
-import { createAuditLog } from '../services/auditLog.service.js';
+import { Response } from 'express';
+import { EmployeeService } from '../services/employee.service.js';
 import { AuthRequest } from '../types/index.js';
 
-export const getEmployees = async (req: Request, res: Response): Promise<void> => {
+export const getNextEmployeeCode = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const employees = await Employee.find().sort({ createdAt: -1 });
-    res.status(200).json({ employees });
+    const orgId = req.user?.organizationId;
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
+      return;
+    }
+
+    const nextCode = await EmployeeService.generateNextEmployeeCode(orgId);
+    res.status(200).json({ nextCode });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 };
 
-export const getEmployeeById = async (req: Request, res: Response): Promise<void> => {
+export const getEmployees = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const employee = await Employee.findById(req.params.id);
-    if (!employee) {
-      res.status(404).json({ message: 'Employee not found' });
+    const orgId = req.user?.organizationId;
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
       return;
     }
-    res.status(200).json({ employee });
+
+    const { search, department, designation, branchId, isActive, page, limit, sortBy, sortOrder } = req.query;
+    const result = await EmployeeService.getEmployees(orgId, {
+      search: search as string,
+      department: department as string,
+      designation: designation as string,
+      branchId: branchId as string,
+      isActive: isActive as string,
+      page: page as string,
+      limit: limit as string,
+      sortBy: sortBy as string,
+      sortOrder: sortOrder as any,
+    });
+
+    if ((res as any).jsonSanitized) {
+      (res as any).jsonSanitized(result);
+    } else {
+      res.status(200).json(result);
+    }
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getEmployeeById = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { organizationId, employeeId, role } = req.user || {};
+
+    if (!organizationId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
+      return;
+    }
+
+    // Standard employee can only fetch their own profile details
+    if (role === 'EMPLOYEE' && employeeId !== id) {
+      res.status(403).json({ message: 'Forbidden. You can only view your own profile.' });
+      return;
+    }
+
+    const employee = await EmployeeService.getEmployeeById(id, organizationId);
+
+    // If standard employee is viewing their own profile, clear restricted fields to display all profile info
+    if (role === 'EMPLOYEE' && employeeId === id) {
+      (req as any).restrictedFields = [];
+    }
+
+    if ((res as any).jsonSanitized) {
+      (res as any).jsonSanitized({ employee });
+    } else {
+      res.status(200).json({ employee });
+    }
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -34,81 +84,61 @@ export const getEmployeeById = async (req: Request, res: Response): Promise<void
 export const createEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { password, ...employeeData } = req.body;
-    const employee = await Employee.create(employeeData);
+    const orgId = req.user?.organizationId;
+    const emailForAudit = req.user?.email || 'System';
 
-    const defaultPassword = password || 'EthicSec@2026';
-    await User.create({
-      name: employee.fullName,
-      email: employee.email,
-      password: defaultPassword,
-      role: 'EMPLOYEE',
-      employeeId: employee._id,
-      isActive: true,
-    });
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
+      return;
+    }
 
-    await createAuditLog(
-      'EMPLOYEE_CREATE',
-      req.user?.email || 'System',
-      'EMPLOYEE',
-      employee.employeeCode,
-      `Onboarded employee ${employee.fullName}`
+    const { employee, generatedPassword } = await EmployeeService.createEmployee(
+      employeeData,
+      password,
+      orgId,
+      emailForAudit
     );
 
-    res.status(201).json({ employee });
+    res.status(201).json({ employee, generatedPassword });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ message: error.message });
   }
 };
 
 export const updateEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const employee = await Employee.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!employee) {
-      res.status(404).json({ message: 'Employee not found' });
+    const { id } = req.params;
+    const orgId = req.user?.organizationId;
+    const emailForAudit = req.user?.email || 'System';
+
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
       return;
     }
 
-    await createAuditLog(
-      'EMPLOYEE_UPDATE',
-      req.user?.email || 'System',
-      'EMPLOYEE',
-      employee.employeeCode,
-      `Updated profile for ${employee.fullName}`
-    );
+    const employee = await EmployeeService.updateEmployee(id, req.body, orgId, emailForAudit);
 
     res.status(200).json({ employee });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ message: error.message });
   }
 };
 
 export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const employee = await Employee.findByIdAndDelete(req.params.id);
-    if (!employee) {
-      res.status(404).json({ message: 'Employee not found' });
+    const { id } = req.params;
+    const orgId = req.user?.organizationId;
+    const emailForAudit = req.user?.email || 'System';
+
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
       return;
     }
 
-    await Promise.all([
-      User.findOneAndDelete({ $or: [{ employeeId: req.params.id }, { email: employee.email }] }),
-      Attendance.deleteMany({ employeeId: req.params.id }),
-      Leave.deleteMany({ employeeId: req.params.id }),
-      Payroll.deleteMany({ employeeId: req.params.id }),
-      Permission.deleteMany({ employeeId: req.params.id }),
-      TaskReport.deleteMany({ employeeId: req.params.id }),
-    ]);
+    await EmployeeService.deleteEmployee(id, orgId, emailForAudit);
 
-    await createAuditLog(
-      'EMPLOYEE_DELETE',
-      req.user?.email || 'System',
-      'EMPLOYEE',
-      employee.employeeCode,
-      `Deleted record and user account for ${employee.fullName}`
-    );
-
-    res.status(200).json({ message: 'Employee, user account, and all associated records deleted successfully' });
+    res.status(200).json({ message: 'Employee record soft-deleted and user account revoked successfully' });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ message: error.message });
   }
 };

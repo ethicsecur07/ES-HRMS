@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const payroll_controller_js_1 = require("./payroll.controller.js");
+const auth_middleware_js_1 = require("../../middlewares/auth.middleware.js");
+const rbacGuard_js_1 = require("../../middlewares/rbacGuard.js");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_js_1.authenticate);
+router.get('/runs', (0, rbacGuard_js_1.rbacGuard)('PAYROLL', 'view'), payroll_controller_js_1.getPayrollRuns);
+router.post('/runs/trigger', (0, rbacGuard_js_1.rbacGuard)('PAYROLL', 'create'), payroll_controller_js_1.triggerPayrollRun);
+router.post('/runs/:runCycle/rollback', (0, rbacGuard_js_1.rbacGuard)('PAYROLL', 'create'), payroll_controller_js_1.rollbackPayrollRun);
+router.post('/runs/export', (0, rbacGuard_js_1.rbacGuard)('PAYROLL', 'create'), payroll_controller_js_1.exportFinanceJournal);
+router.post('/runs/approve', (0, rbacGuard_js_1.rbacGuard)('PAYROLL', 'create'), payroll_controller_js_1.approvePayrollRun);
+router.get('/payslips/:payrollId/pdf', (0, rbacGuard_js_1.rbacGuard)('PAYROLL', 'view'), payroll_controller_js_1.getPayslipPDF);
+exports.default = router;

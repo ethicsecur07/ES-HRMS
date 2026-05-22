@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IFinance extends Document {
+  organizationId: mongoose.Types.ObjectId;
   type: 'ALLOCATION' | 'EXPENSE';
   amount: number;
   categoryOrReason: string;
@@ -13,6 +14,7 @@ export interface IFinance extends Document {
 
 const financeSchema = new Schema<IFinance>(
   {
+    organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     type: { type: String, enum: ['ALLOCATION', 'EXPENSE'], required: true },
     amount: { type: Number, required: true },
     categoryOrReason: { type: String, required: true },

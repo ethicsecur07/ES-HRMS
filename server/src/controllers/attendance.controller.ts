@@ -1,35 +1,18 @@
 import { Request, Response } from 'express';
-import { Attendance } from '../models/Attendance.js';
-import { Employee } from '../models/Employee.js';
-import { User } from '../models/User.js';
-import { createAuditLog } from '../services/auditLog.service.js';
 import { AuthRequest } from '../types/index.js';
+import { AttendanceService } from '../domains/attendance-engine/services/AttendanceService.js';
 
 export const getTodayAttendance = async (req: Request, res: Response): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    const today = new Date().toISOString().split('T')[0];
-    let query: any = { date: today };
-
-    if (authReq.user && authReq.user.role === 'EMPLOYEE') {
-      const user = await User.findById(authReq.user.id);
-      let employeeId = user?.employeeId;
-      if (user && !employeeId) {
-        const employee = await Employee.findOne({ email: user.email });
-        if (employee) {
-          employeeId = employee._id;
-        }
-      }
-      if (employeeId) {
-        query.employeeId = employeeId;
-      } else {
-        res.status(200).json({ attendances: [] });
-        return;
-      }
+    const { organizationId, id: userId, role, email } = authReq.user || {};
+    if (!organizationId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
     }
-
-    const attendances = await Attendance.find(query).populate('employeeId');
-    res.status(200).json({ attendances });
+    
+    const attendances = await AttendanceService.getTodayAttendance(organizationId, userId, role, email);
+    res.status(200).json({ data: attendances });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -38,155 +21,61 @@ export const getTodayAttendance = async (req: Request, res: Response): Promise<v
 export const getAllAttendance = async (req: Request, res: Response): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    let query: any = {};
-
-    if (authReq.user && authReq.user.role === 'EMPLOYEE') {
-      const user = await User.findById(authReq.user.id);
-      let employeeId = user?.employeeId;
-      if (user && !employeeId) {
-        const employee = await Employee.findOne({ email: user.email });
-        if (employee) {
-          employeeId = employee._id;
-        }
-      }
-      if (employeeId) {
-        query.employeeId = employeeId;
-      } else {
-        res.status(200).json({ attendances: [] });
-        return;
-      }
+    const { organizationId, id: userId, role, email } = authReq.user || {};
+    if (!organizationId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
     }
-
-    const attendances = await Attendance.find(query).populate('employeeId').sort({ date: -1, loginTime: -1 });
-    res.status(200).json({ attendances });
+    
+    const attendances = await AttendanceService.getAllAttendance(organizationId, userId, role, email);
+    res.status(200).json({ data: attendances });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 };
 
 export const checkIn = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { employeeId, deviceInfo, overrideReason } = req.body;
-  const today = new Date().toISOString().split('T')[0];
-
   try {
-    const existing = await Attendance.findOne({ employeeId, date: today });
-    if (existing) {
-      res.status(400).json({ message: 'Attendance already recorded for today' });
+    const { employeeId, deviceInfo, overrideReason, lat, lng } = req.body;
+    const { organizationId, email } = req.user || {};
+    if (!organizationId || !email) {
+      res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
     const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
     const ipAddress = Array.isArray(clientIP) ? clientIP[0] : clientIP;
-    const isOfficeIP = ipAddress.includes('192.168.29.') || ipAddress === '127.0.0.1' || ipAddress === '::1';
 
-    const now = new Date();
-    let loginTime = now;
-    let status = isOfficeIP ? 'OFFICE' : 'WFH';
-    let isLate = false;
-    let casualLeaveNote = '';
-
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-
-    // Before 9:35 AM -> calculate to 9:00 AM
-    if (currentHour < 9 || (currentHour === 9 && currentMinute <= 35)) {
-      loginTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
-    } else {
-      // After 9:35 AM -> employee is considered by casual leave on that day
-      status = 'LEAVE';
-      isLate = true;
-      casualLeaveNote = 'Casual Leave applied (Late check-in after 9:35 AM)';
-      const emp = await Employee.findById(employeeId);
-      if (emp && emp.leaveBalance > 0) {
-        emp.leaveBalance -= 1;
-        await emp.save();
-      }
-    }
-
-    const attendance = await Attendance.create({
+    const attendance = await AttendanceService.checkIn(
+      organizationId,
       employeeId,
-      date: today,
-      loginTime,
+      email,
       ipAddress,
       deviceInfo,
-      status,
-      isLate,
-      locationVerified: isOfficeIP || !!overrideReason,
-      overrideReason: casualLeaveNote || overrideReason,
-    });
-
-    await createAuditLog(
-      'ATTENDANCE_CHECKIN',
-      req.user?.email || 'Employee',
-      'ATTENDANCE',
-      attendance.id,
-      `Checked in from ${ipAddress} (Status: ${status})`
+      overrideReason,
+      lat,
+      lng
     );
-
-    res.status(201).json({ attendance });
+    res.status(201).json({ data: attendance });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    res.status(error.message === 'Attendance already recorded for today' || error.message.includes('already') ? 400 : 500).json({ message: error.message });
   }
 };
 
 export const checkOut = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const { taskReportId } = req.body;
-
   try {
-    const attendance = await Attendance.findById(id);
-    if (!attendance) {
-      res.status(404).json({ message: 'Attendance record not found' });
+    const { id } = req.params;
+    const { taskReportId } = req.body;
+    const { organizationId, email } = req.user || {};
+    if (!organizationId || !email) {
+      res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    const now = new Date();
-    let logoutTime = now;
-    let earlyCheckoutNote = '';
-
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-
-    // 5:40 PM (17:40) or after -> consider 6:00 PM (18:00)
-    if (currentHour >= 18 || (currentHour === 17 && currentMinute >= 40)) {
-      logoutTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0);
-    } else {
-      // Before 5:40 PM -> calculate how many hours to 6:00 PM consider that calculate hours permission
-      const targetSixPM = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0);
-      const diffMs = targetSixPM.getTime() - now.getTime();
-      const permHoursToSix = Math.max(0.5, parseFloat((diffMs / (1000 * 60 * 60)).toFixed(1)));
-
-      earlyCheckoutNote = ` (${permHoursToSix} hours permission applied for early checkout before 6:00 PM)`;
-      const emp = await Employee.findById(attendance.employeeId);
-      if (emp && emp.permissionHoursBalance > 0) {
-        emp.permissionHoursBalance = Math.max(0, parseFloat((emp.permissionHoursBalance - permHoursToSix).toFixed(1)));
-        await emp.save();
-      }
-    }
-
-    const start = new Date(attendance.loginTime).getTime();
-    const end = logoutTime.getTime();
-    const workingHours = parseFloat(((end - start) / (1000 * 60 * 60)).toFixed(2));
-
-    attendance.logoutTime = logoutTime;
-    attendance.workingHours = workingHours;
-    attendance.taskSubmitted = !!taskReportId;
-    if (earlyCheckoutNote) {
-      attendance.overrideReason = (attendance.overrideReason ? attendance.overrideReason + '; ' : '') + earlyCheckoutNote.trim();
-    }
-    await attendance.save();
-
-    await createAuditLog(
-      'ATTENDANCE_CHECKOUT',
-      req.user?.email || 'Employee',
-      'ATTENDANCE',
-      attendance.id,
-      `Checked out. Total hours: ${workingHours}${earlyCheckoutNote}`
-    );
-
-    res.status(200).json({ attendance });
+    const attendance = await AttendanceService.checkOut(organizationId, id, email, taskReportId);
+    res.status(200).json({ data: attendance });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    res.status(error.message === 'Attendance record not found' || error.message.includes('not found') ? 404 : 500).json({ message: error.message });
   }
 };
 
@@ -195,41 +84,22 @@ export const verifyIP = async (req: Request, res: Response): Promise<void> => {
   const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
   const isOfficeIP = ipString.includes('192.168.29.') || ipString === '127.0.0.1' || ipString === '::1';
 
-  res.status(200).json({ isOfficeIP, currentIP: ipString });
+  res.status(200).json({ data: { isOfficeIP, currentIP: ipString } });
 };
 
 export const updateAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const { loginTime, logoutTime, status } = req.body;
-
   try {
-    const attendance = await Attendance.findById(id);
-    if (!attendance) {
-      res.status(404).json({ message: 'Attendance record not found' });
+    const { id } = req.params;
+    const { loginTime, logoutTime, status } = req.body;
+    const { organizationId, email } = req.user || {};
+    if (!organizationId || !email) {
+      res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    if (loginTime) attendance.loginTime = new Date(loginTime);
-    if (logoutTime) {
-      attendance.logoutTime = new Date(logoutTime);
-      const start = new Date(attendance.loginTime).getTime();
-      const end = new Date(logoutTime).getTime();
-      attendance.workingHours = parseFloat(((end - start) / (1000 * 60 * 60)).toFixed(2));
-    }
-    if (status) attendance.status = status;
-
-    await attendance.save();
-
-    await createAuditLog(
-      'ATTENDANCE_UPDATE',
-      req.user?.email || 'HR/Admin',
-      'ATTENDANCE',
-      attendance.id,
-      `Manually updated attendance record.`
-    );
-
-    res.status(200).json({ attendance });
+    const attendance = await AttendanceService.updateAttendance(organizationId, id, email, loginTime, logoutTime, status);
+    res.status(200).json({ data: attendance });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    res.status(error.message === 'Attendance record not found' || error.message.includes('not found') ? 404 : 500).json({ message: error.message });
   }
 };

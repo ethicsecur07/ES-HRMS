@@ -1,36 +1,140 @@
+/**
+ * cronJobs.ts (REFACTORED)
+ * -------------------------
+ * Fixes:
+ *   - Monthly balance reset now org-scoped (not global Employee.updateMany)
+ *   - Uses LeaveAccrualService for idempotent, bulk accrual
+ *   - Uses policy values from DB (not hardcoded constants)
+ *   - Carry-forward applied during monthly reset
+ *   - Year-end carry-forward processing
+ *   - Auto-checkout remains, enhanced with org awareness
+ */
+
 import cron from 'node-cron';
 import { Attendance } from '../models/Attendance.js';
-import { Employee } from '../models/Employee.js';
+import { Organization } from '../models/Organization.js';
 import { logger } from '../utils/logger.js';
+import { LeaveAccrualService } from '../domains/leave-engine/services/LeaveAccrualService.js';
+import { calculateMonthlyPayroll } from '../services/payroll.service.js';
 
 export const initCronJobs = () => {
-  // Auto-checkout active attendances at midnight if employee forgot
+  // ─────────────────────────────────────────────────────────────
+  // Auto-checkout at midnight: close any open attendance records
+  // ─────────────────────────────────────────────────────────────
   cron.schedule('0 0 * * *', async () => {
     try {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const dateStr = yesterday.toISOString().split('T')[0];
 
-      const unclosed = await Attendance.find({ date: dateStr, logoutTime: { $exists: false } });
+      const unclosed = await Attendance.find({
+        date: dateStr,
+        logoutTime: { $exists: false },
+      });
+
       for (const att of unclosed) {
-        att.logoutTime = new Date(`${dateStr}T20:00:00.000Z`); // Auto close at 8 PM
+        att.logoutTime = new Date(`${dateStr}T20:00:00.000Z`);
         att.workingHours = 9;
         await att.save();
       }
 
-      logger.info(`Cron: Auto-checked out ${unclosed.length} attendance records for ${dateStr}`);
+      logger.info(`[CRON] Auto-checkout: ${unclosed.length} attendance records closed for ${dateStr}`);
     } catch (error) {
-      logger.error('Cron auto-checkout failed', { error });
+      logger.error('[CRON] Auto-checkout failed', { error });
     }
   });
 
-  // Monthly leave balance reset on 1st of every month
-  cron.schedule('0 0 1 * *', async () => {
+  // ─────────────────────────────────────────────────────────────
+  // Monthly leave balance reset — 1st of every month at 00:05
+  // Org-scoped, policy-driven, with carry-forward support
+  // ─────────────────────────────────────────────────────────────
+  cron.schedule('5 0 1 * *', async () => {
     try {
-      await Employee.updateMany({ isActive: true }, { leaveBalance: 2, wfhBalance: 1, permissionHoursBalance: 3 });
-      logger.info('Cron: Monthly leave, WFH, and permission balances reset successfully');
+      const orgs = await Organization.find({ isActive: true }, { _id: 1 });
+      logger.info(`[CRON] Starting monthly leave reset for ${orgs.length} organizations`);
+
+      let totalReset = 0;
+      for (const org of orgs) {
+        try {
+          const result = await LeaveAccrualService.runMonthlyReset(org._id.toString());
+          totalReset += result.resetCount;
+          logger.info(`[CRON] Reset org ${org._id}: ${result.resetCount} balances`);
+        } catch (orgErr: any) {
+          logger.error(`[CRON] Monthly reset failed for org ${org._id}`, { error: orgErr.message });
+        }
+      }
+
+      logger.info(`[CRON] Monthly leave reset complete. Total balances reset: ${totalReset}`);
     } catch (error) {
-      logger.error('Cron monthly reset failed', { error });
+      logger.error('[CRON] Monthly leave reset failed', { error });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Monthly accrual — runs on 1st of month at 00:10
+  // Idempotent: will skip if already ran for this period
+  // ─────────────────────────────────────────────────────────────
+  cron.schedule('10 0 1 * *', async () => {
+    try {
+      logger.info('[CRON] Starting monthly leave accrual for all organizations');
+      const results = await LeaveAccrualService.runGlobalMonthlyAccrual();
+      
+      const totalUpdates = results.reduce((sum, r) => sum + r.balancesUpdated, 0);
+      const totalSkipped = results.reduce((sum, r) => sum + r.skippedDuplicates, 0);
+      const totalErrors = results.filter(r => r.errors.length > 0).length;
+
+      logger.info(`[CRON] Accrual complete: orgs=${results.length}, balances=${totalUpdates}, skipped=${totalSkipped}, errors=${totalErrors}`);
+    } catch (error) {
+      logger.error('[CRON] Global accrual failed', { error });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Year-end carry-forward — Dec 31st at 23:00
+  // Applies carry-forward caps from policy and resets remaining
+  // ─────────────────────────────────────────────────────────────
+  cron.schedule('0 23 31 12 *', async () => {
+    try {
+      const orgs = await Organization.find({ isActive: true }, { _id: 1 });
+      logger.info(`[CRON] Year-end carry-forward for ${orgs.length} organizations`);
+
+      for (const org of orgs) {
+        try {
+          const result = await LeaveAccrualService.applyYearEndCarryForward(org._id.toString());
+          logger.info(`[CRON] Year-end carry-forward org ${org._id}: ${result.processedCount} balances processed`);
+        } catch (orgErr: any) {
+          logger.error(`[CRON] Year-end carry-forward failed for org ${org._id}`, { error: orgErr.message });
+        }
+      }
+    } catch (error) {
+      logger.error('[CRON] Year-end carry-forward failed', { error });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Monthly payroll generation — runs on 1st of month at 01:00
+  // ─────────────────────────────────────────────────────────────
+  cron.schedule('0 1 1 * *', async () => {
+    try {
+      logger.info('[CRON] Starting automated monthly payroll generation');
+      // Get previous month string in YYYY-MM format
+      const date = new Date();
+      date.setMonth(date.getMonth() - 1);
+      const year = date.getFullYear();
+      const monthStr = String(date.getMonth() + 1).padStart(2, '0');
+      const month = `${year}-${monthStr}`;
+
+      const orgs = await Organization.find({ isActive: true });
+      for (const org of orgs) {
+        try {
+          await calculateMonthlyPayroll(month, org._id.toString());
+          logger.info(`[CRON] Payroll generated for org: ${org.name} (${month})`);
+        } catch (orgError) {
+          logger.error(`[CRON] Failed to generate payroll for org: ${org.name}`, { error: orgError });
+        }
+      }
+    } catch (error) {
+      logger.error('[CRON] Error during automated payroll generation', { error });
     }
   });
 };

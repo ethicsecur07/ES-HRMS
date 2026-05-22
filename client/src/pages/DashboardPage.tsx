@@ -39,7 +39,7 @@ export const DashboardPage: React.FC = () => {
   const { data: allTasks } = useQuery({
     queryKey: ['allTasks'],
     queryFn: taskApi.getAllReports,
-    enabled: role === 'HR' || role === 'ADMIN',
+    enabled: role === 'HR' || role === 'ADMIN' || role === 'MANAGER',
   });
 
   const taskColumns = [
@@ -110,28 +110,91 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* 2. HR & ADMIN DASHBOARD */}
-      {(role === 'HR' || role === 'ADMIN') && (
+      {/* 2. MANAGER DASHBOARD */}
+      {role === 'MANAGER' && (
         <div className="space-y-8">
-          <AdminAnalyticsCharts stats={stats} />
+          <div className="p-6 rounded-2xl bg-card border border-border shadow-sm">
+            <h3 className="text-xl font-bold">Manager Workspace</h3>
+            <p className="text-sm text-muted-foreground">Oversee department performance and team tasks.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card className="space-y-4 border-l-4 border-l-primary shadow-md p-6 bg-card">
+              <div>
+                <h3 className="text-lg font-bold text-foreground tracking-tight">Team Task Reports</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Daily submissions from your department
+                </p>
+              </div>
+              <TableWrapper
+                columns={[
+                  { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId.fullName || 'Unknown' : row.employeeId) : 'Unknown'}</span> },
+                  ...taskColumns,
+                ]}
+                data={allTasks || []}
+                searchKey="completedTasks"
+                searchPlaceholder="Filter reports..."
+              />
+            </Card>
 
+            <div className="space-y-8">
+              <HRApprovalQueue />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. HR DASHBOARD */}
+      {role === 'HR' && (
+        <div className="space-y-8">
+          <div className="p-6 rounded-2xl bg-card border border-border shadow-sm">
+            <h3 className="text-xl font-bold">HR Workspace</h3>
+            <p className="text-sm text-muted-foreground">Manage organization policies, recruitment, and approvals.</p>
+          </div>
+          <AdminAnalyticsCharts stats={stats} />
+          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
               <Card className="space-y-4 border-l-4 border-l-primary shadow-md p-6 bg-card">
                 <div>
+                  <h3 className="text-lg font-bold text-foreground tracking-tight">Employee Directory Overview</h3>
+                </div>
+                {/* Simplified view or list */}
+                <div className="p-4 text-sm text-muted-foreground">Navigate to the Employees tab for full directory access.</div>
+              </Card>
+            </div>
+            <div className="lg:col-span-1 space-y-8">
+              <HRApprovalQueue />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. ADMIN DASHBOARD */}
+      {role === 'ADMIN' && (
+        <div className="space-y-8">
+          <div className="p-6 rounded-2xl bg-card border border-border shadow-sm flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold">Admin Workspace</h3>
+              <p className="text-sm text-muted-foreground">Full organizational overview and system analytics.</p>
+            </div>
+          </div>
+          <AdminAnalyticsCharts stats={stats} />
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8">
+              <Card className="space-y-4 border-l-4 border-l-foreground shadow-md p-6 bg-card">
+                <div>
                   <h3 className="text-lg font-bold text-foreground tracking-tight">Company Productivity Reports</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Daily task submissions from all departments
-                  </p>
                 </div>
                 <TableWrapper
                   columns={[
-                    { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId.fullName || 'Logapriyan M' : row.employeeId) : 'Logapriyan M'}</span> },
+                    { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId.fullName || 'Unknown' : row.employeeId) : 'Unknown'}</span> },
                     ...taskColumns,
                   ]}
                   data={allTasks || []}
                   searchKey="completedTasks"
-                  searchPlaceholder="Filter reports by task content..."
+                  searchPlaceholder="Filter reports..."
                 />
               </Card>
             </div>

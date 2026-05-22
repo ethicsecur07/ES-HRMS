@@ -2,9 +2,20 @@ import { axiosInstance } from './axiosInstance';
 import type { Employee } from '../types';
 
 export const employeeApi = {
-  getAll: async () => {
-    const response = await axiosInstance.get<{ employees: Employee[] }>('/employees');
-    return response.data.employees;
+  getAll: async (params?: {
+    search?: string;
+    department?: string;
+    designation?: string;
+    departmentId?: string;
+    designationId?: string;
+    isActive?: string | boolean;
+    page?: number | string;
+    limit?: number | string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await axiosInstance.get<{ employees: Employee[]; total: number; page: number; limit: number }>('/employees', { params });
+    return response.data;
   },
 
   getById: async (id: string) => {
@@ -24,5 +35,10 @@ export const employeeApi = {
 
   delete: async (id: string) => {
     await axiosInstance.delete(`/employees/${id}`);
+  },
+
+  getNextEmployeeCode: async () => {
+    const response = await axiosInstance.get<{ nextCode: string }>('/employees/next-code');
+    return response.data.nextCode;
   },
 };

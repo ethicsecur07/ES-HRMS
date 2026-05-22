@@ -35,16 +35,23 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Permission = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-const index_js_1 = require("../constants/index.js");
 const permissionSchema = new mongoose_1.Schema({
-    employeeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee', required: true },
-    date: { type: String, required: true },
-    startTime: { type: String, required: true },
-    endTime: { type: String, required: true },
-    totalHours: { type: Number, required: true },
-    reason: { type: String, required: true },
-    approvalStatus: { type: String, enum: Object.values(index_js_1.APPROVAL_STATUS), default: index_js_1.APPROVAL_STATUS.PENDING },
-    appliedAt: { type: Date, default: Date.now },
-    approvedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' },
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
+    roleId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Role', index: true },
+    userId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', index: true },
+    module: { type: String, required: true, index: true },
+    actions: {
+        view: { type: Boolean, default: false },
+        create: { type: Boolean, default: false },
+        edit: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+        approve: { type: Boolean, default: false },
+        assign: { type: Boolean, default: false },
+        export: { type: Boolean, default: false },
+    },
+    restrictedFields: { type: [String], default: [] },
+    policyCondition: { type: mongoose_1.Schema.Types.Mixed, default: null },
 }, { timestamps: true });
+// Either roleId or userId must be present
+permissionSchema.index({ organizationId: 1, roleId: 1, userId: 1, module: 1 }, { unique: true });
 exports.Permission = mongoose_1.default.model('Permission', permissionSchema);

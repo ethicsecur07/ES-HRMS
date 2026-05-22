@@ -31,7 +31,7 @@ export function TableWrapper<T>({
   const filteredData = useMemo(() => {
     if (!searchTerm || !searchKey) return data;
     return data.filter((row) => {
-      let val = '';
+      let val: string;
       if (typeof searchKey === 'function') {
         val = searchKey(row);
       } else {

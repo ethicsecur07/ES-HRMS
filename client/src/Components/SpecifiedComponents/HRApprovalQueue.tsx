@@ -74,6 +74,7 @@ export const HRApprovalQueue: React.FC = () => {
 
   const getTimeAgo = (dateStr?: string) => {
     if (!dateStr) return 'Just now';
+    // eslint-disable-next-line react-hooks/purity
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Just now';
