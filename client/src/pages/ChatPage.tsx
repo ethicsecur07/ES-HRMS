@@ -3,15 +3,21 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { chatApi } from '../api_service/chatApi';
 import { employeeApi } from '../api_service/employeeApi';
 import { useAuthStore } from '../store/useAuthStore';
+import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { MessageSquare, Send } from 'lucide-react';
 
 export const ChatPage: React.FC = () => {
   const { user } = useAuthStore();
+  const { setActiveChatUserId } = useNotificationStore();
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const lastScrollUserRef = useRef<string | null>(null);
+  const lastMessageCountRef = useRef<number>(0);
+  const lastMessageIdRef = useRef<string | null>(null);
 
   const { data } = useQuery({
     queryKey: ['employees'],
@@ -36,8 +42,34 @@ export const ChatPage: React.FC = () => {
   });
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    setActiveChatUserId(selectedUser);
+    return () => {
+      setActiveChatUserId(null);
+    };
+  }, [selectedUser, setActiveChatUserId]);
+
+  useEffect(() => {
+    if (!selectedUser) {
+      lastScrollUserRef.current = null;
+      lastMessageCountRef.current = 0;
+      lastMessageIdRef.current = null;
+      return;
+    }
+
+    const currentLength = messages.length;
+    const currentLastMessageId = currentLength > 0 ? messages[currentLength - 1]._id : null;
+
+    const userChanged = lastScrollUserRef.current !== selectedUser;
+    const newMessagesReceived = currentLength > lastMessageCountRef.current || currentLastMessageId !== lastMessageIdRef.current;
+
+    if (userChanged || newMessagesReceived) {
+      messagesEndRef.current?.scrollIntoView({ behavior: userChanged ? "auto" : "smooth" });
+      
+      lastScrollUserRef.current = selectedUser;
+      lastMessageCountRef.current = currentLength;
+      lastMessageIdRef.current = currentLastMessageId;
+    }
+  }, [messages, selectedUser]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +87,7 @@ export const ChatPage: React.FC = () => {
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {employees.map(emp => (
-            emp.userId !== user?._id && (
+            emp.userId && emp.userId !== user?._id && (
               <button
                 key={emp._id}
                 onClick={() => setSelectedUser(emp.userId || null)}
@@ -106,7 +138,7 @@ export const ChatPage: React.FC = () => {
                 value={message}
                 onChange={e => setMessage(e.target.value)}
                 placeholder="Type a message..."
-                className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                className="flex-1 h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
               />
               <Button type="submit" disabled={!message.trim() || sendMutation.isPending} className="shrink-0 flex items-center gap-2">
                 <Send className="w-4 h-4" /> Send

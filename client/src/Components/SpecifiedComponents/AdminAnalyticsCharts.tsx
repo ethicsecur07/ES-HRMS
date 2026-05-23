@@ -203,7 +203,7 @@ export const FinanceManagementChart: React.FC<FinanceManagementChartProps> = ({ 
               cy="50%"
               innerRadius={45}
               outerRadius={85}
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
             >
               {currentAllocations.map((_: any, index: number) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

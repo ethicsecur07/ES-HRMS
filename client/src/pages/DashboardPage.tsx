@@ -10,12 +10,17 @@ import { EmployeeQuickStats } from '../Components/SpecifiedComponents/EmployeeQu
 import { HRApprovalQueue } from '../Components/SpecifiedComponents/HRApprovalQueue';
 import { AdminAnalyticsCharts } from '../Components/SpecifiedComponents/AdminAnalyticsCharts';
 import { FinanceManagementChart } from '../Components/SpecifiedComponents/AdminAnalyticsCharts';
+import { HolidayEnhancedCalendar } from '../Components/SpecifiedComponents/HolidayEnhancedCalendar';
+import { EmployeeTaskSummary } from '../Components/SpecifiedComponents/EmployeeTaskSummary';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import type { TaskReport } from '../types';
 import { PlusCircle } from 'lucide-react';
 import { LeaveApplyModal } from '../Components/SpecifiedComponents/LeaveApplyModal';
+import { leaveApi } from '../api_service/leaveApi';
+import { wfhApi } from '../api_service/wfhApi';
+import { permissionApi } from '../api_service/permissionApi';
 
 export const DashboardPage: React.FC = () => {
   const { user, role } = useAuthStore();
@@ -35,9 +40,26 @@ export const DashboardPage: React.FC = () => {
     throwOnError: false,
   });
 
-  const { data: myTasks } = useQuery({
+  useQuery({
     queryKey: ['myTasks', user?.employeeId || user?._id],
     queryFn: () => taskApi.getByEmployee(user?.employeeId || user?._id || 'emp-dev-001'),
+    enabled: role === 'EMPLOYEE',
+  });
+
+  // For calendar: fetch leave/wfh/perms for employee role
+  const { data: myLeaves } = useQuery({
+    queryKey: ['leaves'],
+    queryFn: leaveApi.getAll,
+    enabled: role === 'EMPLOYEE',
+  });
+  const { data: myWfh } = useQuery({
+    queryKey: ['wfh'],
+    queryFn: wfhApi.getAll,
+    enabled: role === 'EMPLOYEE',
+  });
+  const { data: myPerms } = useQuery({
+    queryKey: ['permissions'],
+    queryFn: permissionApi.getAll,
     enabled: role === 'EMPLOYEE',
   });
 
@@ -98,20 +120,27 @@ export const DashboardPage: React.FC = () => {
           <AttendanceCheckIn />
           <EmployeeQuickStats employee={myEmployee || null} />
 
-          <Card className="space-y-4 border-l-4 border-l-primary shadow-md">
-            <div>
-              <h3 className="text-lg font-bold text-foreground tracking-tight">My Daily Task Reports</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Archived daily productivity reports submitted prior to check-out
-              </p>
+          {/* Mini calendar + Task summary side by side */}
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
+            {/* Calendar — takes 2 columns */}
+            <div className="xl:col-span-2 space-y-2">
+              <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                My Leave & Holiday Calendar
+              </h3>
+              <HolidayEnhancedCalendar
+                leaves={myLeaves || []}
+                wfh={myWfh || []}
+                perms={myPerms || []}
+                compact={false}
+              />
             </div>
-            <TableWrapper
-              columns={taskColumns}
-              data={myTasks || []}
-              searchKey="completedTasks"
-              searchPlaceholder="Search task history..."
-            />
-          </Card>
+
+            {/* Task summary — takes 3 columns */}
+            <div className="xl:col-span-3">
+              <EmployeeTaskSummary />
+            </div>
+          </div>
         </div>
       )}
 

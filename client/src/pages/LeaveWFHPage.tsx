@@ -16,7 +16,8 @@ import { WFHRequestModal } from '../Components/SpecifiedComponents/WFHRequestMod
 import { PermissionRequestModal } from '../Components/SpecifiedComponents/PermissionRequestModal';
 import type { LeaveRequest, PermissionRequest } from '../types';
 import { formatDate } from '../utils/formatters';
-import { Calendar, Plus, Palmtree, Laptop, Clock, FileText, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { Calendar, Plus, Palmtree, Laptop, Clock, FileText, Info } from 'lucide-react';
+import { HolidayEnhancedCalendar } from '../Components/SpecifiedComponents/HolidayEnhancedCalendar';
 
 export const LeaveWFHPage: React.FC = () => {
   const { role, user } = useAuthStore();
@@ -35,11 +36,7 @@ export const LeaveWFHPage: React.FC = () => {
   const [nameFilter, setNameFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
-  // Calendar Month & Selected Date
-  const [calendarDate, setCalendarDate] = useState(new Date());
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+
 
   const { data: leaves, isLoading: leavesLoading } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll });
   const { data: wfh, isLoading: wfhLoading } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll });
@@ -131,77 +128,7 @@ export const LeaveWFHPage: React.FC = () => {
     });
   }, [perms, nameFilter, statusFilter]);
 
-  // Calendar Helpers & Cell Generator
-  const handlePrevMonth = () => {
-    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
-  };
 
-  const handleNextMonth = () => {
-    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
-  };
-
-  const calendarCells = useMemo(() => {
-    const year = calendarDate.getFullYear();
-    const month = calendarDate.getMonth();
-
-    const firstDayIndex = new Date(year, month, 1).getDay();
-    const totalDays = new Date(year, month + 1, 0).getDate();
-    const prevTotalDays = new Date(year, month, 0).getDate();
-
-    const cells = [];
-
-    // Previous Month padding
-    for (let i = firstDayIndex - 1; i >= 0; i--) {
-      const prevDay = prevTotalDays - i;
-      const prevMonth = month === 0 ? 11 : month - 1;
-      const prevYear = month === 0 ? year - 1 : year;
-      cells.push({
-        dateStr: `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`,
-        dayNum: prevDay,
-        isCurrentMonth: false,
-      });
-    }
-
-    // Current Month days
-    for (let day = 1; day <= totalDays; day++) {
-      cells.push({
-        dateStr: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-        dayNum: day,
-        isCurrentMonth: true,
-      });
-    }
-
-    // Next Month padding
-    const remainingCells = 42 - cells.length;
-    for (let i = 1; i <= remainingCells; i++) {
-      const nextMonth = month === 11 ? 0 : month + 1;
-      const nextYear = month === 11 ? year + 1 : year;
-      cells.push({
-        dateStr: `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
-        dayNum: i,
-        isCurrentMonth: false,
-      });
-    }
-
-    return cells;
-  }, [calendarDate]);
-
-  const getEventsForDate = (dateStr: string) => {
-    const dayLeaves = leaves?.filter(l => dateStr >= l.startDate && dateStr <= l.endDate) || [];
-    const dayWfh = wfh?.filter(w => dateStr >= w.startDate && dateStr <= w.endDate) || [];
-    const dayPerms = perms?.filter(p => p.date === dateStr) || [];
-
-    return {
-      leaves: dayLeaves,
-      wfh: dayWfh,
-      perms: dayPerms,
-      totalCount: dayLeaves.length + dayWfh.length + dayPerms.length,
-    };
-  };
-
-  const selectedDateEvents = useMemo(() => {
-    return getEventsForDate(selectedCalendarDate);
-  }, [selectedCalendarDate, leaves, wfh, perms]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -404,7 +331,7 @@ export const LeaveWFHPage: React.FC = () => {
     );
   }
 
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
@@ -550,121 +477,17 @@ export const LeaveWFHPage: React.FC = () => {
             })()}
           </div>
 
-          {/* Interactive Calendar (Right 2 Columns) */}
+          {/* Interactive Calendar (Right 2 Columns) — powered by HolidayEnhancedCalendar */}
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-primary" />
-              Interactive Leave & WFH Calendar
+              Interactive Leave, WFH & Holiday Calendar
             </h3>
-
-            <Card className="p-6 bg-card shadow-md border border-border space-y-4">
-              {/* Calendar Controls */}
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <h4 className="font-extrabold text-base text-foreground flex items-center gap-2">
-                  {monthNames[calendarDate.getMonth()]} {calendarDate.getFullYear()}
-                </h4>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="sm" onClick={handlePrevMonth} className="h-8 w-8 p-0">
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleNextMonth} className="h-8 w-8 p-0">
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Weekdays */}
-              <div className="grid grid-cols-7 text-center text-xs font-bold text-muted-foreground border-b border-border pb-2">
-                <div>Sun</div>
-                <div>Mon</div>
-                <div>Tue</div>
-                <div>Wed</div>
-                <div>Thu</div>
-                <div>Fri</div>
-                <div>Sat</div>
-              </div>
-
-              {/* Days Grid */}
-              <div className="grid grid-cols-7 gap-1.5">
-                {calendarCells.map((cell, idx) => {
-                  const cellEvents = getEventsForDate(cell.dateStr);
-                  const isSelected = cell.dateStr === selectedCalendarDate;
-                  
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedCalendarDate(cell.dateStr)}
-                      className={`h-11 sm:h-12 flex flex-col items-center justify-between p-1 rounded-xl transition-all border text-xs relative ${
-                        cell.isCurrentMonth 
-                          ? 'text-foreground font-semibold bg-background hover:bg-muted/50' 
-                          : 'text-muted-foreground/30 bg-muted/10 border-transparent pointer-events-none'
-                      } ${
-                        isSelected 
-                          ? 'border-primary ring-2 ring-primary/20 bg-primary/5' 
-                          : 'border-border'
-                      }`}
-                    >
-                      <span className="self-start pl-1 pt-0.5">{cell.dayNum}</span>
-                      
-                      {/* Event Dots Container */}
-                      <div className="flex gap-0.5 mt-auto mb-0.5 pb-0.5">
-                        {cellEvents.leaves.length > 0 && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-primary" title="Leave Scheduled" />
-                        )}
-                        {cellEvents.wfh.length > 0 && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-foreground border border-border" title="WFH Scheduled" />
-                        )}
-                        {cellEvents.perms.length > 0 && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" title="Permission Scheduled" />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Selected Date Event List */}
-              <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border space-y-2.5">
-                <h5 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border/60 pb-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-primary" />
-                  Schedule for {formatDate(selectedCalendarDate)}
-                </h5>
-                
-                {selectedDateEvents.totalCount === 0 ? (
-                  <p className="text-xs text-muted-foreground italic py-1">No leaves, WFH, or permission slots scheduled on this date.</p>
-                ) : (
-                  <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                    {selectedDateEvents.leaves.map((l) => (
-                      <div key={l._id} className="flex items-center justify-between bg-card p-2 rounded-lg border border-border text-xs">
-                        <div>
-                          <span className="font-bold text-primary">{l.leaveType}</span>
-                          <span className="text-muted-foreground block text-[10px] mt-0.5">Reason: {l.reason}</span>
-                        </div>
-                        {getStatusBadge(l.status)}
-                      </div>
-                    ))}
-                    {selectedDateEvents.wfh.map((w) => (
-                      <div key={w._id} className="flex items-center justify-between bg-card p-2 rounded-lg border border-border text-xs">
-                        <div>
-                          <span className="font-bold text-foreground">Work From Home (WFH)</span>
-                          <span className="text-muted-foreground block text-[10px] mt-0.5">Tasks: {w.expectedTasks || 'General Work'}</span>
-                        </div>
-                        {getStatusBadge(w.status)}
-                      </div>
-                    ))}
-                    {selectedDateEvents.perms.map((p) => (
-                      <div key={p._id} className="flex items-center justify-between bg-card p-2 rounded-lg border border-border text-xs">
-                        <div>
-                          <span className="font-bold text-yellow-600 dark:text-yellow-500">Permission Slot</span>
-                          <span className="text-muted-foreground block text-[10px] mt-0.5">Time: {p.startTime} to {p.endTime} ({p.totalHours} hrs)</span>
-                        </div>
-                        {getStatusBadge(p.approvalStatus)}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Card>
+            <HolidayEnhancedCalendar
+              leaves={leaves || []}
+              wfh={wfh || []}
+              perms={perms || []}
+            />
           </div>
         </div>
       ) : (

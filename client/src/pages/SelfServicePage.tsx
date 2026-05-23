@@ -551,7 +551,7 @@ export const SelfServicePage: React.FC = () => {
               <select
                 value={empFilter}
                 onChange={(e) => setEmpFilter(e.target.value)}
-                className="w-full bg-background text-foreground border border-border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+                className="w-full h-10 bg-background text-foreground border border-border rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <option value="">Filter by employee (Show All)...</option>
                 {employees?.map((emp) => (
@@ -567,7 +567,7 @@ export const SelfServicePage: React.FC = () => {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full bg-background text-foreground border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+                  className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   <option value="">Filter by status (Show All)...</option>
                   <option value="PENDING">Pending</option>
@@ -638,7 +638,7 @@ export const SelfServicePage: React.FC = () => {
               <select
                 value={reimbForm.employeeId}
                 onChange={(e) => setReimbForm(p => ({ ...p, employeeId: e.target.value }))}
-                className="w-full bg-background text-foreground border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                 required
               >
                 <option value="">Select Employee...</option>
@@ -687,7 +687,7 @@ export const SelfServicePage: React.FC = () => {
               value={reimbForm.description}
               onChange={(e) => setReimbForm(p => ({ ...p, description: e.target.value }))}
               placeholder="Provide a detailed explanation of the expense..."
-              className="w-full h-24 bg-background text-foreground border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className="w-full h-24 bg-background text-foreground border border-border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 resize-none"
               required
             />
           </div>
@@ -768,7 +768,7 @@ export const SelfServicePage: React.FC = () => {
               <select
                 value={taxForm.employeeId}
                 onChange={(e) => setTaxForm(p => ({ ...p, employeeId: e.target.value }))}
-                className="w-full bg-background text-foreground border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                 required
               >
                 <option value="">Select Employee...</option>
@@ -874,7 +874,7 @@ export const SelfServicePage: React.FC = () => {
               <select
                 value={attForm.employeeId}
                 onChange={(e) => setAttForm(p => ({ ...p, employeeId: e.target.value }))}
-                className="w-full bg-background text-foreground border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                 required
               >
                 <option value="">Select Employee...</option>
@@ -916,7 +916,7 @@ export const SelfServicePage: React.FC = () => {
               value={attForm.reason}
               onChange={(e) => setAttForm(p => ({ ...p, reason: e.target.value }))}
               placeholder="e.g. Forgot to clock in, out-of-office client meet, internet breakdown..."
-              className="w-full h-24 bg-background text-foreground border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className="w-full h-24 bg-background text-foreground border border-border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 resize-none"
               required
             />
           </div>
@@ -967,7 +967,7 @@ export const SelfServicePage: React.FC = () => {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Reason why this request was declined..."
-                className="w-full h-24 bg-background text-foreground border border-border rounded-xl p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                className="w-full h-24 bg-background text-foreground border border-border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 resize-none"
                 required
               />
             </div>

@@ -485,7 +485,7 @@ export const EmployeesPage: React.FC = () => {
                 setSelectedDesigId('All');
                 setCurrentPage(1);
               }}
-              className="px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:outline-none"
+              className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
             >
               <option value="All">All Departments</option>
               {departments.map((dept: any) => (
@@ -501,7 +501,7 @@ export const EmployeesPage: React.FC = () => {
                 setSelectedDesigId(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:outline-none"
+              className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
               disabled={selectedDeptId === 'All'}
             >
               <option value="All">All Designations</option>
@@ -520,7 +520,7 @@ export const EmployeesPage: React.FC = () => {
                 setSelectedStatus(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:outline-none"
+              className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
             >
               <option value="All">All Statuses</option>
               <option value="Active">Active Only</option>
@@ -668,7 +668,7 @@ export const EmployeesPage: React.FC = () => {
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department *</label>
                   <select
                     {...register('departmentId')}
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none transition-all"
+                    className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                   >
                     <option value="" disabled>Select Department</option>
                     {departments.map((dept: any) => (
@@ -685,7 +685,7 @@ export const EmployeesPage: React.FC = () => {
                   <select
                     {...register('designationId')}
                     disabled={!selectedDeptIdWatch}
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none transition-all disabled:opacity-50"
+                    className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                   >
                     <option value="" disabled>Select Designation</option>
                     {filteredDesignations.map((desig: any) => (
@@ -765,7 +765,7 @@ export const EmployeesPage: React.FC = () => {
                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Income Tax Regime</label>
                     <select
                       {...register('taxRegime')}
-                      className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none transition-all"
+                      className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                     >
                       <option value="">Select Regime (Optional)</option>
                       <option value="NEW">New Tax Regime</option>

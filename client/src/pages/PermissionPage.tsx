@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { authPermissionApi, type PermissionData, type PermissionActions } from '../api_service/authPermissionApi';
+import { authPermissionApi, type PermissionData, type PermissionActions, type MatrixUpdateRequest } from '../api_service/authPermissionApi';
 import { employeeApi } from '../api_service/employeeApi';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
@@ -48,14 +48,19 @@ export const PermissionPage: React.FC = () => {
     enabled: activeSubTab === 'overrides',
   });
 
-  // Initialize Matrix State when data loads or role selection changes
+  // Set initial selectedRoleId when matrixData loads
   useEffect(() => {
-    if (matrixData) {
-      const initialRoleId = selectedRoleId || matrixData.roles[0]?._id || '';
-      if (!selectedRoleId && initialRoleId) {
+    if (matrixData && !selectedRoleId) {
+      const initialRoleId = matrixData.roles[0]?._id || '';
+      if (initialRoleId) {
         setSelectedRoleId(initialRoleId);
       }
+    }
+  }, [matrixData, selectedRoleId]);
 
+  // Initialize Matrix State when data loads
+  useEffect(() => {
+    if (matrixData) {
       // Build state map: roleId -> moduleCode -> actions
       const tempState: Record<string, Record<string, PermissionActions>> = {};
       matrixData.roles.forEach((role) => {
@@ -72,10 +77,47 @@ export const PermissionPage: React.FC = () => {
       });
       setMatrixState(tempState);
     }
-  }, [matrixData, selectedRoleId]);
+  }, [matrixData]);
 
   const selectedRole = matrixData?.roles.find(r => r._id === selectedRoleId);
   const selectedEmployee = employees.find(e => e._id === selectedEmployeeId);
+
+  const hasRoleUnsavedChanges = (roleId: string): boolean => {
+    if (!matrixData || !matrixState[roleId]) return false;
+    const roleState = matrixState[roleId];
+    
+    return matrixData.modules.some((mod) => {
+      const currentActions = roleState[mod];
+      if (!currentActions) return false;
+      
+      const original = matrixData.permissions.find(
+        (p) => p.roleId === roleId && p.module === mod
+      );
+      
+      const originalActions = original?.actions || {
+        view: false, create: false, edit: false, delete: false, approve: false, assign: false, export: false
+      };
+      
+      return ACTIONS_LIST.some((action) => currentActions[action] !== originalActions[action]);
+    });
+  };
+
+  const hasAnyUnsavedChanges = matrixData?.roles.some((role) => hasRoleUnsavedChanges(role._id!)) || false;
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasAnyUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes in the Access Matrix. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasAnyUnsavedChanges]);
 
   // Fetch Overrides when employee changes
   useEffect(() => {
@@ -113,6 +155,66 @@ export const PermissionPage: React.FC = () => {
       setRestrictedFieldsInput('');
       setPolicyJson('');
     }
+  };
+
+  const isActionAllChecked = (action: keyof PermissionActions): boolean => {
+    if (!selectedRoleId || !matrixData) return false;
+    const rolePerms = matrixState[selectedRoleId];
+    if (!rolePerms) return false;
+    
+    return matrixData.modules.every((mod) => !!rolePerms[mod]?.[action]);
+  };
+
+  const handleActionColumnToggle = (action: keyof PermissionActions) => {
+    if (!selectedRoleId || !matrixData) return;
+    const allChecked = isActionAllChecked(action);
+    
+    setMatrixState((prev) => {
+      const rolePerms = prev[selectedRoleId] || {};
+      const updatedRolePerms = { ...rolePerms };
+      
+      matrixData.modules.forEach((mod) => {
+        const modActions = updatedRolePerms[mod] || { view: false, create: false, edit: false, delete: false, approve: false, assign: false, export: false };
+        updatedRolePerms[mod] = { ...modActions, [action]: !allChecked };
+      });
+      
+      return {
+        ...prev,
+        [selectedRoleId]: updatedRolePerms,
+      };
+    });
+  };
+
+  const isModuleAllChecked = (moduleCode: string): boolean => {
+    if (!selectedRoleId) return false;
+    const rolePerms = matrixState[selectedRoleId] || {};
+    const modActions = rolePerms[moduleCode];
+    if (!modActions) return false;
+    
+    return ACTIONS_LIST.every((action) => !!modActions[action]);
+  };
+
+  const handleModuleRowToggle = (moduleCode: string) => {
+    if (!selectedRoleId || !matrixData) return;
+    const allChecked = isModuleAllChecked(moduleCode);
+    
+    setMatrixState((prev) => {
+      const rolePerms = prev[selectedRoleId] || {};
+      const modActions = rolePerms[moduleCode] || { view: false, create: false, edit: false, delete: false, approve: false, assign: false, export: false };
+      
+      const updatedActions = { ...modActions };
+      ACTIONS_LIST.forEach((action) => {
+        updatedActions[action] = !allChecked;
+      });
+      
+      return {
+        ...prev,
+        [selectedRoleId]: {
+          ...rolePerms,
+          [moduleCode]: updatedActions,
+        },
+      };
+    });
   };
 
   const handleActionToggle = (moduleCode: string, action: keyof PermissionActions) => {
@@ -164,15 +266,29 @@ export const PermissionPage: React.FC = () => {
   });
 
   const handleSaveMatrix = () => {
-    if (!selectedRoleId || !matrixData) return;
-    const roleState = matrixState[selectedRoleId];
-    if (!roleState) return;
+    if (!matrixData) return;
 
-    const updates = Object.entries(roleState).map(([moduleCode, actions]) => ({
-      roleId: selectedRoleId,
-      module: moduleCode,
-      actions,
-    }));
+    const updates: MatrixUpdateRequest[] = [];
+    matrixData.roles.forEach((role) => {
+      const roleId = role._id!;
+      if (hasRoleUnsavedChanges(roleId)) {
+        const roleState = matrixState[roleId];
+        if (roleState) {
+          Object.entries(roleState).forEach(([moduleCode, actions]) => {
+            updates.push({
+              roleId,
+              module: moduleCode,
+              actions,
+            });
+          });
+        }
+      }
+    });
+
+    if (updates.length === 0) {
+      addToast('No Changes', 'There are no unsaved changes to save.', 'info');
+      return;
+    }
 
     updateMatrixMutation.mutate(updates);
   };
@@ -180,8 +296,8 @@ export const PermissionPage: React.FC = () => {
   // Save Override Mutation
   const saveOverrideMutation = useMutation({
     mutationFn: authPermissionApi.upsertUserOverride,
-    onSuccess: (res) => {
-      if (res.success) {
+    onSuccess: (res: any) => {
+      if (res && (res.success || res._id || res.module)) {
         addToast('Override Saved', 'User-specific override updated successfully.', 'success');
         if (selectedEmployee && selectedEmployee.userId) {
           // Refetch overrides
@@ -222,7 +338,7 @@ export const PermissionPage: React.FC = () => {
 
   const handleSaveOverride = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEmployee?.userId || !editingOverrideModule) return;
+    if (!selectedEmployee?.userId || !editingOverrideModule || editingOverrideModule === 'SELECT_MODULE') return;
 
     let parsedPolicy = null;
     if (policyJson.trim()) {
@@ -280,7 +396,11 @@ export const PermissionPage: React.FC = () => {
           </p>
         </div>
         <Button
-          onClick={() => syncPermissionsMutation.mutate()}
+          onClick={() => {
+            if (window.confirm('Are you sure you want to sync default permissions? This will reset all roles to their default permissions and may overwrite any custom matrix configurations.')) {
+              syncPermissionsMutation.mutate();
+            }
+          }}
           isLoading={syncPermissionsMutation.isPending}
           variant="outline"
           className="flex items-center gap-1.5 text-xs font-bold border-primary/30 text-primary hover:bg-primary/10"
@@ -345,7 +465,14 @@ export const PermissionPage: React.FC = () => {
           <ShieldCheck className="w-4 h-4" /> Dynamic Access Matrix
         </button>
         <button
-          onClick={() => setActiveSubTab('overrides')}
+          onClick={() => {
+            if (hasAnyUnsavedChanges) {
+              if (!window.confirm('You have unsaved changes in the Access Matrix. Switching tabs will discard these changes. Do you want to proceed?')) {
+                return;
+              }
+            }
+            setActiveSubTab('overrides');
+          }}
           className={`px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 ${
             activeSubTab === 'overrides'
               ? 'bg-card text-foreground shadow-sm'
@@ -370,20 +497,28 @@ export const PermissionPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1">
-                    {matrixData?.roles.map((role) => (
-                      <button
-                        key={role._id}
-                        onClick={() => setSelectedRoleId(role._id!)}
-                        className={`flex flex-col text-left px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
-                          selectedRoleId === role._id
-                            ? 'bg-primary/10 border-primary text-primary shadow-sm'
-                            : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                        }`}
-                      >
-                        <span className="font-bold">{role.name}</span>
-                        <span className="text-[9px] font-black uppercase opacity-85 mt-0.5">{role.code}</span>
-                      </button>
-                    ))}
+                    {matrixData?.roles.map((role) => {
+                      const hasUnsaved = hasRoleUnsavedChanges(role._id!);
+                      return (
+                        <button
+                          key={role._id}
+                          onClick={() => setSelectedRoleId(role._id!)}
+                          className={`flex flex-col text-left px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                            selectedRoleId === role._id
+                              ? 'bg-primary/10 border-primary text-primary shadow-sm'
+                              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-bold">{role.name}</span>
+                            {hasUnsaved && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0" title="Unsaved changes" />
+                            )}
+                          </div>
+                          <span className="text-[9px] font-black uppercase opacity-85 mt-0.5">{role.code}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </Card>
@@ -392,7 +527,7 @@ export const PermissionPage: React.FC = () => {
             {/* Matrix Sheet */}
             <div className="flex-1 min-w-0">
               <Card className="p-6 space-y-6">
-                <div className="flex items-center justify-between border-b border-border pb-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
                   <div>
                     <h3 className="text-lg font-bold text-foreground">
                       Access Matrix {selectedRole ? `for ${selectedRole.name}` : ''}
@@ -401,13 +536,21 @@ export const PermissionPage: React.FC = () => {
                       Toggle standard capabilities (View, Create, Edit, etc.) on modules for the selected role.
                     </p>
                   </div>
-                  <Button 
-                    onClick={handleSaveMatrix} 
-                    isLoading={updateMatrixMutation.isPending} 
-                    className="bg-primary text-white font-bold text-xs shadow-lg shadow-primary/25"
-                  >
-                    <Save className="w-4 h-4 mr-1.5" /> SAVE MATRIX
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    {hasAnyUnsavedChanges && (
+                      <span className="text-xs text-amber-500 font-semibold flex items-center gap-1.5 animate-pulse">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        Unsaved Changes
+                      </span>
+                    )}
+                    <Button 
+                      onClick={handleSaveMatrix} 
+                      isLoading={updateMatrixMutation.isPending} 
+                      className="bg-primary text-white font-bold text-xs shadow-lg shadow-primary/25"
+                    >
+                      <Save className="w-4 h-4 mr-1.5" /> SAVE MATRIX
+                    </Button>
+                  </div>
                 </div>
 
                 {isMatrixLoading ? (
@@ -421,7 +564,18 @@ export const PermissionPage: React.FC = () => {
                         <tr className="border-b border-border bg-muted/40 text-[10px] font-black uppercase text-muted-foreground tracking-wider">
                           <th className="p-4 w-48">Module Name</th>
                           {ACTIONS_LIST.map((action) => (
-                            <th key={action} className="p-4 text-center">{action}</th>
+                            <th key={action} className="p-4 text-center">
+                              <div className="flex flex-col items-center gap-1">
+                                <span>{action}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={isActionAllChecked(action)}
+                                  onChange={() => handleActionColumnToggle(action)}
+                                  className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                                  title={`Toggle all ${action} permissions`}
+                                />
+                              </div>
+                            </th>
                           ))}
                         </tr>
                       </thead>
@@ -433,8 +587,19 @@ export const PermissionPage: React.FC = () => {
                           return (
                             <tr key={moduleCode} className="hover:bg-muted/10 transition-colors">
                               <td className="p-4 font-bold text-foreground">
-                                {moduleCode.replace(/_/g, ' ')}
-                                <span className="block text-[9px] font-medium text-muted-foreground font-mono mt-0.5">{moduleCode}</span>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={isModuleAllChecked(moduleCode)}
+                                    onChange={() => handleModuleRowToggle(moduleCode)}
+                                    className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                                    title="Toggle all actions for this module"
+                                  />
+                                  <div>
+                                    {moduleCode.replace(/_/g, ' ')}
+                                    <span className="block text-[9px] font-medium text-muted-foreground font-mono mt-0.5">{moduleCode}</span>
+                                  </div>
+                                </div>
                               </td>
                               {ACTIONS_LIST.map((action) => (
                                 <td key={action} className="p-4 text-center">
@@ -561,13 +726,19 @@ export const PermissionPage: React.FC = () => {
                               <td className="p-4 font-bold text-foreground font-mono">{over.module}</td>
                               <td className="p-4">
                                 <div className="flex flex-wrap gap-1">
-                                  {Object.entries(over.actions)
-                                    .filter(([_, allowed]) => allowed)
-                                    .map(([act]) => (
-                                      <span key={act} className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-black text-[9px] uppercase tracking-wider">
-                                        {act}
-                                      </span>
-                                    ))}
+                                  {Object.entries(over.actions).some(([_, allowed]) => allowed) ? (
+                                    Object.entries(over.actions)
+                                      .filter(([_, allowed]) => allowed)
+                                      .map(([act]) => (
+                                        <span key={act} className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-black text-[9px] uppercase tracking-wider">
+                                          {act}
+                                        </span>
+                                      ))
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive border border-destructive/20 font-black text-[9px] uppercase tracking-wider">
+                                      Explicitly Blocked
+                                    </span>
+                                  )}
                                 </div>
                               </td>
                               <td className="p-4 text-muted-foreground">
@@ -637,27 +808,41 @@ export const PermissionPage: React.FC = () => {
                   <Card className="p-6 space-y-6 border-2 border-primary/20 animate-in slide-in-from-bottom-3 duration-300">
                     <h4 className="text-base font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
                       <ShieldCheck className="w-5 h-5 text-primary" /> 
-                      {editingOverrideModule === 'SELECT_MODULE' ? 'Create Custom Override' : `Edit Override for ${editingOverrideModule}`}
+                      {editingOverrideModule === 'SELECT_MODULE' 
+                        ? 'Create Custom Override' 
+                        : selectedUserOverrides.some(o => o.module === editingOverrideModule)
+                          ? `Edit Override for ${editingOverrideModule.replace(/_/g, ' ')}` 
+                          : `Create Override for ${editingOverrideModule.replace(/_/g, ' ')}`
+                      }
                     </h4>
 
                     <form onSubmit={handleSaveOverride} className="space-y-5">
-                      {editingOverrideModule === 'SELECT_MODULE' && (
+                      {!selectedUserOverrides.some(o => o.module === editingOverrideModule) ? (
                         <div className="space-y-1.5 text-left">
                           <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Module *</label>
                           <select
                             value={editingOverrideModule}
                             onChange={(e) => setEditingOverrideModule(e.target.value)}
                             required
-                            className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all"
+                            className="h-10 w-full px-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 text-sm cursor-pointer"
                           >
                             <option value="SELECT_MODULE" disabled>-- Choose Module --</option>
                             {matrixData?.modules
-                              .filter((m) => !selectedUserOverrides.some((o) => o.module === m))
+                              .filter((m) => !selectedUserOverrides.some((o) => o.module === m) || m === editingOverrideModule)
                               .map((m) => (
                                 <option key={m} value={m}>{m.replace(/_/g, ' ')} ({m})</option>
                               ))
                             }
                           </select>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5 text-left">
+                          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Module</label>
+                          <Input
+                            value={`${editingOverrideModule.replace(/_/g, ' ')} (${editingOverrideModule})`}
+                            disabled
+                            className="bg-muted text-muted-foreground cursor-not-allowed"
+                          />
                         </div>
                       )}
 
@@ -716,7 +901,7 @@ export const PermissionPage: React.FC = () => {
                             value={policyJson}
                             onChange={(e) => setPolicyJson(e.target.value)}
                             rows={4}
-                            className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-xs font-mono transition-all resize-none"
+                            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 text-xs font-mono resize-none"
                           />
                           <p className="text-[10px] text-muted-foreground leading-relaxed mt-1">
                             Provide structured array conditions to enforce contextual ownership limits.

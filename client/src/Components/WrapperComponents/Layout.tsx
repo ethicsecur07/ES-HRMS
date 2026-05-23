@@ -173,20 +173,29 @@ export const Layout: React.FC = () => {
     });
 
     socket.on('new_notification', (notif: any) => {
-      useNotificationStore.getState().addToast(
-        notif.title || 'Live Notification',
-        notif.message || 'New update received from HRMS server.',
-        'info'
-      );
+      // Suppress Toast for CHAT notifications since receive_message handles it
+      if (notif?.type !== 'CHAT') {
+        useNotificationStore.getState().addToast(
+          notif.title || 'Live Notification',
+          notif.message || 'New update received from HRMS server.',
+          'info'
+        );
+      }
       useNotificationStore.getState().addNotification(notif);
     });
 
-    socket.on('receive_message', () => {
-      useNotificationStore.getState().addToast(
-        'New Message',
-        'You received a new chat message.',
-        'info'
-      );
+    socket.on('receive_message', (msg: any) => {
+      const activeChatUserId = useNotificationStore.getState().activeChatUserId;
+      const isChatPage = window.location.pathname === '/chat';
+      
+      // Only show Toast if the user is not actively viewing the sender's chat
+      if (!(isChatPage && activeChatUserId === msg?.senderId)) {
+        useNotificationStore.getState().addToast(
+          'New Message',
+          'You received a new chat message.',
+          'info'
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['chat'] });
     });
 
