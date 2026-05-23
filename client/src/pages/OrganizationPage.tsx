@@ -637,7 +637,7 @@ export const OrganizationPage: React.FC = () => {
                   required
                   value={divisionBranchId}
                   onChange={(e) => setDivisionBranchId(e.target.value)}
-                  className="w-full h-10 px-3 border border-border rounded-xl bg-card text-xs font-semibold focus:outline-none focus:border-primary"
+                  className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                 >
                   <option value="">-- Choose Branch --</option>
                   {orgData?.branches?.map(b => (
@@ -660,7 +660,7 @@ export const OrganizationPage: React.FC = () => {
                   required
                   value={buDivisionId}
                   onChange={(e) => setBuDivisionId(e.target.value)}
-                  className="w-full h-10 px-3 border border-border rounded-xl bg-card text-xs font-semibold focus:outline-none focus:border-primary"
+                  className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                 >
                   <option value="">-- Choose Division --</option>
                   {orgData?.divisions?.map(d => (
@@ -702,7 +702,7 @@ export const OrganizationPage: React.FC = () => {
               disabled={!!hierarchyEmployeeId}
               value={hierarchyEmployeeId}
               onChange={(e) => setHierarchyEmployeeId(e.target.value)}
-              className="w-full h-10 px-3 border border-border rounded-xl bg-card text-xs font-semibold focus:outline-none focus:border-primary disabled:opacity-75"
+              className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-75"
             >
               <option value="">-- Choose Employee --</option>
               {employees?.map(emp => (
@@ -720,7 +720,7 @@ export const OrganizationPage: React.FC = () => {
             <select
               value={hierarchyManagerId}
               onChange={(e) => setHierarchyManagerId(e.target.value)}
-              className="w-full h-10 px-3 border border-border rounded-xl bg-card text-xs font-semibold focus:outline-none focus:border-primary"
+              className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
             >
               <option value="">None (Reports to CEO)</option>
               {employees?.filter(e => e._id !== hierarchyEmployeeId).map(emp => (
@@ -738,7 +738,7 @@ export const OrganizationPage: React.FC = () => {
             <select
               value={hierarchyMatrixId1}
               onChange={(e) => setHierarchyMatrixId1(e.target.value)}
-              className="w-full h-10 px-3 border border-border rounded-xl bg-card text-xs font-semibold focus:outline-none focus:border-primary"
+              className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
             >
               <option value="">None</option>
               {employees?.filter(e => e._id !== hierarchyEmployeeId).map(emp => (
@@ -753,7 +753,7 @@ export const OrganizationPage: React.FC = () => {
             <select
               value={hierarchyHRBPId}
               onChange={(e) => setHierarchyHRBPId(e.target.value)}
-              className="w-full h-10 px-3 border border-border rounded-xl bg-card text-xs font-semibold focus:outline-none focus:border-primary"
+              className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
             >
               <option value="">Unassigned</option>
               {employees?.filter(e => ((e.department as string) === 'HR' || e.designation.includes('HR')) && e._id !== hierarchyEmployeeId).map(emp => (

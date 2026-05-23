@@ -13,7 +13,8 @@ import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Attendance } from '../types';
 import { exportAttendanceExcel } from '../utils/exportUtils';
 import { formatDate } from '../utils/formatters';
-import { CalendarCheck, Download, Wifi, Edit, AlertTriangle, Clock, Users, Laptop } from 'lucide-react';
+import { CalendarCheck, Download, Wifi, Edit, AlertTriangle, Clock, Users, Laptop, Sun, Info } from 'lucide-react';
+import { holidayCalendarApi } from '../api_service/holidayCalendarApi';
 
 export const AttendancePage: React.FC = () => {
   const { role } = useAuthStore();
@@ -33,6 +34,23 @@ export const AttendancePage: React.FC = () => {
     queryKey: ['attendances'],
     queryFn: attendanceApi.getAll,
   });
+
+  const currentYear = new Date().getFullYear();
+  const { data: holidays = [] } = useQuery({
+    queryKey: ['holidays', currentYear],
+    queryFn: () => holidayCalendarApi.getAll(currentYear),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Upcoming holidays this month
+  const upcomingHolidays = (() => {
+    const today = new Date().toISOString().split('T')[0];
+    const yearMonth = today.slice(0, 7);
+    return holidays
+      .filter(h => h.date.startsWith(yearMonth) && h.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 4);
+  })();
 
   const { data: employees, isLoading: empLoading } = useQuery({
     queryKey: ['employees'],
@@ -255,20 +273,83 @@ export const AttendancePage: React.FC = () => {
         </div>
       </div>
 
+      {/* ── Upcoming Holidays Banner ── */}
+      {upcomingHolidays.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 p-4 rounded-2xl bg-emerald-500/8 border border-emerald-200/50 dark:border-emerald-800/40">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Info className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+              Upcoming Holidays
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {upcomingHolidays.map(h => (
+              <span
+                key={h._id}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                  h.isRestricted
+                    ? 'bg-orange-500/10 text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-700/50'
+                    : 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700/50'
+                }`}
+              >
+                <Sun className="w-3 h-3" />
+                {h.name}
+                <span className="font-mono text-[10px] opacity-70">{formatDate(h.date)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Summary Stats (Admin/HR today) */}
       {(role === 'ADMIN' || role === 'HR') && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { label: 'Present Today', value: stats.present, icon: <Users className="w-5 h-5" />, color: 'text-primary border-primary/20 bg-primary/5' },
-            { label: 'Late Today', value: stats.late, icon: <AlertTriangle className="w-5 h-5" />, color: 'text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-700' },
-            { label: 'WFH Today', value: stats.wfh, icon: <Laptop className="w-5 h-5" />, color: 'text-purple-600 border-purple-200 bg-purple-50 dark:bg-purple-900/10 dark:border-purple-700' },
-            { label: 'On Leave', value: stats.absent, icon: <Clock className="w-5 h-5" />, color: 'text-rose-600 border-rose-200 bg-rose-50 dark:bg-rose-900/10 dark:border-rose-700' },
+            {
+              label: 'Present Today',
+              value: stats.present,
+              icon: <Users className="w-7 h-7" />,
+              borderClass: 'border-l-primary',
+              iconClass: 'bg-primary/10 text-primary',
+              subText: 'Active check-ins'
+            },
+            {
+              label: 'Late Today',
+              value: stats.late,
+              icon: <AlertTriangle className="w-7 h-7" />,
+              borderClass: 'border-l-amber-500',
+              iconClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-500',
+              subText: 'Late arrivals today'
+            },
+            {
+              label: 'WFH Today',
+              value: stats.wfh,
+              icon: <Laptop className="w-7 h-7" />,
+              borderClass: 'border-l-purple-500',
+              iconClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-500',
+              subText: 'Working from home'
+            },
+            {
+              label: 'On Leave',
+              value: stats.absent,
+              icon: <Clock className="w-7 h-7" />,
+              borderClass: 'border-l-rose-500',
+              iconClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-500',
+              subText: 'Approved leaves today'
+            },
           ].map((stat) => (
-            <Card key={stat.label} className={`flex items-center gap-4 p-4 border ${stat.color} transition-all hover:shadow-md`}>
-              <div className={`${stat.color} opacity-80`}>{stat.icon}</div>
+            <Card key={stat.label} className={`border-l-4 ${stat.borderClass} flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card`}>
               <div>
-                <p className="text-2xl font-black">{stat.value}</p>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                  {stat.label}
+                </p>
+                <h3 className="text-3xl font-extrabold text-foreground">{stat.value}</h3>
+                <p className="text-xs text-muted-foreground font-medium mt-2">
+                  {stat.subText}
+                </p>
+              </div>
+              <div className={`p-4 rounded-2xl ${stat.iconClass}`}>
+                {stat.icon}
               </div>
             </Card>
           ))}

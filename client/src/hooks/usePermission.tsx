@@ -20,7 +20,7 @@ interface PermissionContextType {
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined);
 
 export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, user, token } = useAuthStore();
+  const { isAuthenticated, user, token, role } = useAuthStore();
   const [permissions, setPermissions] = useState<Record<string, UserPermission>>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -44,26 +44,34 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   useEffect(() => {
     fetchPermissions();
-  }, [fetchPermissions, user?.role]); // Refetch if role changes or session is bootstrapped
+  }, [fetchPermissions, role, user?.role]); // Refetch if role changes or session is bootstrapped
 
   const hasPermission = useCallback(
     (moduleCode: string, action: keyof PermissionActions): boolean => {
+      console.log('hasPermission called:', { moduleCode, action, storeRole: role, userRole: user?.role });
+      if (role === 'ADMIN' || user?.role === 'ADMIN') {
+        if (moduleCode === 'EMPLOYEES' && action === 'create') {
+          return false;
+        }
+        return true;
+      }
       const modPerm = permissions[moduleCode];
       if (!modPerm) return false;
 
       return !!modPerm.actions[action];
     },
-    [permissions]
+    [permissions, role, user?.role]
   );
 
   const isFieldRestricted = useCallback(
     (moduleCode: string, field: string): boolean => {
+      if (role === 'ADMIN' || user?.role === 'ADMIN') return false;
       const modPerm = permissions[moduleCode];
       if (!modPerm) return false;
 
       return modPerm.restrictedFields.includes(field);
     },
-    [permissions]
+    [permissions, role, user?.role]
   );
 
   const refetchPermissions = useCallback(async () => {

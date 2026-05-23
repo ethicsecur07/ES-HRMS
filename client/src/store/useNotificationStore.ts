@@ -16,6 +16,8 @@ interface NotificationState {
   toasts: Toast[];
   unreadCount: number;
   clearedNotificationIds: string[];
+  activeChatUserId: string | null;
+  setActiveChatUserId: (id: string | null) => void;
   addNotification: (notification: Omit<NotificationItem, '_id' | 'createdAt' | 'read'>) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
@@ -38,6 +40,8 @@ export const useNotificationStore = create<NotificationState>()(
       unreadCount: 0,
       clearedNotificationIds: [],
       socket: null,
+      activeChatUserId: null,
+      setActiveChatUserId: (id) => set({ activeChatUserId: id }),
 
       fetchNotifications: async () => {
         try {
@@ -159,6 +163,7 @@ export const useNotificationStore = create<NotificationState>()(
           toasts: [],
           unreadCount: 0,
           clearedNotificationIds: [],
+          activeChatUserId: null,
           socket: null
         });
       },

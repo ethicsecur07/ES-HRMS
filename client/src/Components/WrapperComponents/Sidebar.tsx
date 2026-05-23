@@ -202,12 +202,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {navItems}
 
         {/* Bottom: theme + logout */}
-        <div className="border-t border-border p-2 space-y-1 flex-shrink-0">
+        <div className="border-t border-border py-2 space-y-1 flex-shrink-0">
           {/* Theme */}
           <button
             onClick={toggleTheme}
             title={!expanded ? (theme === 'dark' ? 'Light Mode' : 'Dark Mode') : undefined}
-            className="relative flex items-center gap-3 px-3 py-2.5 mx-0 rounded-xl w-full text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 group"
+            className="relative flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 group"
           >
             {theme === 'dark' ? <Sun className="h-5 w-5 flex-shrink-0" /> : <Moon className="h-5 w-5 flex-shrink-0" />}
             <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0'}`}>
@@ -224,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <button
             onClick={() => logout()}
             title={!expanded ? 'Logout' : undefined}
-            className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-destructive hover:bg-destructive/10 transition-all duration-200 group"
+            className="relative flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-destructive hover:bg-destructive/10 transition-all duration-200 group"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
             <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0'}`}>
