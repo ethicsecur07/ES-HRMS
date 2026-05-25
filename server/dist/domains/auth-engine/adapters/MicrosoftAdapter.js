@@ -11,12 +11,13 @@ class MicrosoftAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
     static TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
     static USERINFO_URL = 'https://graph.microsoft.com/v1.0/me';
     constructor(config) {
+        const tenantId = config.tenantId || 'common';
         super({
             ...config,
-            authorizationUrl: config.authorizationUrl || MicrosoftAdapter.AUTH_URL,
-            tokenUrl: config.tokenUrl || MicrosoftAdapter.TOKEN_URL,
-            userInfoUrl: config.userInfoUrl || MicrosoftAdapter.USERINFO_URL,
-            scopes: config.scopes || ['openid', 'profile', 'email', 'User.Read'],
+            authorizationUrl: config.authorizationUrl || `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
+            tokenUrl: config.tokenUrl || `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+            userInfoUrl: config.userInfoUrl || 'https://graph.microsoft.com/v1.0/me',
+            scopes: (config.scopes && config.scopes.length > 0) ? config.scopes : ['openid', 'profile', 'email', 'User.Read'],
         });
     }
     getAuthorizationUrl(state) {

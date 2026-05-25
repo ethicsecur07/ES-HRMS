@@ -103,8 +103,8 @@ export const applyLeave = async (req: AuthRequest, res: Response): Promise<void>
         organizationId: orgId,
       };
       // Org-scoped rooms: ADMIN and HR rooms namespaced by orgId
-      io.to(`${orgId}:ADMIN`).emit('receive_notification', notifData);
-      io.to(`${orgId}:HR`).emit('receive_notification', notifData);
+      io.to(`org_${orgId}_role_ADMIN`).emit('receive_notification', notifData);
+      io.to(`org_${orgId}_role_HR`).emit('receive_notification', notifData);
     }
 
     res.status(201).json({ leaveRequest: result.leave, message: result.message });
@@ -225,7 +225,7 @@ export const updateLeaveStatus = async (req: AuthRequest, res: Response): Promis
           type: 'LEAVE',
           organizationId: orgId,
         };
-        io.to(empUser.id).emit('receive_notification', notifData);
+        io.to(`user_${empUser._id}`).emit('receive_notification', notifData);
       }
     }
 

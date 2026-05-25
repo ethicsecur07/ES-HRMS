@@ -5,6 +5,9 @@ const Task_js_1 = require("../../models/Task.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const createTask = async (req, res, next) => {
     try {
+        if (!req.body.sprintId || req.body.sprintId === '' || req.body.sprintId === 'backlog') {
+            delete req.body.sprintId;
+        }
         const task = await Task_js_1.Task.create({
             ...req.body,
             projectId: req.params.projectId,
@@ -67,6 +70,9 @@ const updateTaskStatus = async (req, res, next) => {
 exports.updateTaskStatus = updateTaskStatus;
 const updateTask = async (req, res, next) => {
     try {
+        if (!req.body.sprintId || req.body.sprintId === '' || req.body.sprintId === 'backlog') {
+            req.body.sprintId = null;
+        }
         const task = await Task_js_1.Task.findOneAndUpdate({ _id: req.params.taskId, projectId: req.params.projectId, organizationId: req.user?.organizationId }, req.body, { new: true }).populate('assignedTo', 'fullName email profileImage');
         if (!task) {
             res.status(404).json({ message: 'Task not found' });

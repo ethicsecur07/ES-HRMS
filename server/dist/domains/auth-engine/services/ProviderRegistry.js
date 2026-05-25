@@ -1,18 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProviderRegistry = void 0;
-const IdentityProvider_js_1 = require("../models/IdentityProvider.js");
+const OrganizationAuthConfig_js_1 = require("../../../models/OrganizationAuthConfig.js");
 const GoogleAdapter_js_1 = require("../adapters/GoogleAdapter.js");
 const MicrosoftAdapter_js_1 = require("../adapters/MicrosoftAdapter.js");
-const AzureADAdapter_js_1 = require("../adapters/AzureADAdapter.js");
-const OktaAdapter_js_1 = require("../adapters/OktaAdapter.js");
-const Auth0Adapter_js_1 = require("../adapters/Auth0Adapter.js");
-const OneLoginAdapter_js_1 = require("../adapters/OneLoginAdapter.js");
 const SAML2Adapter_js_1 = require("../adapters/SAML2Adapter.js");
+const OAuthAdapter_js_1 = require("../adapters/OAuthAdapter.js");
 /**
  * ProviderRegistry
  * Manages identity provider configurations per organization and instantiates
- * the correct SSO adapter based on providerType.
+ * the correct SSO adapter based on provider.
  */
 class ProviderRegistry {
     static adapterCache = new Map();
@@ -20,7 +17,7 @@ class ProviderRegistry {
      * Get all enabled identity providers for an organization.
      */
     static async getProviders(organizationId) {
-        return IdentityProvider_js_1.IdentityProvider.find({
+        return OrganizationAuthConfig_js_1.OrganizationAuthConfig.find({
             organizationId,
             isEnabled: true,
         }).sort({ priority: 1 });
@@ -29,7 +26,7 @@ class ProviderRegistry {
      * Get the primary identity provider for an organization.
      */
     static async getPrimaryProvider(organizationId) {
-        return IdentityProvider_js_1.IdentityProvider.findOne({
+        return OrganizationAuthConfig_js_1.OrganizationAuthConfig.findOne({
             organizationId,
             isEnabled: true,
             isPrimary: true,
@@ -38,10 +35,10 @@ class ProviderRegistry {
     /**
      * Get a specific provider config by type for an organization.
      */
-    static async getProviderByType(organizationId, providerType) {
-        return IdentityProvider_js_1.IdentityProvider.findOne({
+    static async getProviderByType(organizationId, provider) {
+        return OrganizationAuthConfig_js_1.OrganizationAuthConfig.findOne({
             organizationId,
-            providerType,
+            provider,
             isEnabled: true,
         });
     }
@@ -49,7 +46,7 @@ class ProviderRegistry {
      * Instantiate the correct SSO adapter for a given provider configuration.
      */
     static createAdapter(provider) {
-        const cacheKey = `${provider.organizationId}-${provider.providerType}`;
+        const cacheKey = `${provider.organizationId}-${provider.provider}`;
         // Return cached adapter if config hasn't changed
         if (this.adapterCache.has(cacheKey)) {
             return this.adapterCache.get(cacheKey);
@@ -64,7 +61,6 @@ class ProviderRegistry {
             scopes: provider.scopes,
             tenantId: provider.tenantId,
             domain: provider.domain,
-            apiKey: provider.apiKey,
             samlEntryPoint: provider.samlEntryPoint,
             samlIssuer: provider.samlIssuer,
             samlCert: provider.samlCert,
@@ -72,30 +68,21 @@ class ProviderRegistry {
             attributeMapping: provider.attributeMapping,
         };
         let adapter;
-        switch (provider.providerType) {
+        switch (provider.provider) {
             case 'GOOGLE':
                 adapter = new GoogleAdapter_js_1.GoogleAdapter(config);
                 break;
             case 'MICROSOFT':
                 adapter = new MicrosoftAdapter_js_1.MicrosoftAdapter(config);
                 break;
-            case 'AZURE_AD':
-                adapter = new AzureADAdapter_js_1.AzureADAdapter(config);
-                break;
-            case 'OKTA':
-                adapter = new OktaAdapter_js_1.OktaAdapter(config);
-                break;
-            case 'AUTH0':
-                adapter = new Auth0Adapter_js_1.Auth0Adapter(config);
-                break;
-            case 'ONELOGIN':
-                adapter = new OneLoginAdapter_js_1.OneLoginAdapter(config);
-                break;
-            case 'SAML2':
+            case 'SAML':
                 adapter = new SAML2Adapter_js_1.SAML2Adapter(config);
                 break;
+            case 'OAUTH':
+                adapter = new OAuthAdapter_js_1.OAuthAdapter(config);
+                break;
             default:
-                throw new Error(`Unsupported provider type: ${provider.providerType}`);
+                throw new Error(`Unsupported provider type: ${provider.provider}`);
         }
         this.adapterCache.set(cacheKey, adapter);
         return adapter;
@@ -103,9 +90,9 @@ class ProviderRegistry {
     /**
      * Clear cached adapter (e.g., when config is updated).
      */
-    static clearCache(organizationId, providerType) {
-        if (providerType) {
-            this.adapterCache.delete(`${organizationId}-${providerType}`);
+    static clearCache(organizationId, provider) {
+        if (provider) {
+            this.adapterCache.delete(`${organizationId}-${provider}`);
         }
         else {
             // Clear all adapters for this org
@@ -120,17 +107,21 @@ class ProviderRegistry {
      * Register or update an identity provider for an organization.
      */
     static async registerProvider(organizationId, providerData) {
-        const existing = await IdentityProvider_js_1.IdentityProvider.findOne({
+        const providerKey = providerData.provider;
+        if (!providerKey) {
+            throw new Error('Provider type is required for registration');
+        }
+        const existing = await OrganizationAuthConfig_js_1.OrganizationAuthConfig.findOne({
             organizationId,
-            providerType: providerData.providerType,
+            provider: providerKey,
         });
         if (existing) {
             Object.assign(existing, providerData);
             await existing.save();
-            this.clearCache(organizationId, providerData.providerType);
+            this.clearCache(organizationId, providerKey);
             return existing;
         }
-        const provider = await IdentityProvider_js_1.IdentityProvider.create({
+        const provider = await OrganizationAuthConfig_js_1.OrganizationAuthConfig.create({
             organizationId,
             ...providerData,
         });
@@ -139,9 +130,9 @@ class ProviderRegistry {
     /**
      * Remove an identity provider.
      */
-    static async removeProvider(organizationId, providerType) {
-        const result = await IdentityProvider_js_1.IdentityProvider.deleteOne({ organizationId, providerType });
-        this.clearCache(organizationId, providerType);
+    static async removeProvider(organizationId, provider) {
+        const result = await OrganizationAuthConfig_js_1.OrganizationAuthConfig.deleteOne({ organizationId, provider });
+        this.clearCache(organizationId, provider);
         return result.deletedCount > 0;
     }
     /**
@@ -149,7 +140,7 @@ class ProviderRegistry {
      */
     static async resolveAuthRoute(organizationId) {
         const primary = await this.getPrimaryProvider(organizationId);
-        if (primary && primary.providerType !== 'LOCAL') {
+        if (primary && primary.provider !== 'LOCAL') {
             return {
                 provider: primary,
                 adapter: this.createAdapter(primary),
@@ -157,7 +148,7 @@ class ProviderRegistry {
         }
         // Fallback to first non-LOCAL enabled provider
         const providers = await this.getProviders(organizationId);
-        const ssoProvider = providers.find((p) => p.providerType !== 'LOCAL');
+        const ssoProvider = providers.find((p) => p.provider !== 'LOCAL');
         if (ssoProvider) {
             return {
                 provider: ssoProvider,

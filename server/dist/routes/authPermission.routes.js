@@ -7,6 +7,8 @@ const router = (0, express_1.Router)();
 router.use(auth_middleware_js_1.authenticate);
 // Route available to any authenticated user to fetch their own compiled permissions
 router.get('/my-permissions', authPermission_controller_js_1.getMyPermissions);
+// Sync permissions - ADMIN only
+router.post('/sync', (0, auth_middleware_js_1.authorize)(['ADMIN']), authPermission_controller_js_1.syncPermissions);
 // Only ADMIN and HR roles can manage other permissions
 router.use((0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']));
 router.get('/matrix', authPermission_controller_js_1.getPermissionMatrix);

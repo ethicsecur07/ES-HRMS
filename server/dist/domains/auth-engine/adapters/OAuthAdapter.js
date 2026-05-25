@@ -1,39 +1,37 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GoogleAdapter = void 0;
+exports.OAuthAdapter = void 0;
 const BaseSSOAdapter_js_1 = require("./BaseSSOAdapter.js");
 /**
- * Google OAuth 2.0 Adapter
- * Uses Google's OpenID Connect flow for authentication.
+ * Generic OAuth 2.0 Provider Engine Adapter
+ * Dynamically communicates with arbitrary OAuth providers configured by admins.
  */
-class GoogleAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
-    providerName = 'GOOGLE';
-    static AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-    static TOKEN_URL = 'https://oauth2.googleapis.com/token';
-    static USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
+class OAuthAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
+    providerName = 'OAUTH';
     constructor(config) {
-        super({
-            ...config,
-            authorizationUrl: config.authorizationUrl || GoogleAdapter.AUTH_URL,
-            tokenUrl: config.tokenUrl || GoogleAdapter.TOKEN_URL,
-            userInfoUrl: config.userInfoUrl || GoogleAdapter.USERINFO_URL,
-            scopes: (config.scopes && config.scopes.length > 0) ? config.scopes : ['openid', 'profile', 'email'],
-        });
+        super(config);
     }
     getAuthorizationUrl(state) {
+        if (!this.config.authorizationUrl) {
+            throw new Error('OAuth Provider Engine: Authorization URL is not configured.');
+        }
         const params = new URLSearchParams({
             client_id: this.config.clientId,
             redirect_uri: this.config.redirectUri,
             response_type: 'code',
-            scope: (this.config.scopes || []).join(' '),
+            scope: (this.config.scopes || ['openid', 'profile', 'email']).join(' '),
             state,
-            access_type: 'offline',
-            prompt: 'consent',
         });
         return `${this.config.authorizationUrl}?${params.toString()}`;
     }
     async handleCallback(code) {
-        // Exchange code for tokens
+        if (!this.config.tokenUrl) {
+            throw new Error('OAuth Provider Engine: Token URL is not configured.');
+        }
+        if (!this.config.userInfoUrl) {
+            throw new Error('OAuth Provider Engine: User Info URL is not configured.');
+        }
+        // Exchange authorization code for tokens
         const tokenResponse = await fetch(this.config.tokenUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -47,7 +45,7 @@ class GoogleAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
         });
         if (!tokenResponse.ok) {
             const error = await tokenResponse.text();
-            throw new Error(`Google token exchange failed: ${error}`);
+            throw new Error(`OAuth Provider Engine token exchange failed: ${error}`);
         }
         const tokens = await tokenResponse.json();
         // Fetch user profile
@@ -55,18 +53,14 @@ class GoogleAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
             headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
         if (!profileResponse.ok) {
-            throw new Error('Failed to fetch Google user profile');
+            const error = await profileResponse.text();
+            throw new Error(`OAuth Provider Engine profile fetch failed: ${error}`);
         }
         const rawProfile = await profileResponse.json();
+        // Map profile dynamically using configuration mapping
+        const mapped = this.mapProfile(rawProfile);
         return {
-            profile: {
-                email: rawProfile.email,
-                name: rawProfile.name || `${rawProfile.given_name || ''} ${rawProfile.family_name || ''}`.trim(),
-                firstName: rawProfile.given_name,
-                lastName: rawProfile.family_name,
-                avatar: rawProfile.picture,
-                raw: rawProfile,
-            },
+            profile: mapped,
             tokens: {
                 accessToken: tokens.access_token,
                 refreshToken: tokens.refresh_token,
@@ -77,11 +71,5 @@ class GoogleAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
             provider: this.providerName,
         };
     }
-    async revokeToken(token) {
-        await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        });
-    }
 }
-exports.GoogleAdapter = GoogleAdapter;
+exports.OAuthAdapter = OAuthAdapter;

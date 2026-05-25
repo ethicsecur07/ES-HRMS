@@ -100,7 +100,7 @@ export class LatePenaltyService {
           organizationId: orgId,
         });
         if (empUser) {
-          io.to(empUser.id).emit('receive_notification', {
+          io.to(`user_${empUser._id}`).emit('receive_notification', {
             _id: `late-penalty-${empId}-${monthStart}`,
             title: 'Late Penalty Applied',
             message: `You have accumulated ${lateCountThisMonth} late check-ins this month. 0.5 day deducted from your Casual Leave balance.`,

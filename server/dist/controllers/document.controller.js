@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.downloadDocument = exports.addDocumentVersion = exports.uploadDocument = exports.getDocuments = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const HRDocument_js_1 = require("../models/HRDocument.js");
 const Employee_js_1 = require("../models/Employee.js");
 const getDocuments = async (req, res, next) => {
@@ -9,9 +13,15 @@ const getDocuments = async (req, res, next) => {
         const { employeeId, role } = req.user || {};
         const query = { organizationId: orgId };
         if (role === 'EMPLOYEE') {
-            query.employeeId = employeeId;
+            if (employeeId && mongoose_1.default.Types.ObjectId.isValid(employeeId)) {
+                query.employeeId = employeeId;
+            }
+            else {
+                res.status(400).json({ message: 'Invalid or missing employee context in session.' });
+                return;
+            }
         }
-        else if (req.query.employeeId) {
+        else if (req.query.employeeId && mongoose_1.default.Types.ObjectId.isValid(req.query.employeeId)) {
             query.employeeId = req.query.employeeId;
         }
         if (req.query.category) {
@@ -36,6 +46,10 @@ const uploadDocument = async (req, res, next) => {
         const finalTargetEmpId = role === 'EMPLOYEE' ? userEmpId : targetEmpId;
         if (!finalTargetEmpId) {
             res.status(400).json({ message: 'Employee ID is required.' });
+            return;
+        }
+        if (!mongoose_1.default.Types.ObjectId.isValid(finalTargetEmpId)) {
+            res.status(400).json({ message: 'Invalid employee ID format.' });
             return;
         }
         // Enforce that target employee belongs to the same organization
@@ -75,6 +89,10 @@ const addDocumentVersion = async (req, res, next) => {
         const { employeeId, role, id: userId } = req.user || {};
         const { id } = req.params;
         const { fileUrl } = req.body;
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            res.status(400).json({ message: 'Invalid document ID format.' });
+            return;
+        }
         if (!fileUrl) {
             res.status(400).json({ message: 'File URL is required.' });
             return;
@@ -111,6 +129,10 @@ const downloadDocument = async (req, res, next) => {
         const orgId = req.user?.organizationId;
         const { employeeId, role } = req.user || {};
         const { id } = req.params;
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            res.status(400).json({ message: 'Invalid document ID format.' });
+            return;
+        }
         const document = await HRDocument_js_1.HRDocument.findOne({ _id: id, organizationId: orgId });
         if (!document) {
             res.status(404).json({ message: 'Document not found.' });

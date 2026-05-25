@@ -233,7 +233,7 @@ const getMyLeaveBalances = async (req, res, next) => {
             empId = emp?._id.toString();
         }
         if (!empId) {
-            res.status(404).json({ message: 'Employee profile not found.' });
+            res.json({ data: { balances: [], employeeId: null }, message: 'Employee profile not found.' });
             return;
         }
         const [balances, policies] = await Promise.all([

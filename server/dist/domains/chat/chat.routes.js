@@ -2,7 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const chat_controller_js_1 = require("./chat.controller.js");
+const auth_middleware_js_1 = require("../../middlewares/auth.middleware.js");
+const rbacGuard_js_1 = require("../../middlewares/rbacGuard.js");
 const router = (0, express_1.Router)();
-router.get('/:otherUserId', chat_controller_js_1.getConversation);
-router.post('/', chat_controller_js_1.sendMessage);
+router.get('/:otherUserId', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('CHAT', 'view'), chat_controller_js_1.getConversation);
+router.post('/', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('CHAT', 'create'), chat_controller_js_1.sendMessage);
 exports.default = router;

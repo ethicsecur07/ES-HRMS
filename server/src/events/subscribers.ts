@@ -1,6 +1,7 @@
 import { eventBus } from './EventBus.js';
 import { getIO } from '../sockets/socketHandler.js';
 import { Payroll } from '../models/Payroll.js';
+import { User } from '../models/User.js';
 import { createAuditLog } from '../services/auditLog.service.js';
 
 export const registerSubscribers = () => {
@@ -41,13 +42,17 @@ export const registerSubscribers = () => {
       const io = getIO();
       if (io) {
         // Emit to the specific employee or general update
-        io.emit('notification', {
-          employeeId: payload.employeeId,
-          title: 'Leave Approved',
-          message: `Your leave request for ${payload.totalDays} day(s) has been approved.`,
-          type: 'INFO'
-        });
-        console.log(`[EVENT HANDLER] Emitted socket notification to employee ${payload.employeeId}`);
+        const empUser = await User.findOne({ employeeId: payload.employeeId, organizationId: payload.organizationId });
+        if (empUser) {
+          io.to(`user_${empUser._id}`).emit('receive_notification', {
+            _id: `leave-approved-${payload.leaveId}`,
+            title: 'Leave Approved',
+            message: `Your leave request for ${payload.totalDays} day(s) has been approved.`,
+            type: 'LEAVE',
+            recipientId: empUser._id.toString()
+          });
+          console.log(`[EVENT HANDLER] Emitted socket notification to employee user_${empUser._id}`);
+        }
       }
 
       // 3. Create Audit Trail Log
