@@ -19,7 +19,7 @@ exports.createProject = createProject;
 const getProjects = async (req, res, next) => {
     try {
         const projects = await Project_js_1.Project.find({ organizationId: req.user?.organizationId })
-            .populate('allocatedManagerId', 'fullName email')
+            .populate('allocatedManagerId', 'name email')
             .sort({ createdAt: -1 });
         res.json({ projects });
     }
@@ -31,7 +31,7 @@ exports.getProjects = getProjects;
 const getProjectDetails = async (req, res, next) => {
     try {
         const project = await Project_js_1.Project.findOne({ _id: req.params.projectId, organizationId: req.user?.organizationId })
-            .populate('allocatedManagerId', 'fullName email')
+            .populate('allocatedManagerId', 'name email')
             .populate('teamMemberIds', 'fullName email');
         if (!project) {
             res.status(404).json({ message: 'Project not found' });

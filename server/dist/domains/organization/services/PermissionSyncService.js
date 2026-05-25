@@ -102,6 +102,10 @@ class PermissionSyncService {
                 'SETTINGS',
                 'SELF_SERVICE',
                 'DOCUMENTS',
+                'PROJECTS',
+                'RECRUITMENT',
+                'CHAT',
+                'NOTIFICATIONS',
             ];
             const employeeSelfServiceModules = [
                 'DASHBOARD',
@@ -112,7 +116,11 @@ class PermissionSyncService {
                 'WORKFLOW',
                 'SELF_SERVICE',
                 'DOCUMENTS',
+                'CHAT',
+                'NOTIFICATIONS',
             ];
+            // Modules accessible to TEAM_LEAD (view-only for project tracking)
+            const teamLeadViewModules = ['PROJECTS', 'RECRUITMENT'];
             // Prepare upsert operations
             const operations = [];
             // 1. ADMIN permissions (Full access)
@@ -184,22 +192,23 @@ class PermissionSyncService {
             // 4. TEAM_LEAD permissions (Inherits EMPLOYEE, but gets explicit approval permissions on self service)
             for (const moduleCode of allModules) {
                 const isSelfService = employeeSelfServiceModules.includes(moduleCode);
+                const isTeamLeadView = teamLeadViewModules.includes(moduleCode);
                 operations.push({
                     updateOne: {
                         filter: { organizationId: orgId, roleId: teamLeadRole._id, userId: null, module: moduleCode },
                         update: {
                             $set: {
                                 actions: {
-                                    view: isSelfService || moduleCode === 'EMPLOYEES',
-                                    create: isSelfService,
-                                    edit: isSelfService,
+                                    view: isSelfService || moduleCode === 'EMPLOYEES' || isTeamLeadView,
+                                    create: isSelfService || isTeamLeadView,
+                                    edit: isSelfService || isTeamLeadView,
                                     delete: false,
-                                    approve: isSelfService, // Team Lead can approve self-service requests
-                                    assign: isSelfService,
+                                    approve: isSelfService,
+                                    assign: isSelfService || isTeamLeadView,
                                     export: false,
                                 },
                                 restrictedFields: [],
-                                policyCondition: null, // Team Lead is not restricted to own items in lead role
+                                policyCondition: null,
                             },
                         },
                         upsert: true,

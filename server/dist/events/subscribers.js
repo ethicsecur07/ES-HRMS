@@ -4,6 +4,7 @@ exports.registerSubscribers = void 0;
 const EventBus_js_1 = require("./EventBus.js");
 const socketHandler_js_1 = require("../sockets/socketHandler.js");
 const Payroll_js_1 = require("../models/Payroll.js");
+const User_js_1 = require("../models/User.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const registerSubscribers = () => {
     // Listen for leave.approved events
@@ -27,13 +28,17 @@ const registerSubscribers = () => {
             const io = (0, socketHandler_js_1.getIO)();
             if (io) {
                 // Emit to the specific employee or general update
-                io.emit('notification', {
-                    employeeId: payload.employeeId,
-                    title: 'Leave Approved',
-                    message: `Your leave request for ${payload.totalDays} day(s) has been approved.`,
-                    type: 'INFO'
-                });
-                console.log(`[EVENT HANDLER] Emitted socket notification to employee ${payload.employeeId}`);
+                const empUser = await User_js_1.User.findOne({ employeeId: payload.employeeId, organizationId: payload.organizationId });
+                if (empUser) {
+                    io.to(`user_${empUser._id}`).emit('receive_notification', {
+                        _id: `leave-approved-${payload.leaveId}`,
+                        title: 'Leave Approved',
+                        message: `Your leave request for ${payload.totalDays} day(s) has been approved.`,
+                        type: 'LEAVE',
+                        recipientId: empUser._id.toString()
+                    });
+                    console.log(`[EVENT HANDLER] Emitted socket notification to employee user_${empUser._id}`);
+                }
             }
             // 3. Create Audit Trail Log
             await (0, auditLog_service_js_1.createAuditLog)('LEAVE_APPROVED_EVENT', payload.approvedBy, 'LEAVES', payload.leaveId, `Leave approved for ${payload.employeeName} (${payload.totalDays} days). Payroll deductions updated by ${deductionAmount}.`, payload.organizationId);

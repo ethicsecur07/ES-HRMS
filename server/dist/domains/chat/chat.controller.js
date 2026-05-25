@@ -16,7 +16,7 @@ const getConversation = async (req, res) => {
         }).sort({ createdAt: 1 });
         // Mark received messages as read
         await Message_js_1.Message.updateMany({ senderId: otherUserId, receiverId: userId, read: false }, { read: true });
-        res.status(200).json({ success: true, messages });
+        res.status(200).json({ data: { messages } });
     }
     catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -47,7 +47,7 @@ const sendMessage = async (req, res) => {
             channels: ['IN_APP'], // Could be Push or Email depending on settings
             type: 'CHAT'
         });
-        res.status(201).json({ success: true, message });
+        res.status(201).json({ data: message });
     }
     catch (error) {
         res.status(400).json({ success: false, message: error.message });

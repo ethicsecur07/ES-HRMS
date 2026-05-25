@@ -44,6 +44,17 @@ const seedDatabase = async () => {
                     await userRecord.save();
                 }
             }
+            // Ensure Manager and Team Lead exist
+            const managerExists = await User_js_1.User.findOne({ email: 'siddharth@ethicsecur.com' });
+            if (!managerExists) {
+                await User_js_1.User.create({ _id: new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79404'), organizationId: orgId, name: 'Siddharth', email: 'siddharth@ethicsecur.com', password: await PasswordService_js_1.PasswordService.hashPassword('EthicSec@2026'), role: index_js_1.ROLES.MANAGER, isActive: true });
+                logger_js_1.logger.info('Seeded missing Manager user.');
+            }
+            const teamLeadExists = await User_js_1.User.findOne({ email: 'karthik@ethicsecur.com' });
+            if (!teamLeadExists) {
+                await User_js_1.User.create({ _id: new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79505'), organizationId: orgId, name: 'Karthik', email: 'karthik@ethicsecur.com', password: await PasswordService_js_1.PasswordService.hashPassword('EthicSec@2026'), role: index_js_1.ROLES.TEAM_LEAD, isActive: true });
+                logger_js_1.logger.info('Seeded missing Team Lead user.');
+            }
             await (0, exports.syncRolePermissions)(orgId);
             return;
         }

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMyPermissions = exports.deleteUserOverride = exports.upsertUserOverride = exports.getUserOverrides = exports.updatePermissionMatrix = exports.getPermissionMatrix = void 0;
+exports.syncPermissions = exports.getMyPermissions = exports.deleteUserOverride = exports.upsertUserOverride = exports.getUserOverrides = exports.updatePermissionMatrix = exports.getPermissionMatrix = void 0;
 const Permission_js_1 = require("../models/Permission.js");
 const Role_js_1 = require("../models/Role.js");
 const User_js_1 = require("../models/User.js");
@@ -22,6 +22,10 @@ const DEFAULT_MODULES = [
     'SETTINGS',
     'SELF_SERVICE',
     'DOCUMENTS',
+    'PROJECTS',
+    'RECRUITMENT',
+    'CHAT',
+    'NOTIFICATIONS',
 ];
 /**
  * Get permission matrix: lists all modules and how they are configured for each role.
@@ -318,3 +322,31 @@ const getMyPermissions = async (req, res) => {
     }
 };
 exports.getMyPermissions = getMyPermissions;
+/**
+ * Force re-sync of all role permissions for the current organization.
+ * This is useful when new modules are added or permissions need to be reset.
+ * ADMIN only.
+ */
+const syncPermissions = async (req, res) => {
+    try {
+        const orgId = req.user?.organizationId;
+        if (!orgId) {
+            res.status(401).json({ success: false, message: 'Unauthorized. Organization not found.' });
+            return;
+        }
+        if (req.user?.role !== 'ADMIN') {
+            res.status(403).json({ success: false, message: 'Only ADMIN can trigger a permission sync.' });
+            return;
+        }
+        const mongoose = await import('mongoose');
+        const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');
+        await PermissionSyncService.syncForTenant(new mongoose.default.Types.ObjectId(orgId));
+        // Clear Redis RBAC cache for this organization
+        await (0, redisClient_js_1.redisClearPattern)(`rbac:${orgId}:*`);
+        res.status(200).json({ success: true, message: 'Role permissions successfully synchronized for all modules including PROJECTS and RECRUITMENT.' });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to sync permissions.', error: error.message });
+    }
+};
+exports.syncPermissions = syncPermissions;

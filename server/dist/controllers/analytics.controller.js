@@ -11,6 +11,8 @@ const Payroll_js_1 = require("../models/Payroll.js");
 const AuditLog_js_1 = require("../models/AuditLog.js");
 const TaskReport_js_1 = require("../models/TaskReport.js");
 const Organization_js_1 = require("../models/Organization.js");
+const Project_js_1 = require("../models/Project.js");
+const Task_js_1 = require("../models/Task.js");
 const index_js_1 = require("../constants/index.js");
 const LeaveAnalyticsService_js_1 = require("../domains/leave-engine/services/LeaveAnalyticsService.js");
 const countTasks = (text) => {
@@ -91,17 +93,96 @@ const getDashboardStats = async (req, res) => {
         const overallProductivity = totalCompanyReportsCount > 0
             ? Math.round((totalCompanyEfficiencySum / totalCompanyReportsCount) * 10) / 10
             : 0;
+        // Build financeData from Payroll: last 6 months with allocation breakdowns
+        const financeMonths = [];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date();
+            d.setMonth(d.getMonth() - i);
+            financeMonths.push(d.toISOString().slice(0, 7)); // YYYY-MM
+        }
+        const formatMonthLabel = (m) => {
+            const [year, mon] = m.split('-');
+            return new Date(Number(year), Number(mon) - 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
+        };
+        const payrollDocs = await Payroll_js_1.Payroll.find({
+            organizationId: new mongoose_1.default.Types.ObjectId(orgId),
+            month: { $in: financeMonths },
+        });
+        let financeData = [];
+        // Try building from real payroll data
+        if (payrollDocs.length > 0) {
+            financeData = financeMonths.map((m) => {
+                const monthPayrolls = payrollDocs.filter((p) => p.month === m);
+                const totalBase = monthPayrolls.reduce((sum, p) => sum + (p.baseSalary || 0), 0);
+                const totalBonus = monthPayrolls.reduce((sum, p) => sum + (p.bonus || 0) + (p.overtime || 0) + (p.reimbursements || 0), 0);
+                const totalTax = monthPayrolls.reduce((sum, p) => sum + (p.tax || 0), 0);
+                const totalDeductions = monthPayrolls.reduce((sum, p) => sum + (p.deductions || 0) + (p.leaveDeductions || 0), 0);
+                return {
+                    month: formatMonthLabel(m),
+                    allocations: [
+                        { name: 'Base Salary', value: totalBase },
+                        { name: 'Bonus & Extras', value: totalBonus },
+                        { name: 'Tax', value: totalTax },
+                        { name: 'Deductions', value: totalDeductions },
+                    ].filter((a) => a.value > 0),
+                };
+            }).filter((m) => m.allocations.length > 0);
+        }
+        // Fallback: derive from Employee salaries if no payroll data exists
+        if (financeData.length === 0) {
+            const allActiveEmployees = await Employee_js_1.Employee.find({ isActive: true, organizationId: orgId }, { salary: 1 });
+            const totalMonthlySalary = allActiveEmployees.reduce((sum, emp) => sum + (emp.salary || 0), 0);
+            // Use employee salary sum, or estimate from count
+            const baseCost = totalMonthlySalary > 0 ? totalMonthlySalary : (totalEmployees * 50000);
+            financeData = financeMonths.slice(-3).map((m) => ({
+                month: formatMonthLabel(m),
+                allocations: [
+                    { name: 'Base Salary', value: Math.round(baseCost * 0.70) },
+                    { name: 'Bonus & Extras', value: Math.round(baseCost * 0.10) },
+                    { name: 'Tax', value: Math.round(baseCost * 0.12) },
+                    { name: 'Deductions', value: Math.round(baseCost * 0.08) },
+                ],
+            }));
+        }
+        // Build projectProductivity from Project + Task data
+        const projects = await Project_js_1.Project.find({ organizationId: orgId })
+            .populate('allocatedManagerId', 'name')
+            .lean();
+        const allOrgTasks = await Task_js_1.Task.find({ organizationId: orgId }).lean();
+        const projectProductivity = projects.map((proj) => {
+            const projTasks = allOrgTasks.filter((t) => t.projectId.toString() === proj._id.toString());
+            const total = projTasks.length;
+            const completed = projTasks.filter((t) => t.status === 'COMPLETED').length;
+            const inProgress = projTasks.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'REVIEW').length;
+            const completionPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
+            const inProgressPercent = total > 0 ? Math.round((inProgress / total) * 100) : 0;
+            const manager = proj.allocatedManagerId;
+            const managerName = manager?.name || 'Unassigned';
+            return {
+                id: proj._id,
+                projectName: proj.name,
+                managedBy: managerName,
+                status: proj.status,
+                totalTasks: total,
+                inProgressPercent,
+                completionPercent,
+                teamSize: proj.teamMemberIds?.length || 0,
+            };
+        });
         res.status(200).json({
             totalEmployees,
             presentToday,
             wfhToday,
             absentToday,
             pendingApprovals: pendingApprovalCounts.total,
-            pendingApprovalBreakdown: pendingApprovalCounts, // leaves, wfh, permissions
+            pendingApprovalBreakdown: pendingApprovalCounts,
             monthlyPayrollCost,
             attendanceTrends,
             departmentBreakdown,
+            deptsData: departmentBreakdown,
             overallProductivity,
+            financeData,
+            projectProductivity,
         });
     }
     catch (error) {

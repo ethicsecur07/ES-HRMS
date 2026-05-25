@@ -136,14 +136,14 @@ export const applyWFH = async (req: AuthRequest, res: Response): Promise<void> =
 
     const io = getIO();
     if (io) {
-      io.to(`${orgId}:ADMIN`).emit('receive_notification', {
+      io.to(`org_${orgId}_role_ADMIN`).emit('receive_notification', {
         _id: `wfh-pending-${wfh.id}`,
         title: 'New WFH Request',
         message: `${employee.fullName} requested WFH for ${date}.`,
         type: 'WFH',
         organizationId: orgId,
       });
-      io.to(`${orgId}:HR`).emit('receive_notification', {
+      io.to(`org_${orgId}_role_HR`).emit('receive_notification', {
         _id: `wfh-pending-${wfh.id}`,
         title: 'New WFH Request',
         message: `${employee.fullName} requested WFH for ${date}.`,
@@ -276,7 +276,7 @@ export const updateWFHStatus = async (req: AuthRequest, res: Response): Promise<
     if (io) {
       const empUser = await User.findOne({ employeeId: wfh.employeeId, organizationId: orgId });
       if (empUser) {
-        io.to(empUser.id).emit('receive_notification', {
+        io.to(`user_${empUser._id}`).emit('receive_notification', {
           _id: `wfh-status-${wfh.id}-${status}`,
           title: `WFH Request ${status}`,
           message: `Your WFH request for ${wfh.startDate} has been ${status.toLowerCase()}.`,

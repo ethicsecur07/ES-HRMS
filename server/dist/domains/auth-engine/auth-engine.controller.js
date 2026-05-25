@@ -33,7 +33,7 @@ const getOrgProviders = async (req, res) => {
         res.status(200).json({
             success: true,
             data: providers.map((p) => ({
-                type: p.providerType,
+                type: p.provider,
                 name: p.displayName,
                 isPrimary: p.isPrimary,
             })),
@@ -56,7 +56,8 @@ const initiateSSO = async (req, res) => {
             res.status(404).json({ success: false, message: 'Organization not found' });
             return;
         }
-        const provider = await ProviderRegistry_js_1.ProviderRegistry.getProviderByType(org._id.toString(), providerType.toUpperCase());
+        const providerKey = (providerType || '').toUpperCase() === 'SAML2' ? 'SAML' : (providerType || '').toUpperCase();
+        const provider = await ProviderRegistry_js_1.ProviderRegistry.getProviderByType(org._id.toString(), providerKey);
         if (!provider) {
             res.status(404).json({ success: false, message: `Provider ${providerType} not configured for this organization` });
             return;
@@ -86,7 +87,8 @@ const handleSSOCallback = async (req, res) => {
             res.status(404).json({ success: false, message: 'Organization not found' });
             return;
         }
-        const provider = await ProviderRegistry_js_1.ProviderRegistry.getProviderByType(org._id.toString(), (providerType || 'SAML2').toUpperCase());
+        const providerKey = (providerType || 'SAML').toUpperCase() === 'SAML2' ? 'SAML' : (providerType || 'SAML').toUpperCase();
+        const provider = await ProviderRegistry_js_1.ProviderRegistry.getProviderByType(org._id.toString(), providerKey);
         if (!provider) {
             res.status(404).json({ success: false, message: 'Provider not configured' });
             return;
@@ -173,6 +175,7 @@ const handleSSOCallback = async (req, res) => {
                 role: user.role,
                 email: user.email,
                 organizationId: org._id.toString(),
+                employeeId: user.employeeId?.toString(),
                 mfaPending: true,
             });
             await LoginRiskService_js_1.LoginRiskService.recordEvent({
@@ -203,6 +206,7 @@ const handleSSOCallback = async (req, res) => {
             role: user.role,
             email: user.email,
             organizationId: org._id.toString(),
+            employeeId: user.employeeId?.toString(),
         });
         await LoginRiskService_js_1.LoginRiskService.recordEvent({
             userId: user._id,
@@ -267,6 +271,7 @@ const verifyMFA = async (req, res) => {
             role: req.user.role,
             email: req.user.email,
             organizationId: req.user.organizationId,
+            employeeId: req.user.employeeId,
         });
         res.status(200).json({ success: true, data: { verified: true, token } });
     }
@@ -291,6 +296,7 @@ const verifyRecoveryCode = async (req, res) => {
             role: req.user.role,
             email: req.user.email,
             organizationId: req.user.organizationId,
+            employeeId: req.user.employeeId,
         });
         res.status(200).json({ success: true, data: { verified: true, token } });
     }
@@ -417,8 +423,15 @@ exports.listProviders = listProviders;
  */
 const registerProvider = async (req, res) => {
     try {
-        const provider = await ProviderRegistry_js_1.ProviderRegistry.registerProvider(req.user.organizationId, req.body);
-        await (0, auditLog_service_js_1.createAuditLog)('IDP_REGISTERED', req.user.email, 'AUTH', 'Identity Provider', `Registered ${provider.providerType} provider`, req.user.organizationId);
+        const providerData = { ...req.body };
+        if (providerData.providerType && !providerData.provider) {
+            providerData.provider = providerData.providerType;
+        }
+        if (providerData.provider === 'SAML2') {
+            providerData.provider = 'SAML';
+        }
+        const provider = await ProviderRegistry_js_1.ProviderRegistry.registerProvider(req.user.organizationId, providerData);
+        await (0, auditLog_service_js_1.createAuditLog)('IDP_REGISTERED', req.user.email, 'AUTH', 'Identity Provider', `Registered ${provider.provider} provider`, req.user.organizationId);
         res.status(201).json({ success: true, data: provider });
     }
     catch (error) {
@@ -432,7 +445,8 @@ exports.registerProvider = registerProvider;
  */
 const removeProvider = async (req, res) => {
     try {
-        const removed = await ProviderRegistry_js_1.ProviderRegistry.removeProvider(req.user.organizationId, req.params.providerType.toUpperCase());
+        const providerKey = req.params.providerType.toUpperCase() === 'SAML2' ? 'SAML' : req.params.providerType.toUpperCase();
+        const removed = await ProviderRegistry_js_1.ProviderRegistry.removeProvider(req.user.organizationId, providerKey);
         if (!removed) {
             res.status(404).json({ success: false, message: 'Provider not found' });
             return;

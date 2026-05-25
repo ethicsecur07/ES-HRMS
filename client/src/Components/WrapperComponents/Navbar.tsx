@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Sun, Moon, LogOut, Menu } from 'lucide-react';
+import { Bell, Sun, Moon, Menu } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { employeeApi } from '../../api_service/employeeApi';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -15,7 +15,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
-  const { user, role, logout, updateUser } = useAuthStore();
+  const { user, role, updateUser } = useAuthStore();
   const { notifications, markAsRead, markAllAsRead, clearNotifications } = useNotificationStore();
   const { theme, toggleTheme } = useThemeStore();
   const { expanded } = useSidebarExpanded();
@@ -217,13 +217,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
               </span>
             </div>
 
-            <button
+            {/* <button
               onClick={logout}
               className="p-2 sm:p-2.5 rounded-xl border border-border bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all ml-1 sm:ml-2"
               title="Log Out"
             >
               <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
-            </button>
+            </button> */}
           </div>
         </div>
 

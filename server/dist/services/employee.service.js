@@ -176,7 +176,17 @@ class EmployeeService {
             .sort(sortObj)
             .skip(skipNum)
             .limit(limitNum);
-        return { employees, total, page: pageNum, limit: limitNum };
+        const employeeIds = employees.map(emp => emp._id);
+        const users = await User_js_1.User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId');
+        const userMap = new Map(users.map(u => [u.employeeId?.toString(), u._id.toString()]));
+        const enrichedEmployees = employees.map(emp => {
+            const empObj = emp.toObject();
+            return {
+                ...empObj,
+                userId: userMap.get(emp._id.toString()) || null
+            };
+        });
+        return { employees: enrichedEmployees, total, page: pageNum, limit: limitNum };
     }
     /**
      * Fetches employee details.
@@ -188,7 +198,12 @@ class EmployeeService {
         if (!employee) {
             throw new Error('Employee not found');
         }
-        return employee;
+        const user = await User_js_1.User.findOne({ employeeId: employee._id, organizationId: orgId }).select('_id');
+        const empObj = employee.toObject();
+        return {
+            ...empObj,
+            userId: user?._id.toString() || null
+        };
     }
     /**
      * Soft deletes employee and their corresponding user login mapping.

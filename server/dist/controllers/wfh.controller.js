@@ -109,14 +109,14 @@ const applyWFH = async (req, res) => {
         await (0, auditLog_service_js_1.createAuditLog)('WFH_APPLY', req.user.email, 'WFH', wfh.id, `Requested WFH for ${date}`, orgId);
         const io = (0, socketHandler_js_1.getIO)();
         if (io) {
-            io.to(`${orgId}:ADMIN`).emit('receive_notification', {
+            io.to(`org_${orgId}_role_ADMIN`).emit('receive_notification', {
                 _id: `wfh-pending-${wfh.id}`,
                 title: 'New WFH Request',
                 message: `${employee.fullName} requested WFH for ${date}.`,
                 type: 'WFH',
                 organizationId: orgId,
             });
-            io.to(`${orgId}:HR`).emit('receive_notification', {
+            io.to(`org_${orgId}_role_HR`).emit('receive_notification', {
                 _id: `wfh-pending-${wfh.id}`,
                 title: 'New WFH Request',
                 message: `${employee.fullName} requested WFH for ${date}.`,
@@ -225,7 +225,7 @@ const updateWFHStatus = async (req, res) => {
         if (io) {
             const empUser = await User_js_1.User.findOne({ employeeId: wfh.employeeId, organizationId: orgId });
             if (empUser) {
-                io.to(empUser.id).emit('receive_notification', {
+                io.to(`user_${empUser._id}`).emit('receive_notification', {
                     _id: `wfh-status-${wfh.id}-${status}`,
                     title: `WFH Request ${status}`,
                     message: `Your WFH request for ${wfh.startDate} has been ${status.toLowerCase()}.`,

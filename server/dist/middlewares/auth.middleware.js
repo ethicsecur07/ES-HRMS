@@ -21,14 +21,28 @@ const authenticate = async (req, res, next) => {
             }
             const demoRole = token.replace('demo-jwt-token-', '').toUpperCase();
             const mockUsers = {
-                ADMIN: { id: '605c72ef1f77bcf86cd79101', role: 'ADMIN', email: 'Official@ethicsecur.co.in', organizationId: '605c72ef1f77bcf86cd79001' },
-                MANAGER: { id: '605c72ef1f77bcf86cd79404', role: 'MANAGER', email: 'siddharth@ethicsecur.com', organizationId: '605c72ef1f77bcf86cd79001' },
-                HR: { id: '605c72ef1f77bcf86cd79202', role: 'HR', email: 'oviya@ethicsecur.com', organizationId: '605c72ef1f77bcf86cd79001' },
-                TEAM_LEAD: { id: '605c72ef1f77bcf86cd79505', role: 'TEAM_LEAD', email: 'karthik@ethicsecur.com', organizationId: '605c72ef1f77bcf86cd79001' },
-                EMPLOYEE: { id: '605c72ef1f77bcf86cd79303', role: 'EMPLOYEE', email: 'logapriyan@ethicsec.com', organizationId: '605c72ef1f77bcf86cd79001' },
+                ADMIN: { role: 'ADMIN', email: 'Official@ethicsecur.co.in' },
+                MANAGER: { role: 'MANAGER', email: 'siddharth@ethicsecur.com' },
+                HR: { role: 'HR', email: 'oviya@ethicsecur.com' },
+                TEAM_LEAD: { role: 'TEAM_LEAD', email: 'karthik@ethicsecur.com' },
+                EMPLOYEE: { role: 'EMPLOYEE', email: 'logapriyan@ethicsec.com' },
             };
-            req.user = mockUsers[demoRole] || mockUsers.EMPLOYEE;
-            return next();
+            const targetUser = mockUsers[demoRole] || mockUsers.EMPLOYEE;
+            const dbUser = await User_js_1.User.findOne({ email: new RegExp('^' + targetUser.email + '$', 'i') });
+            if (dbUser) {
+                req.user = {
+                    id: dbUser.id,
+                    role: dbUser.role,
+                    email: dbUser.email,
+                    organizationId: dbUser.organizationId.toString(),
+                    employeeId: dbUser.employeeId?.toString()
+                };
+                return next();
+            }
+            else {
+                res.status(404).json({ message: 'Demo user not found in database. Run seed script.' });
+                return;
+            }
         }
         const decoded = (0, jwt_js_1.verifyToken)(token);
         if (decoded.mfaPending) {

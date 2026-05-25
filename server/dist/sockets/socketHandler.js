@@ -24,6 +24,37 @@ const initSockets = (httpServer) => {
             if (!token) {
                 return next(new Error('Authentication error. Token missing.'));
             }
+            // Developer Sandbox Bypass
+            if (token.startsWith('demo-jwt-token-')) {
+                if (process.env.NODE_ENV === 'production') {
+                    return next(new Error('Demo tokens disabled in production.'));
+                }
+                const demoRole = token.replace('demo-jwt-token-', '').toUpperCase();
+                const mockUsers = {
+                    ADMIN: { role: 'ADMIN', email: 'Official@ethicsecur.co.in' },
+                    MANAGER: { role: 'MANAGER', email: 'siddharth@ethicsecur.com' },
+                    HR: { role: 'HR', email: 'oviya@ethicsecur.com' },
+                    TEAM_LEAD: { role: 'TEAM_LEAD', email: 'karthik@ethicsecur.com' },
+                    EMPLOYEE: { role: 'EMPLOYEE', email: 'logapriyan@ethicsec.com' },
+                };
+                const targetUser = mockUsers[demoRole] || mockUsers.EMPLOYEE;
+                // In sockets, we can't easily use await without importing User model, but we can do it if needed.
+                // Actually, we can just import User at the top and await it.
+                const { User } = await import('../models/User.js');
+                const dbUser = await User.findOne({ email: new RegExp('^' + targetUser.email + '$', 'i') });
+                if (dbUser) {
+                    socket.user = {
+                        id: dbUser.id,
+                        role: dbUser.role,
+                        email: dbUser.email,
+                        organizationId: dbUser.organizationId.toString()
+                    };
+                    return next();
+                }
+                else {
+                    return next(new Error('Demo user not found in database.'));
+                }
+            }
             const decoded = (0, jwt_js_1.verifyToken)(token);
             if (!decoded || !decoded.id) {
                 return next(new Error('Authentication error. Invalid token.'));
@@ -50,7 +81,8 @@ const initSockets = (httpServer) => {
             socket.join(`org_${user.organizationId}`);
             socket.join(`user_${user.id}`);
             socket.join(`role_${user.role}`);
-            logger_js_1.logger.info(`Socket ${socket.id} joined rooms: org_${user.organizationId}, user_${user.id}, role_${user.role}`);
+            socket.join(`org_${user.organizationId}_role_${user.role}`);
+            logger_js_1.logger.info(`Socket ${socket.id} joined rooms: org_${user.organizationId}, user_${user.id}, role_${user.role}, org_${user.organizationId}_role_${user.role}`);
         }
         socket.on('join_room', (role) => {
             socket.join(role);

@@ -2,29 +2,51 @@ import { createClient, RedisClientType } from 'redis';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
+let isRedisDisabled = false;
 let client: RedisClientType<any, any> | null = null;
+let connectionPromise: Promise<RedisClientType<any, any> | null> | null = null;
 
 export const getRedisClient = async (): Promise<RedisClientType<any, any> | null> => {
+  if (isRedisDisabled) {
+    return null;
+  }
   if (client && client.isOpen) {
     return client;
   }
-  try {
-    client = createClient({ 
-      url: redisUrl,
-      socket: {
-        connectTimeout: 1500, // 1.5 seconds max wait time
-        reconnectStrategy: false // Fail fast if Redis is not running locally
-      }
-    });
-    client.on('error', (err: any) => console.error('Redis Client Error', err));
-    await client.connect();
-    console.log('✅ Connected to Redis');
-    return client;
-  } catch (err) {
-    console.error('❌ Failed to connect to Redis, continuing without Redis caching:', err);
-    client = null;
-    return null;
+  if (connectionPromise) {
+    return connectionPromise;
   }
+
+  connectionPromise = (async () => {
+    try {
+      client = createClient({ 
+        url: redisUrl,
+        socket: {
+          connectTimeout: 1500, // 1.5 seconds max wait time
+          reconnectStrategy: false // Fail fast if Redis is not running locally
+        }
+      });
+      client.on('error', (err: any) => {
+        console.error('Redis Client Error', err);
+        if (err.code === 'ECONNREFUSED') {
+          isRedisDisabled = true;
+          client = null;
+        }
+      });
+      await client.connect();
+      console.log('✅ Connected to Redis');
+      return client;
+    } catch (err) {
+      console.error('❌ Failed to connect to Redis, disabling Redis caching:', err);
+      isRedisDisabled = true;
+      client = null;
+      return null;
+    } finally {
+      connectionPromise = null;
+    }
+  })();
+
+  return connectionPromise;
 };
 
 export const redisSet = async (key: string, value: any, ttlSeconds?: number): Promise<void> => {

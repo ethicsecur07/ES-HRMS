@@ -94,7 +94,8 @@ export const initSockets = (httpServer: Server) => {
       socket.join(`org_${user.organizationId}`);
       socket.join(`user_${user.id}`);
       socket.join(`role_${user.role}`);
-      logger.info(`Socket ${socket.id} joined rooms: org_${user.organizationId}, user_${user.id}, role_${user.role}`);
+      socket.join(`org_${user.organizationId}_role_${user.role}`);
+      logger.info(`Socket ${socket.id} joined rooms: org_${user.organizationId}, user_${user.id}, role_${user.role}, org_${user.organizationId}_role_${user.role}`);
     }
 
     socket.on('join_room', (role: string) => {

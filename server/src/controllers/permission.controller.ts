@@ -118,8 +118,8 @@ export const applyPermission = async (req: AuthRequest, res: Response): Promise<
         type: 'PERMISSION',
         organizationId: orgId,
       };
-      io.to(`${orgId}:ADMIN`).emit('receive_notification', notifPayload);
-      io.to(`${orgId}:HR`).emit('receive_notification', notifPayload);
+      io.to(`org_${orgId}_role_ADMIN`).emit('receive_notification', notifPayload);
+      io.to(`org_${orgId}_role_HR`).emit('receive_notification', notifPayload);
     }
 
     res.status(201).json({
@@ -268,7 +268,7 @@ export const updatePermissionStatus = async (req: AuthRequest, res: Response): P
               if (io) {
                 const empUser = await User.findOne({ employeeId: perm.employeeId, organizationId: orgId });
                 if (empUser) {
-                  io.to(empUser.id).emit('receive_notification', {
+                  io.to(`user_${empUser._id}`).emit('receive_notification', {
                     _id: `perm-convert-${perm.id}`,
                     title: 'Permission Converted to Half-Day Leave',
                     message: `Your monthly permission hours exceeded the ${limitHours}-hour limit. A half-day Casual Leave has been automatically deducted for ${perm.date}.`,
@@ -315,7 +315,7 @@ export const updatePermissionStatus = async (req: AuthRequest, res: Response): P
     if (io) {
       const empUser = await User.findOne({ employeeId: perm.employeeId, organizationId: orgId });
       if (empUser) {
-        io.to(empUser.id).emit('receive_notification', {
+        io.to(`user_${empUser._id}`).emit('receive_notification', {
           _id: `perm-status-${perm.id}-${status}`,
           title: `Permission Request ${status}`,
           message: `Your permission request for ${perm.date} (${perm.totalHours} hrs) has been ${status.toLowerCase()}.`,

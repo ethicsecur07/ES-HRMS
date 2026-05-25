@@ -3,23 +3,50 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.redisClearPattern = exports.redisDel = exports.redisGet = exports.redisSet = exports.getRedisClient = void 0;
 const redis_1 = require("redis");
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+let isRedisDisabled = false;
 let client = null;
+let connectionPromise = null;
 const getRedisClient = async () => {
+    if (isRedisDisabled) {
+        return null;
+    }
     if (client && client.isOpen) {
         return client;
     }
-    try {
-        client = (0, redis_1.createClient)({ url: redisUrl });
-        client.on('error', (err) => console.error('Redis Client Error', err));
-        await client.connect();
-        console.log('✅ Connected to Redis');
-        return client;
+    if (connectionPromise) {
+        return connectionPromise;
     }
-    catch (err) {
-        console.error('❌ Failed to connect to Redis, continuing without Redis caching:', err);
-        client = null;
-        return null;
-    }
+    connectionPromise = (async () => {
+        try {
+            client = (0, redis_1.createClient)({
+                url: redisUrl,
+                socket: {
+                    connectTimeout: 1500, // 1.5 seconds max wait time
+                    reconnectStrategy: false // Fail fast if Redis is not running locally
+                }
+            });
+            client.on('error', (err) => {
+                console.error('Redis Client Error', err);
+                if (err.code === 'ECONNREFUSED') {
+                    isRedisDisabled = true;
+                    client = null;
+                }
+            });
+            await client.connect();
+            console.log('✅ Connected to Redis');
+            return client;
+        }
+        catch (err) {
+            console.error('❌ Failed to connect to Redis, disabling Redis caching:', err);
+            isRedisDisabled = true;
+            client = null;
+            return null;
+        }
+        finally {
+            connectionPromise = null;
+        }
+    })();
+    return connectionPromise;
 };
 exports.getRedisClient = getRedisClient;
 const redisSet = async (key, value, ttlSeconds) => {

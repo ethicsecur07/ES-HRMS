@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteEmployee = exports.updateEmployee = exports.createEmployee = exports.getEmployeeById = exports.getEmployees = exports.getNextEmployeeCode = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const employee_service_js_1 = require("../services/employee.service.js");
 const getNextEmployeeCode = async (req, res) => {
     try {
@@ -52,6 +56,10 @@ const getEmployeeById = async (req, res) => {
     try {
         const { id } = req.params;
         const { organizationId, employeeId, role } = req.user || {};
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            res.status(400).json({ message: 'Invalid employee ID format.' });
+            return;
+        }
         if (!organizationId) {
             res.status(400).json({ message: 'Organization context is missing.' });
             return;
@@ -99,6 +107,10 @@ const updateEmployee = async (req, res) => {
     try {
         const { id } = req.params;
         const orgId = req.user?.organizationId;
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            res.status(400).json({ message: 'Invalid employee ID format.' });
+            return;
+        }
         const emailForAudit = req.user?.email || 'System';
         if (!orgId) {
             res.status(400).json({ message: 'Organization context is missing.' });
@@ -116,6 +128,10 @@ const deleteEmployee = async (req, res) => {
     try {
         const { id } = req.params;
         const orgId = req.user?.organizationId;
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            res.status(400).json({ message: 'Invalid employee ID format.' });
+            return;
+        }
         const emailForAudit = req.user?.email || 'System';
         if (!orgId) {
             res.status(400).json({ message: 'Organization context is missing.' });

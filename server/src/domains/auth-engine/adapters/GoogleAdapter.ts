@@ -17,7 +17,7 @@ export class GoogleAdapter extends BaseSSOAdapter {
       authorizationUrl: config.authorizationUrl || GoogleAdapter.AUTH_URL,
       tokenUrl: config.tokenUrl || GoogleAdapter.TOKEN_URL,
       userInfoUrl: config.userInfoUrl || GoogleAdapter.USERINFO_URL,
-      scopes: config.scopes || ['openid', 'profile', 'email'],
+      scopes: (config.scopes && config.scopes.length > 0) ? config.scopes : ['openid', 'profile', 'email'],
     });
   }
 

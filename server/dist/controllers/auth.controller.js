@@ -90,6 +90,7 @@ async function createSessionAndRespond(user, org, req, res, risk) {
         role: user.role,
         email: user.email,
         organizationId: org._id.toString(),
+        employeeId: user.employeeId?.toString(),
         sessionId: sessionId.toString(),
     });
     // Record SUCCESS login event
@@ -286,6 +287,7 @@ const login = async (req, res) => {
                 role: user.role,
                 email: user.email,
                 organizationId: org._id.toString(),
+                employeeId: user.employeeId?.toString(),
                 mfaPending: true,
             });
             await LoginRiskService_js_1.LoginRiskService.recordEvent({
@@ -467,6 +469,7 @@ const refreshToken = async (req, res) => {
             role: user.role,
             email: user.email,
             organizationId: user.organizationId.toString(),
+            employeeId: user.employeeId?.toString(),
             sessionId: session._id.toString(),
         });
         res.cookie('refreshToken', newRefreshToken, {
@@ -624,6 +627,7 @@ const impersonate = async (req, res) => {
             role: targetUser.role,
             email: targetUser.email,
             organizationId: targetUser.organizationId.toString(),
+            employeeId: targetUser.employeeId?.toString(),
             isImpersonated: true,
             originalAdminId: req.user.id,
         });

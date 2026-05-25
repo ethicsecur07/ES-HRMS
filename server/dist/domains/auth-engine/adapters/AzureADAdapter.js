@@ -15,7 +15,7 @@ class AzureADAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
             authorizationUrl: config.authorizationUrl || `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
             tokenUrl: config.tokenUrl || `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
             userInfoUrl: config.userInfoUrl || 'https://graph.microsoft.com/v1.0/me',
-            scopes: config.scopes || ['openid', 'profile', 'email', 'User.Read', 'GroupMember.Read.All'],
+            scopes: (config.scopes && config.scopes.length > 0) ? config.scopes : ['openid', 'profile', 'email', 'User.Read', 'GroupMember.Read.All'],
         });
     }
     getAuthorizationUrl(state) {

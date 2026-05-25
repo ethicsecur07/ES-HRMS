@@ -3,11 +3,33 @@ import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Bell, Check, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { formatDate } from '../utils/formatters';
 
 export const NotificationCenter: React.FC = () => {
   const { notifications, markAsRead, markAllAsRead, clearNotifications, fetchNotifications } = useNotificationStore();
   const [filter, setFilter] = useState<string>('ALL');
+  const navigate = useNavigate();
+
+  const handleNotificationClick = (n: any) => {
+    markAsRead(n._id);
+    const typeStr = (n.type || '').toUpperCase();
+    if (typeStr === 'PAYROLL') {
+      navigate('/payroll');
+    } else if (typeStr === 'WFH' || typeStr === 'LEAVE' || typeStr === 'PERMISSION') {
+      navigate('/leave-wfh');
+    } else if (typeStr === 'ATTENDANCE') {
+      navigate('/attendance');
+    } else if (typeStr === 'FINANCE') {
+      navigate('/finance');
+    } else if (typeStr === 'EMPLOYEE') {
+      navigate('/employees');
+    } else if (typeStr === 'REPORT' || typeStr === 'TASK') {
+      navigate('/reports');
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   useEffect(() => {
     fetchNotifications();
@@ -56,7 +78,11 @@ export const NotificationCenter: React.FC = () => {
           </div>
         ) : (
           filtered.map(notif => (
-            <Card key={notif._id} className={`p-4 transition-all hover:border-primary/40 ${!notif.read ? 'border-l-4 border-l-primary bg-primary/5' : 'bg-card'}`}>
+            <Card
+              key={notif._id}
+              onClick={() => handleNotificationClick(notif)}
+              className={`p-4 transition-all hover:border-primary/40 cursor-pointer hover:shadow-md ${!notif.read ? 'border-l-4 border-l-primary bg-primary/5' : 'bg-card'}`}
+            >
               <div className="flex justify-between items-start">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
@@ -71,7 +97,13 @@ export const NotificationCenter: React.FC = () => {
                   <p className="text-sm text-muted-foreground">{notif.message}</p>
                 </div>
                 {!notif.read && (
-                  <button onClick={() => markAsRead(notif._id)} className="text-xs text-primary hover:underline font-semibold mt-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markAsRead(notif._id);
+                    }}
+                    className="text-xs text-primary hover:underline font-semibold mt-1"
+                  >
                     Mark Read
                   </button>
                 )}

@@ -23,6 +23,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-hook-form": "^7.54.2",
+    "react-is": "^19.2.6",
     "react-router-dom": "^7.1.5",
     "recharts": "^3.8.1",
     "socket.io-client": "^4.8.1",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@rolldown/binding-win32-x64-msvc": "^1.0.1",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
