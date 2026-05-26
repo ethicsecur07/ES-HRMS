@@ -213,7 +213,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                 {user?.name || 'User'}
               </span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-max border uppercase tracking-wider ${role ? roleColors[role] : ''}`}>
-                {role || 'EMPLOYEE'}
+                {employeeData?.designation || user?.ssoData?.jobTitle || role || 'EMPLOYEE'}
               </span>
             </div>
 

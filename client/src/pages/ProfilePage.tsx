@@ -728,6 +728,22 @@ export const ProfilePage: React.FC = () => {
                           {user.ssoData.mappedRole || user.role}
                         </span>
                       </div>
+                      {user.ssoData.jobTitle && (
+                        <div className="flex justify-between items-center py-1 border-b border-border/50">
+                          <span className="text-muted-foreground font-semibold">SSO Job Title</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {user.ssoData.jobTitle}
+                          </span>
+                        </div>
+                      )}
+                      {user.ssoData.department && (
+                        <div className="flex justify-between items-center py-1 border-b border-border/50">
+                          <span className="text-muted-foreground font-semibold">SSO Department</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {user.ssoData.department}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center py-1">
                         <span className="text-muted-foreground font-semibold">Last Sync Time</span>
                         <span className="font-mono text-muted-foreground font-bold">

@@ -660,6 +660,11 @@ export const PermissionPage: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <span className="font-bold text-foreground block truncate">{emp.fullName}</span>
                         <span className="text-[10px] text-muted-foreground block truncate">{emp.designation}</span>
+                        {emp.ssoData && (
+                          <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[8px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25 uppercase tracking-wider">
+                            SSO: {emp.ssoData.provider} {emp.ssoData.jobTitle ? `(${emp.ssoData.jobTitle})` : ''}
+                          </span>
+                        )}
                         {!emp.userId && (
                           <span className="text-[8px] font-black uppercase text-amber-600 dark:text-amber-400 mt-1 block">No User Account</span>
                         )}

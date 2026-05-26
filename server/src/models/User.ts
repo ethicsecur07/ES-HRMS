@@ -21,6 +21,8 @@ export interface IUser extends Document {
     provider: string;
     azureRoles: string[];
     mappedRole?: string;
+    jobTitle?: string;
+    department?: string;
     lastSyncedAt: Date;
   };
   createdAt: Date;
@@ -48,6 +50,8 @@ const userSchema = new Schema<IUser>(
       provider: { type: String },
       azureRoles: { type: [String] },
       mappedRole: { type: String },
+      jobTitle: { type: String },
+      department: { type: String },
       lastSyncedAt: { type: Date }
     },
   },

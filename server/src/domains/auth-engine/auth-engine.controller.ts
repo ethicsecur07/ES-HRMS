@@ -182,6 +182,8 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
         provider: providerType,
         azureRoles: authResult.profile.roles || [],
         mappedRole: resolvedRole || undefined,
+        jobTitle: authResult.profile.jobTitle || undefined,
+        department: authResult.profile.department || undefined,
         lastSyncedAt: new Date()
       };
       await user.save();
@@ -197,6 +199,8 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
           provider: providerType,
           azureRoles: authResult.profile.roles || [],
           mappedRole: resolvedRole || undefined,
+          jobTitle: authResult.profile.jobTitle || undefined,
+          department: authResult.profile.department || undefined,
           lastSyncedAt: new Date()
         }
       });

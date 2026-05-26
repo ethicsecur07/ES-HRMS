@@ -77,6 +77,8 @@ class MicrosoftAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
                 name: rawProfile.displayName,
                 firstName: rawProfile.givenName,
                 lastName: rawProfile.surname,
+                department: rawProfile.department,
+                jobTitle: rawProfile.jobTitle,
                 roles: azureRoles,
                 raw: rawProfile,
             },

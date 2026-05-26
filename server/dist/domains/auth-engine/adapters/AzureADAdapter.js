@@ -79,6 +79,7 @@ class AzureADAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
                 firstName: rawProfile.givenName,
                 lastName: rawProfile.surname,
                 department: rawProfile.department,
+                jobTitle: rawProfile.jobTitle,
                 groups,
                 raw: rawProfile,
             },

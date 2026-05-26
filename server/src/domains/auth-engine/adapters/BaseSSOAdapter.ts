@@ -12,6 +12,7 @@ export interface SSOUserProfile {
   groups?: string[];
   roles?: string[];
   department?: string;
+  jobTitle?: string;
   raw: Record<string, any>; // raw profile from provider
 }
 

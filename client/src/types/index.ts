@@ -19,6 +19,8 @@ export interface User {
     provider: string;
     azureRoles: string[];
     mappedRole?: string;
+    jobTitle?: string;
+    department?: string;
     lastSyncedAt: string;
   };
 }
@@ -85,6 +87,14 @@ export interface Employee {
   permissionHoursBalance: number; // monthly 3
   isActive: boolean;
   userId?: string;
+  ssoData?: {
+    provider: string;
+    azureRoles: string[];
+    mappedRole?: string;
+    jobTitle?: string;
+    department?: string;
+    lastSyncedAt: string;
+  };
   bankDetails?: BankDetails;
   taxDetails?: TaxDetails;
 }

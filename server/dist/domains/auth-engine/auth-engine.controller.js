@@ -165,6 +165,8 @@ const handleSSOCallback = async (req, res) => {
                 provider: providerType,
                 azureRoles: authResult.profile.roles || [],
                 mappedRole: resolvedRole || undefined,
+                jobTitle: authResult.profile.jobTitle || undefined,
+                department: authResult.profile.department || undefined,
                 lastSyncedAt: new Date()
             };
             await user.save();
@@ -181,6 +183,8 @@ const handleSSOCallback = async (req, res) => {
                     provider: providerType,
                     azureRoles: authResult.profile.roles || [],
                     mappedRole: resolvedRole || undefined,
+                    jobTitle: authResult.profile.jobTitle || undefined,
+                    department: authResult.profile.department || undefined,
                     lastSyncedAt: new Date()
                 }
             });

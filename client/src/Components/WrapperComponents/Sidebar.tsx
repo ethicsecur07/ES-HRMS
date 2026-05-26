@@ -267,7 +267,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </div>
             <div onClick={() => { navigate('/profile'); onClose(); }} className="flex flex-col text-left cursor-pointer flex-1 min-w-0">
               <span className="text-sm font-bold text-foreground leading-none mb-1 tracking-tight truncate">{user?.name || 'User'}</span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-max border uppercase tracking-wider ${role ? roleColors[role as Role] : ''}`}>{role || 'EMPLOYEE'}</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-max border uppercase tracking-wider ${role ? roleColors[role as Role] : ''}`}>
+                {employeeData?.designation || user?.ssoData?.jobTitle || role || 'EMPLOYEE'}
+              </span>
             </div>
           </div>
 

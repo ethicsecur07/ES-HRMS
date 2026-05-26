@@ -226,14 +226,16 @@ export class EmployeeService {
       .limit(limitNum);
 
     const employeeIds = employees.map(emp => emp._id);
-    const users = await User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId');
-    const userMap = new Map(users.map(u => [u.employeeId?.toString(), u._id.toString()]));
+    const users = await User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId ssoData');
+    const userMap = new Map(users.map(u => [u.employeeId?.toString(), { userId: u._id.toString(), ssoData: u.ssoData }]));
 
     const enrichedEmployees = employees.map(emp => {
       const empObj = emp.toObject();
+      const userData = userMap.get(emp._id.toString()) || null;
       return {
         ...empObj,
-        userId: userMap.get(emp._id.toString()) || null
+        userId: userData?.userId || null,
+        ssoData: userData?.ssoData || null
       };
     });
 
@@ -250,11 +252,12 @@ export class EmployeeService {
     if (!employee) {
       throw new Error('Employee not found');
     }
-    const user = await User.findOne({ employeeId: employee._id, organizationId: orgId }).select('_id');
+    const user = await User.findOne({ employeeId: employee._id, organizationId: orgId }).select('_id ssoData');
     const empObj = employee.toObject();
     return {
       ...empObj,
-      userId: user?._id.toString() || null
+      userId: user?._id.toString() || null,
+      ssoData: user?.ssoData || null
     };
   }
 

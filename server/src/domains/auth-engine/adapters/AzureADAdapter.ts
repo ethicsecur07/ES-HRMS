@@ -86,6 +86,7 @@ export class AzureADAdapter extends BaseSSOAdapter {
         firstName: rawProfile.givenName,
         lastName: rawProfile.surname,
         department: rawProfile.department,
+        jobTitle: rawProfile.jobTitle,
         groups,
         raw: rawProfile,
       },
