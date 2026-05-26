@@ -44,7 +44,6 @@ const expenseSchema = new mongoose_1.Schema({
     status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING', index: true },
     submittedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
     approvedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' },
-    workflowInstanceId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'WorkflowInstance' },
     attachmentUrl: { type: String },
     date: { type: String, required: true },
 }, { timestamps: true });

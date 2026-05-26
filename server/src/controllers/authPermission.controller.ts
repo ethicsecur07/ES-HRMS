@@ -379,7 +379,7 @@ export const syncPermissions = async (req: AuthRequest, res: Response): Promise<
 
     const mongoose = await import('mongoose');
     const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');
-    await PermissionSyncService.syncForTenant(new mongoose.default.Types.ObjectId(orgId));
+    await PermissionSyncService.syncForTenant(new mongoose.default.Types.ObjectId(orgId), undefined, true);
 
     // Clear Redis RBAC cache for this organization
     await redisClearPattern(`rbac:${orgId}:*`);

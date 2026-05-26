@@ -340,7 +340,7 @@ const syncPermissions = async (req, res) => {
         }
         const mongoose = await import('mongoose');
         const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');
-        await PermissionSyncService.syncForTenant(new mongoose.default.Types.ObjectId(orgId));
+        await PermissionSyncService.syncForTenant(new mongoose.default.Types.ObjectId(orgId), undefined, true);
         // Clear Redis RBAC cache for this organization
         await (0, redisClient_js_1.redisClearPattern)(`rbac:${orgId}:*`);
         res.status(200).json({ success: true, message: 'Role permissions successfully synchronized for all modules including PROJECTS and RECRUITMENT.' });

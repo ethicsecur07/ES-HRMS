@@ -17,7 +17,6 @@ import {
   LogOut,
   ListTodo,
   Network,
-  GitBranch,
   FolderOpen,
   Receipt,
   MessageSquare
@@ -105,7 +104,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       case '/settings/leave-policy': return Shield;
       case '/lifecycle': return ListTodo;
       case '/organization': return Network;
-      case '/workflows': return GitBranch;
       case '/self-service': return Receipt;
       case '/documents': return FolderOpen;
       case '/chat': return MessageSquare;

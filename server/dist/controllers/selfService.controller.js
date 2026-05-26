@@ -10,8 +10,6 @@ const Attendance_js_1 = require("../models/Attendance.js");
 const OcrService_js_1 = require("../domains/reimbursement/OcrService.js");
 const ReimbursementPolicy_js_1 = require("../models/payroll/ReimbursementPolicy.js");
 const Role_js_1 = require("../models/Role.js");
-const WorkflowRunner_js_1 = require("../domains/workflow-engine/WorkflowRunner.js");
-const WorkflowInstance_js_1 = require("../models/WorkflowInstance.js");
 // --- REIMBURSEMENT CLAIMS ---
 const getReimbursements = async (req, res, next) => {
     try {
@@ -89,8 +87,6 @@ const createReimbursement = async (req, res, next) => {
             status: 'PENDING',
         });
         await claim.save();
-        // Trigger Workflow if active template exists
-        await WorkflowRunner_js_1.WorkflowRunner.triggerWorkflow(orgId.toString(), 'EXPENSE_CLAIM', 'ReimbursementClaim', claim.id);
         res.status(201).json(claim);
     }
     catch (err) {
@@ -125,19 +121,6 @@ const approveReimbursement = async (req, res, next) => {
         const claim = await SelfService_js_1.ReimbursementClaim.findOne({ _id: id, organizationId: orgId });
         if (!claim) {
             res.status(404).json({ message: 'Reimbursement claim not found.' });
-            return;
-        }
-        // Block manual status updates if an active workflow is monitoring this reimbursement claim.
-        const activeWorkflow = await WorkflowInstance_js_1.WorkflowInstance.findOne({
-            organizationId: orgId,
-            refModel: 'ReimbursementClaim',
-            refId: id,
-            status: 'ACTIVE'
-        });
-        if (activeWorkflow) {
-            res.status(400).json({
-                message: 'Cannot manually approve/reject this claim. An active workflow is monitoring its status.'
-            });
             return;
         }
         claim.status = status;
@@ -199,8 +182,6 @@ const createTaxDeclaration = async (req, res, next) => {
             status: 'PENDING',
         });
         await declaration.save();
-        // Trigger Workflow if active template exists
-        await WorkflowRunner_js_1.WorkflowRunner.triggerWorkflow(orgId.toString(), 'TAX_DECLARATION', 'TaxDeclaration', declaration.id);
         res.status(201).json(declaration);
     }
     catch (err) {
@@ -220,19 +201,6 @@ const approveTaxDeclaration = async (req, res, next) => {
         const declaration = await SelfService_js_1.TaxDeclaration.findOne({ _id: id, organizationId: orgId });
         if (!declaration) {
             res.status(404).json({ message: 'Tax declaration not found.' });
-            return;
-        }
-        // Block manual status updates if an active workflow is monitoring this tax declaration.
-        const activeWorkflow = await WorkflowInstance_js_1.WorkflowInstance.findOne({
-            organizationId: orgId,
-            refModel: 'TaxDeclaration',
-            refId: id,
-            status: 'ACTIVE'
-        });
-        if (activeWorkflow) {
-            res.status(400).json({
-                message: 'Cannot manually approve/reject this tax declaration. An active workflow is monitoring its status.'
-            });
             return;
         }
         declaration.status = status;
@@ -294,8 +262,6 @@ const createAttendanceCorrection = async (req, res, next) => {
             status: 'PENDING',
         });
         await request.save();
-        // Trigger Workflow if active template exists
-        await WorkflowRunner_js_1.WorkflowRunner.triggerWorkflow(orgId.toString(), 'ATTENDANCE_CORRECTION', 'AttendanceCorrectionRequest', request.id);
         res.status(201).json(request);
     }
     catch (err) {
@@ -319,21 +285,6 @@ const approveAttendanceCorrection = async (req, res, next) => {
         const request = await SelfService_js_1.AttendanceCorrectionRequest.findOne({ _id: id, organizationId: orgId }).session(session);
         if (!request) {
             res.status(404).json({ message: 'Attendance correction request not found.' });
-            await session.abortTransaction();
-            session.endSession();
-            return;
-        }
-        // Block manual status updates if an active workflow is monitoring this attendance correction request.
-        const activeWorkflow = await WorkflowInstance_js_1.WorkflowInstance.findOne({
-            organizationId: orgId,
-            refModel: 'AttendanceCorrectionRequest',
-            refId: id,
-            status: 'ACTIVE'
-        }).session(session);
-        if (activeWorkflow) {
-            res.status(400).json({
-                message: 'Cannot manually approve/reject this request. An active workflow is monitoring its status.'
-            });
             await session.abortTransaction();
             session.endSession();
             return;

@@ -19,7 +19,6 @@ const fallbackModuleRoutes: ModuleRouteData[] = [
   { moduleCode: 'FINANCE', routePath: '/finance', displayName: 'Finance & Maintenance', order: 7 },
   { moduleCode: 'EMPLOYEE_LIFECYCLE', routePath: '/lifecycle', displayName: 'Employee Lifecycle', order: 8 },
   { moduleCode: 'ORG_STRUCTURE', routePath: '/organization', displayName: 'Organization Structure', order: 9 },
-  { moduleCode: 'WORKFLOW', routePath: '/workflows', displayName: 'Workflow Engine', order: 10 },
   { moduleCode: 'REPORTS', routePath: '/reports', displayName: 'Reports & Analytics', order: 11 },
   { moduleCode: 'AUDIT_LOGS', routePath: '/audit-logs', displayName: 'Audit Logs', order: 12 },
   { moduleCode: 'SETTINGS', routePath: '/settings', displayName: 'Settings', order: 13 },

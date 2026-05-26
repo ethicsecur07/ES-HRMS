@@ -18,8 +18,6 @@ const LeavePolicyEngine_js_1 = require("../policies/LeavePolicyEngine.js");
 const LeaveBalanceService_js_1 = require("./LeaveBalanceService.js");
 const auditLog_service_js_1 = require("../../../services/auditLog.service.js");
 const logger_js_1 = require("../../../utils/logger.js");
-const WorkflowRunner_js_1 = require("../../workflow-engine/WorkflowRunner.js");
-const WorkflowInstance_js_1 = require("../../../models/WorkflowInstance.js");
 class LeaveService {
     /**
      * Create a leave request with full validation.
@@ -111,8 +109,6 @@ class LeaveService {
                     appliedAt: new Date(),
                 },
             ], { session });
-            // Trigger Workflow if active template exists
-            await WorkflowRunner_js_1.WorkflowRunner.triggerWorkflow(organizationId, 'LEAVE_REQUEST', 'Leave', leave.id, session);
             await session.commitTransaction();
             // 7. Audit log (after transaction commits)
             await (0, auditLog_service_js_1.createAuditLog)('LEAVE_APPLY', appliedByEmail, 'LEAVE', leave.id, `Applied for ${leaveType} (${totalDays} days): ${startDate} to ${endDate}`, organizationId);
@@ -145,20 +141,6 @@ class LeaveService {
             if (leave.status !== 'PENDING') {
                 await session.abortTransaction();
                 return { success: false, message: `Cannot approve a leave that is already ${leave.status}.` };
-            }
-            // Block manual approval updates if an active workflow is monitoring the leave.
-            const activeWorkflow = await WorkflowInstance_js_1.WorkflowInstance.findOne({
-                organizationId,
-                refModel: 'Leave',
-                refId: leaveId,
-                status: 'ACTIVE'
-            }).session(session);
-            if (activeWorkflow) {
-                await session.abortTransaction();
-                return {
-                    success: false,
-                    message: 'Cannot manually approve this leave request. An active workflow is monitoring its status.'
-                };
             }
             // Deduct balance atomically
             if (leave.leaveType !== 'WFH' && leave.leaveType !== 'Unpaid Leave') { // WFH and Unpaid Leave bypass standard balance
@@ -198,19 +180,6 @@ class LeaveService {
         if (leave.status !== 'PENDING') {
             return { success: false, message: `Cannot reject a leave that is already ${leave.status}.` };
         }
-        // Block manual rejection updates if an active workflow is monitoring the leave.
-        const activeWorkflow = await WorkflowInstance_js_1.WorkflowInstance.findOne({
-            organizationId,
-            refModel: 'Leave',
-            refId: leaveId,
-            status: 'ACTIVE'
-        });
-        if (activeWorkflow) {
-            return {
-                success: false,
-                message: 'Cannot manually reject this leave request. An active workflow is monitoring its status.'
-            };
-        }
         leave.status = 'REJECTED';
         leave.approvedBy = new mongoose_1.default.Types.ObjectId(approverId);
         leave.rejectionReason = rejectionReason;
@@ -240,8 +209,6 @@ class LeaveService {
                 await session.abortTransaction();
                 return { success: false, message: 'Cannot cancel a rejected leave.' };
             }
-            // Terminate any active workflow instance monitoring this leave request
-            await WorkflowInstance_js_1.WorkflowInstance.findOneAndUpdate({ organizationId, refModel: 'Leave', refId: leaveId, status: 'ACTIVE' }, { $set: { status: 'TERMINATED', updatedAt: new Date() } }, { session });
             const wasApproved = leave.status === 'APPROVED';
             // Restore balance if leave was approved
             if (wasApproved && leave.leaveType !== 'WFH') {

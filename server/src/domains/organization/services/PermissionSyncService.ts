@@ -8,9 +8,9 @@ export class PermissionSyncService {
    * Synchronizes standard RBAC permissions for the core roles of a specific tenant.
    * This is required when onboarding a new SaaS tenant so they don't start with 0 permissions.
    */
-  static async syncForTenant(orgId: mongoose.Types.ObjectId, session?: mongoose.ClientSession): Promise<void> {
+  static async syncForTenant(orgId: mongoose.Types.ObjectId, session?: mongoose.ClientSession, force = false): Promise<void> {
     try {
-      logger.info(`🔑 Synchronizing role permissions for organization: ${orgId}`);
+      logger.info(`🔑 Synchronizing role permissions for organization: ${orgId} (force reset: ${force})`);
 
       let roles = await Role.find({ organizationId: orgId }).session(session || null);
       const rolesMissingSlug = roles.filter((role) => !role.slug);
@@ -145,8 +145,14 @@ export class PermissionSyncService {
         operations.push({
           updateOne: {
             filter: { organizationId: orgId, roleId: adminRole._id, userId: null, module: moduleCode },
-            update: {
+            update: force ? {
               $set: {
+                actions: { view: true, create: true, edit: true, delete: true, approve: true, assign: true, export: true },
+                restrictedFields: [],
+                policyCondition: null,
+              },
+            } : {
+              $setOnInsert: {
                 actions: { view: true, create: true, edit: true, delete: true, approve: true, assign: true, export: true },
                 restrictedFields: [],
                 policyCondition: null,
@@ -160,20 +166,27 @@ export class PermissionSyncService {
       // 2. MANAGER permissions (Full access except settings/audit logs)
       for (const moduleCode of allModules) {
         const isExcluded = ['AUDIT_LOGS', 'SETTINGS'].includes(moduleCode);
+        const actions = {
+          view: !isExcluded,
+          create: !isExcluded,
+          edit: !isExcluded,
+          delete: !isExcluded,
+          approve: !isExcluded,
+          assign: !isExcluded,
+          export: !isExcluded,
+        };
         operations.push({
           updateOne: {
             filter: { organizationId: orgId, roleId: managerRole._id, userId: null, module: moduleCode },
-            update: {
+            update: force ? {
               $set: {
-                actions: {
-                  view: !isExcluded,
-                  create: !isExcluded,
-                  edit: !isExcluded,
-                  delete: !isExcluded,
-                  approve: !isExcluded,
-                  assign: !isExcluded,
-                  export: !isExcluded,
-                },
+                actions,
+                restrictedFields: [],
+                policyCondition: null,
+              },
+            } : {
+              $setOnInsert: {
+                actions,
                 restrictedFields: [],
                 policyCondition: null,
               },
@@ -186,20 +199,27 @@ export class PermissionSyncService {
       // 3. HR permissions (Same as Manager)
       for (const moduleCode of allModules) {
         const isExcluded = ['AUDIT_LOGS', 'SETTINGS'].includes(moduleCode);
+        const actions = {
+          view: !isExcluded,
+          create: !isExcluded,
+          edit: !isExcluded,
+          delete: !isExcluded,
+          approve: !isExcluded,
+          assign: !isExcluded,
+          export: !isExcluded,
+        };
         operations.push({
           updateOne: {
             filter: { organizationId: orgId, roleId: hrRole._id, userId: null, module: moduleCode },
-            update: {
+            update: force ? {
               $set: {
-                actions: {
-                  view: !isExcluded,
-                  create: !isExcluded,
-                  edit: !isExcluded,
-                  delete: !isExcluded,
-                  approve: !isExcluded,
-                  assign: !isExcluded,
-                  export: !isExcluded,
-                },
+                actions,
+                restrictedFields: [],
+                policyCondition: null,
+              },
+            } : {
+              $setOnInsert: {
+                actions,
                 restrictedFields: [],
                 policyCondition: null,
               },
@@ -213,20 +233,27 @@ export class PermissionSyncService {
       for (const moduleCode of allModules) {
         const isSelfService = employeeSelfServiceModules.includes(moduleCode);
         const isTeamLeadView = teamLeadViewModules.includes(moduleCode);
+        const actions = {
+          view: isSelfService || moduleCode === 'EMPLOYEES' || isTeamLeadView,
+          create: isSelfService || isTeamLeadView,
+          edit: isSelfService || isTeamLeadView,
+          delete: false,
+          approve: isSelfService,
+          assign: isSelfService || isTeamLeadView,
+          export: false,
+        };
         operations.push({
           updateOne: {
             filter: { organizationId: orgId, roleId: teamLeadRole._id, userId: null, module: moduleCode },
-            update: {
+            update: force ? {
               $set: {
-                actions: {
-                  view: isSelfService || moduleCode === 'EMPLOYEES' || isTeamLeadView,
-                  create: isSelfService || isTeamLeadView,
-                  edit: isSelfService || isTeamLeadView,
-                  delete: false,
-                  approve: isSelfService,
-                  assign: isSelfService || isTeamLeadView,
-                  export: false,
-                },
+                actions,
+                restrictedFields: [],
+                policyCondition: null,
+              },
+            } : {
+              $setOnInsert: {
+                actions,
                 restrictedFields: [],
                 policyCondition: null,
               },
@@ -241,20 +268,27 @@ export class PermissionSyncService {
         const isSelfService = employeeSelfServiceModules.includes(moduleCode);
         
         if (moduleCode === 'EMPLOYEES') {
+          const actions = {
+            view: true,
+            create: false,
+            edit: false,
+            delete: false,
+            approve: false,
+            assign: false,
+            export: false,
+          };
           operations.push({
             updateOne: {
               filter: { organizationId: orgId, roleId: employeeRole._id, userId: null, module: moduleCode },
-              update: {
+              update: force ? {
                 $set: {
-                  actions: {
-                    view: true,
-                    create: false,
-                    edit: false,
-                    delete: false,
-                    approve: false,
-                    assign: false,
-                    export: false,
-                  },
+                  actions,
+                  restrictedFields: ['salary', 'address', 'emergencyContact'],
+                  policyCondition: null,
+                },
+              } : {
+                $setOnInsert: {
+                  actions,
                   restrictedFields: ['salary', 'address', 'emergencyContact'],
                   policyCondition: null,
                 },
@@ -269,21 +303,28 @@ export class PermissionSyncService {
         const selfServicePolicy = isSelfService ? [
           [ { attribute: "resource.employeeId", operator: "EQUALS", value: "user.employeeId" } ]
         ] : null;
+        const actions = {
+          view: isSelfService,
+          create: isSelfService,
+          edit: isSelfService,
+          delete: false,
+          approve: false,
+          assign: false,
+          export: false,
+        };
 
         operations.push({
           updateOne: {
             filter: { organizationId: orgId, roleId: employeeRole._id, userId: null, module: moduleCode },
-            update: {
+            update: force ? {
               $set: {
-                actions: {
-                  view: isSelfService,
-                  create: isSelfService,
-                  edit: isSelfService,
-                  delete: false,
-                  approve: false,
-                  assign: false,
-                  export: false,
-                },
+                actions,
+                restrictedFields: [],
+                policyCondition: selfServicePolicy, 
+              },
+            } : {
+              $setOnInsert: {
+                actions,
                 restrictedFields: [],
                 policyCondition: selfServicePolicy, 
               },

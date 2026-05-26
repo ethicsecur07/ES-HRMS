@@ -16,7 +16,6 @@ const leave_routes_js_1 = __importDefault(require("./routes/leave.routes.js"));
 const wfh_routes_js_1 = __importDefault(require("./routes/wfh.routes.js"));
 const payroll_routes_js_1 = __importDefault(require("./routes/payroll.routes.js"));
 const payroll_routes_js_2 = __importDefault(require("./domains/payroll-engine/payroll.routes.js"));
-const workflow_routes_js_1 = __importDefault(require("./domains/workflow-engine/workflow.routes.js"));
 const leavev2_routes_js_1 = __importDefault(require("./domains/leave-engine/leavev2.routes.js"));
 const helmetEnhancements_js_1 = require("./middlewares/helmetEnhancements.js");
 const cspHeaders_js_1 = require("./middlewares/cspHeaders.js");
@@ -97,7 +96,6 @@ const createApp = () => {
     app.use('/api/analytics', analytics_routes_js_1.default);
     app.use('/api/permissions', permission_routes_js_1.default);
     app.use('/api/tasks', task_routes_js_1.default);
-    app.use('/api/v2/workflows', workflow_routes_js_1.default); // Workflow Engine
     app.use('/api/v2/auth', auth_engine_routes_js_1.default); // Enterprise Auth & SSO Engine
     app.use('/api/v2/leave', leavev2_routes_js_1.default); // Enterprise Leave Engine V2
     app.use('/api/finance', finance_routes_js_1.default);

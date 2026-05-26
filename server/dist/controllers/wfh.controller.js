@@ -20,8 +20,6 @@ const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const socketHandler_js_1 = require("../sockets/socketHandler.js");
 const LeaveBalanceService_js_1 = require("../domains/leave-engine/services/LeaveBalanceService.js");
 const logger_js_1 = require("../utils/logger.js");
-const WorkflowRunner_js_1 = require("../domains/workflow-engine/WorkflowRunner.js");
-const WorkflowInstance_js_1 = require("../models/WorkflowInstance.js");
 async function resolveEmployeeId(req) {
     if (!req.user)
         return null;
@@ -104,8 +102,6 @@ const applyWFH = async (req, res) => {
             expectedTasks,
             status: 'PENDING',
         });
-        // Trigger Workflow if active template exists
-        await WorkflowRunner_js_1.WorkflowRunner.triggerWorkflow(orgId.toString(), 'WFH_REQUEST', 'Leave', wfh.id);
         await (0, auditLog_service_js_1.createAuditLog)('WFH_APPLY', req.user.email, 'WFH', wfh.id, `Requested WFH for ${date}`, orgId);
         const io = (0, socketHandler_js_1.getIO)();
         if (io) {
@@ -190,19 +186,6 @@ const updateWFHStatus = async (req, res) => {
         }
         if (wfh.status !== 'PENDING') {
             res.status(400).json({ message: `Cannot update a WFH request that is already ${wfh.status}.` });
-            return;
-        }
-        // Block manual status updates if an active workflow is monitoring the WFH request.
-        const activeWorkflow = await WorkflowInstance_js_1.WorkflowInstance.findOne({
-            organizationId: orgId,
-            refModel: 'Leave',
-            refId: id,
-            status: 'ACTIVE'
-        });
-        if (activeWorkflow) {
-            res.status(400).json({
-                message: 'Cannot manually update this WFH request. An active workflow is monitoring its status.'
-            });
             return;
         }
         if (status === 'APPROVED') {

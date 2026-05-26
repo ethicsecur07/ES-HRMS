@@ -9,7 +9,6 @@ export interface IExpense extends Document {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   submittedBy: mongoose.Types.ObjectId;
   approvedBy?: mongoose.Types.ObjectId;
-  workflowInstanceId?: mongoose.Types.ObjectId;
   attachmentUrl?: string; // S3 or Cloudinary link
   date: string; // YYYY-MM-DD
   createdAt: Date;
@@ -26,7 +25,6 @@ const expenseSchema = new Schema<IExpense>(
     status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING', index: true },
     submittedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-    workflowInstanceId: { type: Schema.Types.ObjectId, ref: 'WorkflowInstance' },
     attachmentUrl: { type: String },
     date: { type: String, required: true },
   },

@@ -17,6 +17,12 @@ export interface IUser extends Document {
   isBlocked: boolean;
   blockedUntil?: Date;
   passwordChangedAt: Date;
+  ssoData?: {
+    provider: string;
+    azureRoles: string[];
+    mappedRole?: string;
+    lastSyncedAt: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +44,12 @@ const userSchema = new Schema<IUser>(
     isBlocked: { type: Boolean, default: false },
     blockedUntil: { type: Date },
     passwordChangedAt: { type: Date, default: Date.now },
+    ssoData: {
+      provider: { type: String },
+      azureRoles: { type: [String] },
+      mappedRole: { type: String },
+      lastSyncedAt: { type: Date }
+    },
   },
   { timestamps: true }
 );

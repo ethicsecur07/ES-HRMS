@@ -13,7 +13,7 @@ router.use(authenticate as any);
 
 router.post('/', createExpense);
 router.get('/', getExpenses);
-router.post('/workflow/:id/approve', approveExpense);
-router.post('/workflow/:id/reject', rejectExpense);
+router.post('/:id/approve', approveExpense);
+router.post('/:id/reject', rejectExpense);
 
 export default router;

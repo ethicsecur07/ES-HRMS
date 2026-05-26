@@ -85,6 +85,18 @@ export const ProfilePage: React.FC = () => {
   const [mfaSetupData, setMfaSetupData] = useState<{ qrCode: string; secret: string } | null>(null);
   const [mfaCodeInput, setMfaCodeInput] = useState('');
 
+  // Fetch latest user details on mount to refresh store
+  useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const res = await authApi.getMe();
+      if (res?.user) {
+        updateUser(res.user);
+      }
+      return res;
+    },
+  });
+
   // Fetch employee details if user has employeeId
   const { data: employeeData, isLoading: empLoading } = useQuery({
     queryKey: ['employeeProfile', user?.employeeId],
@@ -679,6 +691,50 @@ export const ProfilePage: React.FC = () => {
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       You are currently logged in with <strong className="text-foreground">{role}</strong> privileges. Your account manages enterprise operations, configurations, and staff oversight.
                     </p>
+                  </Card>
+                )}
+
+                {/* Azure AD SSO Card */}
+                {user?.ssoData && (
+                  <Card className="p-6 border border-border bg-gradient-to-br from-card via-card to-indigo-500/5 shadow-md space-y-6 bg-card text-left">
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b border-border pb-3">
+                      <span className="h-2 w-2 rounded-full bg-indigo-500 flex-shrink-0 animate-pulse" />
+                      SSO Identity Sync
+                    </h3>
+                    <div className="space-y-3.5 text-xs">
+                      <div className="flex justify-between items-center py-1 border-b border-border/50">
+                        <span className="text-muted-foreground font-semibold">Provider Source</span>
+                        <span className="font-bold text-foreground bg-indigo-500/10 text-indigo-600 px-2.5 py-0.5 rounded-full uppercase tracking-wider text-[10px]">
+                          {user.ssoData.provider}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-start py-1 border-b border-border/50">
+                        <span className="text-muted-foreground font-semibold">Azure AD App Roles</span>
+                        <div className="flex flex-wrap gap-1 justify-end max-w-[180px]">
+                          {user.ssoData.azureRoles && user.ssoData.azureRoles.length > 0 ? (
+                            user.ssoData.azureRoles.map((r, i) => (
+                              <span key={i} className="font-mono bg-muted text-foreground border border-border px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                {r}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="italic text-muted-foreground">None Assigned</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center py-1 border-b border-border/50">
+                        <span className="text-muted-foreground font-semibold">Mapped HRMS Role</span>
+                        <span className="font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider text-[10px]">
+                          {user.ssoData.mappedRole || user.role}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-muted-foreground font-semibold">Last Sync Time</span>
+                        <span className="font-mono text-muted-foreground font-bold">
+                          {new Date(user.ssoData.lastSyncedAt).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
                   </Card>
                 )}
               </div>

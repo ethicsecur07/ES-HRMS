@@ -52,6 +52,12 @@ const userSchema = new mongoose_1.Schema({
     isBlocked: { type: Boolean, default: false },
     blockedUntil: { type: Date },
     passwordChangedAt: { type: Date, default: Date.now },
+    ssoData: {
+        provider: { type: String },
+        azureRoles: { type: [String] },
+        mappedRole: { type: String },
+        lastSyncedAt: { type: Date }
+    },
 }, { timestamps: true });
 const softDeletePlugin_js_1 = require("../utils/softDeletePlugin.js");
 // Enforce tenant isolation for users (an email can only exist once PER organization)

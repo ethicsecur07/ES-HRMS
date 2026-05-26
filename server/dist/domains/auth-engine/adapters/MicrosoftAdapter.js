@@ -56,12 +56,28 @@ class MicrosoftAdapter extends BaseSSOAdapter_js_1.BaseSSOAdapter {
             throw new Error('Failed to fetch Microsoft user profile');
         }
         const rawProfile = await profileResponse.json();
+        let azureRoles = [];
+        if (tokens.id_token) {
+            try {
+                const payloadBase64Url = tokens.id_token.split('.')[1];
+                const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = Buffer.from(payloadBase64, 'base64').toString('utf8');
+                const idTokenClaims = JSON.parse(jsonPayload);
+                if (idTokenClaims.roles) {
+                    azureRoles = Array.isArray(idTokenClaims.roles) ? idTokenClaims.roles : [idTokenClaims.roles];
+                }
+            }
+            catch (err) {
+                console.error('Failed to decode Microsoft ID token claims:', err);
+            }
+        }
         return {
             profile: {
                 email: rawProfile.mail || rawProfile.userPrincipalName,
                 name: rawProfile.displayName,
                 firstName: rawProfile.givenName,
                 lastName: rawProfile.surname,
+                roles: azureRoles,
                 raw: rawProfile,
             },
             tokens: {
