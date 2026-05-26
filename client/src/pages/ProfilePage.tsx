@@ -584,9 +584,11 @@ export const ProfilePage: React.FC = () => {
             </p>
             {employeeData && (
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-2 text-xs font-semibold text-white/90 border-t border-white/20 mt-3">
-                <span className="flex items-center gap-1 bg-black/20 px-3 py-1 rounded-lg backdrop-blur-sm">
-                  <Shield className="w-3.5 h-3.5 text-accent-foreground" /> Code: {employeeData.employeeCode}
-                </span>
+                {employeeData.employeeCode && !employeeData.employeeCode.startsWith('TEMP-EMP-') && (
+                  <span className="flex items-center gap-1 bg-black/20 px-3 py-1 rounded-lg backdrop-blur-sm">
+                    <Shield className="w-3.5 h-3.5 text-accent-foreground" /> Code: {employeeData.employeeCode}
+                  </span>
+                )}
                 <span className="flex items-center gap-1 bg-black/20 px-3 py-1 rounded-lg backdrop-blur-sm">
                   <Briefcase className="w-3.5 h-3.5 text-accent-foreground" /> {employeeData.designation} ({employeeData.department})
                 </span>
@@ -792,7 +794,7 @@ export const ProfilePage: React.FC = () => {
                           />
                           <Input
                             label="Employee Code (Static)"
-                            value={employeeData.employeeCode || ''}
+                            value={employeeData.employeeCode && !employeeData.employeeCode.startsWith('TEMP-EMP-') ? employeeData.employeeCode : ''}
                             disabled
                             className="bg-muted/50 cursor-not-allowed font-mono text-xs"
                           />
@@ -840,7 +842,9 @@ export const ProfilePage: React.FC = () => {
                       <Briefcase className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                       <div>
                         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Employee Code</p>
-                        <p className="font-semibold text-foreground font-mono">{employeeData.employeeCode}</p>
+                        <p className="font-semibold text-foreground font-mono">
+                          {employeeData.employeeCode && !employeeData.employeeCode.startsWith('TEMP-EMP-') ? employeeData.employeeCode : ''}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">

@@ -298,7 +298,9 @@ export const SelfServicePage: React.FC = () => {
             return (
               <div className="flex items-center gap-2">
                 <span className="font-bold text-xs text-foreground block">{emp?.fullName || 'Employee'}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">({emp?.employeeCode || 'N/A'})</span>
+                {emp?.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') && (
+                  <span className="text-[10px] text-muted-foreground font-mono">({emp.employeeCode})</span>
+                )}
               </div>
             );
           }
@@ -360,7 +362,9 @@ export const SelfServicePage: React.FC = () => {
             return (
               <div className="flex items-center gap-2">
                 <span className="font-bold text-xs text-foreground block">{emp?.fullName || 'Employee'}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">({emp?.employeeCode || 'N/A'})</span>
+                {emp?.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') && (
+                  <span className="text-[10px] text-muted-foreground font-mono">({emp.employeeCode})</span>
+                )}
               </div>
             );
           }
@@ -421,7 +425,9 @@ export const SelfServicePage: React.FC = () => {
             return (
               <div className="flex items-center gap-2">
                 <span className="font-bold text-xs text-foreground block">{emp?.fullName || 'Employee'}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">({emp?.employeeCode || 'N/A'})</span>
+                {emp?.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') && (
+                  <span className="text-[10px] text-muted-foreground font-mono">({emp.employeeCode})</span>
+                )}
               </div>
             );
           }
@@ -556,7 +562,7 @@ export const SelfServicePage: React.FC = () => {
                 <option value="">Filter by employee (Show All)...</option>
                 {employees?.map((emp) => (
                   <option key={emp._id} value={emp._id}>
-                    {emp.fullName} ({emp.employeeCode}) - {emp.designation}
+                    {emp.fullName} {emp.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') ? `(${emp.employeeCode})` : ''} - {emp.designation}
                   </option>
                 ))}
               </select>

@@ -161,7 +161,9 @@ export const PayrollPage: React.FC = () => {
         return (
           <div className="flex items-center gap-2 text-left">
             <span className="font-bold text-xs text-foreground">{emp?.fullName || 'Logapriyan M'}</span>
-            <span className="text-[10px] text-muted-foreground font-mono">({emp?.employeeCode || 'DEV-001'})</span>
+            {emp?.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') && (
+              <span className="text-[10px] text-muted-foreground font-mono">({emp.employeeCode})</span>
+            )}
           </div>
         );
       },

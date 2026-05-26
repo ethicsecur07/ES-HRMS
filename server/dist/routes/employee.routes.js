@@ -9,6 +9,7 @@ const employee_validation_js_1 = require("../validations/employee.validation.js"
 const router = (0, express_1.Router)();
 router.get('/', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'view'), employee_controller_js_1.getEmployees);
 router.get('/next-code', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'view'), employee_controller_js_1.getNextEmployeeCode);
+router.post('/sync-microsoft', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'create'), employee_controller_js_1.syncMicrosoftEmployees);
 router.get('/:id', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'view'), employee_controller_js_1.getEmployeeById);
 router.post('/', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'create'), (0, validate_middleware_js_1.validateRequest)(employee_validation_js_1.createEmployeeSchema), employee_controller_js_1.createEmployee);
 router.put('/:id', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('EMPLOYEES', 'edit'), (0, validate_middleware_js_1.validateRequest)(employee_validation_js_1.updateEmployeeSchema), employee_controller_js_1.updateEmployee);

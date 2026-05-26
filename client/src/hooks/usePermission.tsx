@@ -50,9 +50,6 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     (moduleCode: string, action: keyof PermissionActions): boolean => {
       console.log('hasPermission called:', { moduleCode, action, storeRole: role, userRole: user?.role });
       if (role === 'ADMIN' || user?.role === 'ADMIN') {
-        if (moduleCode === 'EMPLOYEES' && action === 'create') {
-          return false;
-        }
         return true;
       }
       const modPerm = permissions[moduleCode];

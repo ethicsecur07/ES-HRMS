@@ -115,6 +115,12 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    // Restrict Microsoft SSO login exclusively to @ethicsecur.co.in domain
+    if (providerType === 'MICROSOFT' && !authResult.profile.email.toLowerCase().endsWith('@ethicsecur.co.in')) {
+      res.status(403).json({ success: false, message: 'Access denied. Only @ethicsecur.co.in corporate accounts are authorized.' });
+      return;
+    }
+
     const ipAddress = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '0.0.0.0';
     const userAgent = req.headers['user-agent'] || '';
 

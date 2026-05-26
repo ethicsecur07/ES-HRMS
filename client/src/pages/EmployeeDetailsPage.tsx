@@ -339,7 +339,10 @@ export const EmployeeDetailsPage: React.FC = () => {
             )}
             <div>
               <h2 className="text-2xl font-bold text-foreground tracking-tight">{employee.fullName}</h2>
-              <p className="text-xs text-muted-foreground font-mono">{employee.employeeCode} | {employee.designation}</p>
+              <p className="text-xs text-muted-foreground font-mono">
+                {employee.employeeCode && !employee.employeeCode.startsWith('TEMP-EMP-') ? `${employee.employeeCode} | ` : ''}
+                {employee.designation}
+              </p>
             </div>
           </div>
         </div>
@@ -433,7 +436,9 @@ export const EmployeeDetailsPage: React.FC = () => {
                   <Briefcase className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <div>
                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Employee Code</p>
-                    <p className="font-semibold text-foreground font-mono">{employee.employeeCode}</p>
+                    <p className="font-semibold text-foreground font-mono">
+                      {employee.employeeCode && !employee.employeeCode.startsWith('TEMP-EMP-') ? employee.employeeCode : ''}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">

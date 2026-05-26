@@ -157,7 +157,9 @@ export const AttendancePage: React.FC = () => {
             )}
             <div>
               <p className="font-bold text-xs text-foreground">{fullName}</p>
-              <p className="text-[10px] text-muted-foreground font-mono">({emp?.employeeCode || 'DEV-001'})</p>
+              {emp?.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') && (
+                <p className="text-[10px] text-muted-foreground font-mono">({emp.employeeCode})</p>
+              )}
             </div>
           </div>
         );
