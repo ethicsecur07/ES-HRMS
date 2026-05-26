@@ -85,6 +85,8 @@ export class MicrosoftAdapter extends BaseSSOAdapter {
         name: rawProfile.displayName,
         firstName: rawProfile.givenName,
         lastName: rawProfile.surname,
+        department: rawProfile.department,
+        jobTitle: rawProfile.jobTitle,
         roles: azureRoles,
         raw: rawProfile,
       },

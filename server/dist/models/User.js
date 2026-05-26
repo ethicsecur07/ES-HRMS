@@ -56,6 +56,8 @@ const userSchema = new mongoose_1.Schema({
         provider: { type: String },
         azureRoles: { type: [String] },
         mappedRole: { type: String },
+        jobTitle: { type: String },
+        department: { type: String },
         lastSyncedAt: { type: Date }
     },
 }, { timestamps: true });
