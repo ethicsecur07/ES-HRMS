@@ -3,10 +3,10 @@ import type { Designation } from '../types';
 
 export const designationApi = {
   getAll: async (departmentId?: string) => {
-    const response = await axiosInstance.get<{ success: boolean; data: Designation[] }>('/designations', {
+    const response = await axiosInstance.get<Designation[]>('/designations', {
       params: { departmentId },
     });
-    return response.data as unknown as Designation[];
+    return response.data;
   },
 
   getById: async (id: string) => {

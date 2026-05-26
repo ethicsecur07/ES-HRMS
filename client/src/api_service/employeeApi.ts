@@ -41,4 +41,16 @@ export const employeeApi = {
     const response = await axiosInstance.get<{ nextCode: string }>('/employees/next-code');
     return response.data.nextCode;
   },
+  
+  syncMicrosoft: async () => {
+    const response = await axiosInstance.post<{
+      success: boolean;
+      totalMicrosoftUsers: number;
+      filteredUsers: number;
+      createdCount: number;
+      updatedCount: number;
+      errors: string[];
+    }>('/employees/sync-microsoft');
+    return response.data;
+  },
 };

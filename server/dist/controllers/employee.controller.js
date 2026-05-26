@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteEmployee = exports.updateEmployee = exports.createEmployee = exports.getEmployeeById = exports.getEmployees = exports.getNextEmployeeCode = void 0;
+exports.syncMicrosoftEmployees = exports.deleteEmployee = exports.updateEmployee = exports.createEmployee = exports.getEmployeeById = exports.getEmployees = exports.getNextEmployeeCode = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const employee_service_js_1 = require("../services/employee.service.js");
 const getNextEmployeeCode = async (req, res) => {
@@ -28,11 +28,13 @@ const getEmployees = async (req, res) => {
             res.status(400).json({ message: 'Organization context is missing.' });
             return;
         }
-        const { search, department, designation, branchId, isActive, page, limit, sortBy, sortOrder } = req.query;
+        const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder } = req.query;
         const result = await employee_service_js_1.EmployeeService.getEmployees(orgId, {
             search: search,
             department: department,
             designation: designation,
+            departmentId: departmentId,
+            designationId: designationId,
             branchId: branchId,
             isActive: isActive,
             page: page,
@@ -145,3 +147,19 @@ const deleteEmployee = async (req, res) => {
     }
 };
 exports.deleteEmployee = deleteEmployee;
+const syncMicrosoftEmployees = async (req, res) => {
+    try {
+        const orgId = req.user?.organizationId;
+        if (!orgId) {
+            res.status(400).json({ message: 'Organization context is missing.' });
+            return;
+        }
+        const emailForAudit = req.user?.email || 'System';
+        const result = await employee_service_js_1.EmployeeService.syncMicrosoftEmployees(orgId, emailForAudit);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+exports.syncMicrosoftEmployees = syncMicrosoftEmployees;

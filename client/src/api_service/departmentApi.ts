@@ -3,8 +3,8 @@ import type { Department } from '../types';
 
 export const departmentApi = {
   getAll: async () => {
-    const response = await axiosInstance.get<{ success: boolean; data: Department[] }>('/departments');
-    return response.data as unknown as Department[];
+    const response = await axiosInstance.get<Department[]>('/departments');
+    return response.data;
   },
 
   getById: async (id: string) => {

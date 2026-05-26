@@ -48,7 +48,9 @@ export const PayrollSlipModal: React.FC<PayrollSlipModalProps> = ({
           </div>
           <div>
             <span className="text-xs text-muted-foreground block font-medium">Employee Code</span>
-            <span className="font-bold text-foreground">{employee.employeeCode}</span>
+            <span className="font-bold text-foreground">
+              {employee.employeeCode && !employee.employeeCode.startsWith('TEMP-EMP-') ? employee.employeeCode : ''}
+            </span>
           </div>
           <div>
             <span className="text-xs text-muted-foreground block font-medium">Department</span>
@@ -108,7 +110,7 @@ export const PayrollSlipModal: React.FC<PayrollSlipModalProps> = ({
           </div>
 
           <Button
-            onClick={() => exportPayslipPDF(payroll, employee.fullName, employee.employeeCode)}
+            onClick={() => exportPayslipPDF(payroll, employee.fullName, employee.employeeCode?.startsWith('TEMP-EMP-') ? '' : employee.employeeCode)}
             className="bg-primary text-white font-bold tracking-wider shadow-md shadow-primary/20"
           >
             <Download className="w-4 h-4 mr-2" />

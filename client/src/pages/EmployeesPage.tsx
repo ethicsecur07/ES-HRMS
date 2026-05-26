@@ -17,11 +17,11 @@ import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Employee } from '../types';
 import { formatCurrency } from '../utils/formatters';
-import { PlusCircle, Edit, Trash2, PhoneCall, Eye, Camera, Loader2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, PhoneCall, Eye, Camera, Loader2, Sparkles, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 const baseEmployeeSchema = z.object({
   id: z.string().optional(),
-  employeeCode: z.string().min(1, 'Employee Code is required'),
+  employeeCode: z.string().optional().or(z.literal('')),
   fullName: z.string()
     .min(3, 'Full name must be at least 3 characters')
     .regex(/^[a-zA-Z\s]+$/, 'Full name must contain only letters and spaces'),
@@ -105,14 +105,26 @@ export const EmployeesPage: React.FC = () => {
   const [profileImage, setProfileImage] = useState<string>('');
   const [isUploadingImg, setIsUploadingImg] = useState(false);
   const [formTab, setFormTab] = useState<'general' | 'professional' | 'emergency' | 'bank_tax'>('general');
+  const [isSyncingMS, setIsSyncingMS] = useState(false);
 
   // Filters & Pagination State
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDeptId, setSelectedDeptId] = useState('All');
-  const [selectedDesigId, setSelectedDesigId] = useState('All');
-  const [selectedStatus, setSelectedStatus] = useState('Active');
+  const [selectedStatus, setSelectedStatus] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Derived: are any filters active?
+  const hasActiveFilters = searchQuery !== '' || selectedDeptId !== 'All' || selectedStatus !== 'All';
+
+  const clearFilters = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    setSelectedDeptId('All');
+    setSelectedStatus('All');
+    setCurrentPage(1);
+  };
 
   const navigate = useNavigate();
   const { addToast } = useNotificationStore();
@@ -131,16 +143,16 @@ export const EmployeesPage: React.FC = () => {
 
   // Fetch employees with pagination, search, and filters
   const { data: employeesData, isLoading } = useQuery({
-    queryKey: ['employees', searchQuery, selectedDeptId, selectedDesigId, selectedStatus, currentPage],
+    queryKey: ['employees', searchQuery, selectedDeptId, selectedStatus, currentPage],
     queryFn: () =>
       employeeApi.getAll({
         search: searchQuery || undefined,
         departmentId: selectedDeptId !== 'All' ? selectedDeptId : undefined,
-        designationId: selectedDesigId !== 'All' ? selectedDesigId : undefined,
         isActive: selectedStatus === 'Active' ? 'true' : selectedStatus === 'Inactive' ? 'false' : undefined,
         page: currentPage,
         limit: itemsPerPage,
       }),
+    staleTime: 10000,
   });
 
   const employees = employeesData?.employees || [];
@@ -163,10 +175,12 @@ export const EmployeesPage: React.FC = () => {
   // Filter designations for the selected department
   const filteredDesignations = useMemo(() => {
     if (!selectedDeptIdWatch) return [];
-    return designations.filter(
-      (d: any) =>
-        (d.departmentId?._id || d.departmentId) === selectedDeptIdWatch && d.isActive
-    );
+    return designations.filter((d: any) => {
+      const deptId = typeof d.departmentId === 'object' && d.departmentId !== null
+        ? d.departmentId._id
+        : d.departmentId;
+      return deptId === selectedDeptIdWatch && d.isActive;
+    });
   }, [selectedDeptIdWatch, designations]);
 
   // Autocomplete designation choice if department changes
@@ -213,7 +227,7 @@ export const EmployeesPage: React.FC = () => {
       const targetDesig = designations.find((d) => d._id === values.designationId);
 
       const data = {
-        employeeCode: values.employeeCode,
+        employeeCode: values.employeeCode || `TEMP-EMP-${values.email}`,
         fullName: values.fullName,
         email: values.email,
         password: values.password || 'EthicSec@2026',
@@ -290,7 +304,7 @@ export const EmployeesPage: React.FC = () => {
     setEditingId(emp._id);
     setProfileImage(emp.profileImage || '');
     setValue('id', emp._id);
-    setValue('employeeCode', emp.employeeCode);
+    setValue('employeeCode', emp.employeeCode?.startsWith('TEMP-EMP-') ? '' : emp.employeeCode);
     setValue('fullName', emp.fullName);
     setValue('email', emp.email);
     setValue('password', '');
@@ -346,6 +360,28 @@ export const EmployeesPage: React.FC = () => {
     setShowModal(true);
   };
 
+  const handleSyncMicrosoft = async () => {
+    if (!window.confirm('Are you sure you want to sync employees from your Microsoft Directory? This will auto-provision or update accounts for users with @ethicsecur.co.in corporate email.')) {
+      return;
+    }
+
+    setIsSyncingMS(true);
+    try {
+      const result = await employeeApi.syncMicrosoft();
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      addToast(
+        'Directory Synced',
+        `Microsoft sync complete! Onboarded: ${result.createdCount} | Updated: ${result.updatedCount}. (Filtered to @ethicsecur.co.in domain)`,
+        'success'
+      );
+    } catch (error: any) {
+      console.error('Failed to sync employees:', error);
+      addToast('Sync Failed', error.response?.data?.message || error.message || 'Failed to sync with Microsoft SSO.', 'error');
+    } finally {
+      setIsSyncingMS(false);
+    }
+  };
+
   const columns = [
     {
       header: 'Employee',
@@ -371,7 +407,7 @@ export const EmployeesPage: React.FC = () => {
               {row.fullName}
             </p>
             <p className="text-[10px] text-muted-foreground font-mono group-hover:text-foreground transition-colors">
-              {row.employeeCode} | {row.email}
+              {row.employeeCode && !row.employeeCode.startsWith('TEMP-EMP-') ? `${row.employeeCode} | ` : ''}{row.email}
             </p>
           </div>
         </div>
@@ -451,41 +487,84 @@ export const EmployeesPage: React.FC = () => {
     <div className="space-y-6 text-left animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold text-foreground tracking-tight">Employee Directory</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Employee Directory</h2>
+            <span className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold font-mono">
+              {hasActiveFilters ? `${totalEmployees} result${totalEmployees !== 1 ? 's' : ''}` : `${totalEmployees} employee${totalEmployees !== 1 ? 's' : ''}`}
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Manage company workforce, dynamic organization structures, bank details, and profiles.
+            {hasActiveFilters
+              ? 'Showing filtered results — click ✕ Clear Filters to reset.'
+              : 'Manage company workforce, organization structures, bank details, and profiles.'}
           </p>
         </div>
         {hasPermission('EMPLOYEES', 'create') && (
-          <Button onClick={handleAddNew} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
-            <PlusCircle className="w-5 h-5 mr-2" />
-            ONBOARD EMPLOYEE
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={handleSyncMicrosoft}
+              disabled={isSyncingMS}
+              className="bg-muted hover:bg-muted/80 text-foreground font-bold tracking-wider shadow-lg flex items-center border border-border"
+            >
+              {isSyncingMS ? (
+                <Loader2 className="w-5 h-5 mr-2 animate-spin text-primary" />
+              ) : (
+                <Sparkles className="w-5 h-5 mr-2 text-primary" />
+              )}
+              {isSyncingMS ? 'SYNCING...' : 'SYNC MICROSOFT'}
+            </Button>
+            <Button onClick={handleAddNew} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
+              <PlusCircle className="w-5 h-5 mr-2" />
+              ONBOARD EMPLOYEE
+            </Button>
+          </div>
         )}
       </div>
 
       <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6">
         {/* Advanced Filter Bar */}
         <div className="flex flex-col xl:flex-row items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
-          <div className="flex-1 w-full">
+          <div className="flex-1 w-full flex items-center gap-2">
             <Input
               placeholder="Search employees by name, code, or email..."
-              value={searchQuery}
+              value={searchInput}
+              icon={<Search className="w-4 h-4 text-muted-foreground" />}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
+                setSearchInput(e.target.value);
+                // Automatically clear filter if user clears search text completely
+                if (e.target.value === '') {
+                  setSearchQuery('');
+                  setCurrentPage(1);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setSearchQuery(searchInput);
+                  setCurrentPage(1);
+                }
               }}
             />
+            <Button
+              type="button"
+              onClick={() => {
+                setSearchQuery(searchInput);
+                setCurrentPage(1);
+              }}
+              className="bg-primary hover:bg-primary/90 text-white font-bold h-10 px-4 flex items-center gap-1.5 shadow-md shadow-primary/10"
+            >
+              <Search className="w-4 h-4" />
+              SEARCH
+            </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full xl:w-auto flex-shrink-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full xl:w-auto flex-shrink-0">
             <select
               value={selectedDeptId}
               onChange={(e) => {
                 setSelectedDeptId(e.target.value);
-                setSelectedDesigId('All');
                 setCurrentPage(1);
               }}
-              className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
+              className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors"
             >
               <option value="All">All Departments</option>
               {departments.map((dept: any) => (
@@ -496,40 +575,31 @@ export const EmployeesPage: React.FC = () => {
             </select>
 
             <select
-              value={selectedDesigId}
-              onChange={(e) => {
-                setSelectedDesigId(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-              disabled={selectedDeptId === 'All'}
-            >
-              <option value="All">All Designations</option>
-              {designations
-                .filter((d: any) => (d.departmentId?._id || d.departmentId) === selectedDeptId)
-                .map((desig: any) => (
-                  <option key={desig._id} value={desig._id}>
-                    {desig.name}
-                  </option>
-                ))}
-            </select>
-
-            <select
               value={selectedStatus}
               onChange={(e) => {
                 setSelectedStatus(e.target.value);
                 setCurrentPage(1);
               }}
-              className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
+              className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors"
             >
               <option value="All">All Statuses</option>
               <option value="Active">Active Only</option>
               <option value="Inactive">Inactive Only</option>
             </select>
           </div>
+
+          {/* Clear Filters Button */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex-shrink-0 h-10 px-4 py-2 rounded-lg border border-primary/40 bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider hover:bg-primary/20 transition-colors whitespace-nowrap"
+            >
+              ✕ Clear Filters
+            </button>
+          )}
         </div>
 
-        <TableWrapper columns={columns} data={employees} />
+        <TableWrapper columns={columns} data={employees} rowsPerPage={itemsPerPage} />
 
         {/* Pagination Controls */}
         {totalPages > 1 && (

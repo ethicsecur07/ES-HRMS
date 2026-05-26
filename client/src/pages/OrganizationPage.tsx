@@ -344,7 +344,10 @@ export const OrganizationPage: React.FC = () => {
           </div>
           <div>
             <p className="font-bold text-xs text-foreground">{row.employee.fullName}</p>
-            <p className="text-[10px] text-muted-foreground font-mono">{row.employee.employeeCode} | {row.employee.designation}</p>
+            <p className="text-[10px] text-muted-foreground font-mono">
+              {row.employee.employeeCode && !row.employee.employeeCode.startsWith('TEMP-EMP-') ? `${row.employee.employeeCode} | ` : ''}
+              {row.employee.designation}
+            </p>
           </div>
         </div>
       )
@@ -706,7 +709,9 @@ export const OrganizationPage: React.FC = () => {
             >
               <option value="">-- Choose Employee --</option>
               {employees?.map(emp => (
-                <option key={emp._id} value={emp._id}>{emp.fullName} ({emp.employeeCode})</option>
+                <option key={emp._id} value={emp._id}>
+                  {emp.fullName} {emp.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') ? `(${emp.employeeCode})` : ''}
+                </option>
               ))}
             </select>
           </div>

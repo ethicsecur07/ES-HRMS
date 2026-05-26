@@ -28,13 +28,11 @@ const seedDatabase = async () => {
     try {
         const orgId = new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79000');
         const adminExists = await User_js_1.User.findOne({ email: /official@ethicsecur\.co\.in/i, organizationId: orgId });
-        const empExists = await Employee_js_1.Employee.findOne({ email: 'logapriyan@ethicsec.com', organizationId: orgId });
-        if (adminExists && empExists) {
-            logger_js_1.logger.info('Database already contains enterprise records with permanent Admin, HR, and Employee. Checking/migrating plain-text passwords...');
+        if (adminExists) {
+            logger_js_1.logger.info('Database already seeded. Checking/migrating passwords and cleaning legacy seed data...');
             const usersToVerify = [
                 { email: 'official@ethicsecur.co.in', defaultPass: 'Ethicsecur@2024' },
                 { email: 'oviya@ethicsecur.com', defaultPass: 'Ovi@2003' },
-                { email: 'logapriyan@ethicsec.com', defaultPass: 'EthicSec@2026' },
             ];
             for (const u of usersToVerify) {
                 const userRecord = await User_js_1.User.findOne({ email: u.email, organizationId: orgId }).select('+password');
@@ -44,6 +42,15 @@ const seedDatabase = async () => {
                     await userRecord.save();
                 }
             }
+            // --- One-time cleanup: Remove legacy seeded Logapriyan employee (replaced by Microsoft Sync) ---
+            const legacyEmp = await Employee_js_1.Employee.findOne({ email: 'logapriyan@ethicsec.com', organizationId: orgId });
+            if (legacyEmp) {
+                await User_js_1.User.deleteMany({ employeeId: legacyEmp._id, organizationId: orgId });
+                await Employee_js_1.Employee.deleteOne({ _id: legacyEmp._id });
+                logger_js_1.logger.info('🗑️ Removed legacy seeded employee (Logapriyan M / DEV-001). Employee list is now managed via Microsoft Sync.');
+            }
+            // Also remove the legacy logapriyan user account if orphaned
+            await User_js_1.User.deleteMany({ email: 'logapriyan@ethicsec.com', organizationId: orgId });
             // Ensure Manager and Team Lead exist
             const managerExists = await User_js_1.User.findOne({ email: 'siddharth@ethicsecur.com' });
             if (!managerExists) {
@@ -126,40 +133,15 @@ const seedDatabase = async () => {
         ];
         await LeavePolicy_js_1.LeavePolicy.insertMany(leavePoliciesData);
         logger_js_1.logger.info('✅ Seeded Organization Leave Policies.');
-        // 6. Seed Permanent Enterprise Employee Record
-        const empId = new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79001');
-        const empData = {
-            _id: empId,
-            organizationId: orgId,
-            employeeCode: 'DEV-001',
-            fullName: 'Logapriyan M',
-            email: 'logapriyan@ethicsec.com',
-            phone: '+91 9876543210',
-            department: index_js_1.DEPARTMENTS.DEV,
-            designation: 'Full Stack Engineer',
-            joiningDate: new Date('2026-01-15'),
-            salary: 45000,
-            address: 'Chennai, Tamil Nadu',
-            emergencyContact: {
-                name: 'Ravi M',
-                relationship: 'Father',
-                phone: '+91 9876543211',
-            },
-            leaveBalance: 2,
-            wfhBalance: 1,
-            permissionHoursBalance: 3,
-            isActive: true,
-        };
-        await Employee_js_1.Employee.create(empData);
-        logger_js_1.logger.info('✅ Seeded Permanent Enterprise Employee Record (Logapriyan M).');
-        // 7. Seed Users (Abishek, Oviya & Logapriyan)
+        // Note: Employee records are populated exclusively via Microsoft Directory Sync.
+        // No static employee seed data is inserted — use the 'Sync Microsoft' button in the Employee Directory.
+        // 7. Seed System Users (Admin & HR only — employees come from Microsoft Sync)
         const usersData = [
             { _id: new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79101'), organizationId: orgId, name: 'Abishek', email: 'Official@ethicsecur.co.in', password: await PasswordService_js_1.PasswordService.hashPassword('Ethicsecur@2024'), role: index_js_1.ROLES.ADMIN, isActive: true },
             { _id: new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79202'), organizationId: orgId, name: 'Oviya', email: 'oviya@ethicsecur.com', password: await PasswordService_js_1.PasswordService.hashPassword('Ovi@2003'), role: index_js_1.ROLES.HR, isActive: true },
-            { _id: new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79303'), organizationId: orgId, name: 'Logapriyan M', email: 'logapriyan@ethicsec.com', password: await PasswordService_js_1.PasswordService.hashPassword('EthicSec@2026'), role: index_js_1.ROLES.EMPLOYEE, employeeId: empId, isActive: true },
         ];
         const createdUsers = await User_js_1.User.insertMany(usersData);
-        logger_js_1.logger.info(`✅ Seeded ${createdUsers.length} Enterprise Users (Admin, HR & Employee).`);
+        logger_js_1.logger.info(`✅ Seeded ${createdUsers.length} System Users (Admin & HR). Employees will be synced from Microsoft Directory.`);
         await (0, exports.syncRolePermissions)(orgId);
         logger_js_1.logger.info('🚀 Database Seeding Completed Successfully! Enterprise HRMS is ready with clean state.');
     }

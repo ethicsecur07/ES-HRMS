@@ -26,11 +26,13 @@ export const getEmployees = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    const { search, department, designation, branchId, isActive, page, limit, sortBy, sortOrder } = req.query;
+    const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder } = req.query;
     const result = await EmployeeService.getEmployees(orgId, {
       search: search as string,
       department: department as string,
       designation: designation as string,
+      departmentId: departmentId as string,
+      designationId: designationId as string,
       branchId: branchId as string,
       isActive: isActive as string,
       page: page as string,
@@ -156,5 +158,22 @@ export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<v
     res.status(200).json({ message: 'Employee record soft-deleted and user account revoked successfully' });
   } catch (error: any) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+export const syncMicrosoftEmployees = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const orgId = req.user?.organizationId;
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
+      return;
+    }
+
+    const emailForAudit = req.user?.email || 'System';
+    const result = await EmployeeService.syncMicrosoftEmployees(orgId, emailForAudit);
+    
+    res.status(200).json(result);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
 };

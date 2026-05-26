@@ -99,6 +99,11 @@ const handleSSOCallback = async (req, res) => {
             res.status(400).json({ success: false, message: 'No email returned from identity provider' });
             return;
         }
+        // Restrict Microsoft SSO login exclusively to @ethicsecur.co.in domain
+        if (providerType === 'MICROSOFT' && !authResult.profile.email.toLowerCase().endsWith('@ethicsecur.co.in')) {
+            res.status(403).json({ success: false, message: 'Access denied. Only @ethicsecur.co.in corporate accounts are authorized.' });
+            return;
+        }
         const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
         const userAgent = req.headers['user-agent'] || '';
         // Risk assessment
