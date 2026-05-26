@@ -7,8 +7,6 @@ import { AuthRequest } from '../types/index.js';
 import { ReimbursementPolicy } from '../models/payroll/ReimbursementPolicy.js';
 import { Role } from '../models/Role.js';
 import { Employee } from '../models/Employee.js';
-import { WorkflowRunner } from '../domains/workflow-engine/WorkflowRunner.js';
-import { WorkflowInstance } from '../models/WorkflowInstance.js';
 
 // --- REIMBURSEMENT CLAIMS ---
 
@@ -99,14 +97,6 @@ export const createReimbursement = async (req: AuthRequest, res: Response, next:
 
     await claim.save();
 
-    // Trigger Workflow if active template exists
-    await WorkflowRunner.triggerWorkflow(
-      orgId!.toString(),
-      'EXPENSE_CLAIM',
-      'ReimbursementClaim',
-      claim.id
-    );
-
     res.status(201).json(claim);
   } catch (err) {
     next(err);
@@ -142,21 +132,6 @@ export const approveReimbursement = async (req: AuthRequest, res: Response, next
     const claim = await ReimbursementClaim.findOne({ _id: id, organizationId: orgId });
     if (!claim) {
       res.status(404).json({ message: 'Reimbursement claim not found.' });
-      return;
-    }
-
-    // Block manual status updates if an active workflow is monitoring this reimbursement claim.
-    const activeWorkflow = await WorkflowInstance.findOne({
-      organizationId: orgId,
-      refModel: 'ReimbursementClaim',
-      refId: id,
-      status: 'ACTIVE'
-    });
-
-    if (activeWorkflow) {
-      res.status(400).json({
-        message: 'Cannot manually approve/reject this claim. An active workflow is monitoring its status.'
-      });
       return;
     }
 
@@ -227,14 +202,6 @@ export const createTaxDeclaration = async (req: AuthRequest, res: Response, next
 
     await declaration.save();
 
-    // Trigger Workflow if active template exists
-    await WorkflowRunner.triggerWorkflow(
-      orgId!.toString(),
-      'TAX_DECLARATION',
-      'TaxDeclaration',
-      declaration.id
-    );
-
     res.status(201).json(declaration);
   } catch (err) {
     next(err);
@@ -255,21 +222,6 @@ export const approveTaxDeclaration = async (req: AuthRequest, res: Response, nex
     const declaration = await TaxDeclaration.findOne({ _id: id, organizationId: orgId });
     if (!declaration) {
       res.status(404).json({ message: 'Tax declaration not found.' });
-      return;
-    }
-
-    // Block manual status updates if an active workflow is monitoring this tax declaration.
-    const activeWorkflow = await WorkflowInstance.findOne({
-      organizationId: orgId,
-      refModel: 'TaxDeclaration',
-      refId: id,
-      status: 'ACTIVE'
-    });
-
-    if (activeWorkflow) {
-      res.status(400).json({
-        message: 'Cannot manually approve/reject this tax declaration. An active workflow is monitoring its status.'
-      });
       return;
     }
 
@@ -340,14 +292,6 @@ export const createAttendanceCorrection = async (req: AuthRequest, res: Response
 
     await request.save();
 
-    // Trigger Workflow if active template exists
-    await WorkflowRunner.triggerWorkflow(
-      orgId!.toString(),
-      'ATTENDANCE_CORRECTION',
-      'AttendanceCorrectionRequest',
-      request.id
-    );
-
     res.status(201).json(request);
   } catch (err) {
     next(err);
@@ -372,23 +316,6 @@ export const approveAttendanceCorrection = async (req: AuthRequest, res: Respons
     const request = await AttendanceCorrectionRequest.findOne({ _id: id, organizationId: orgId }).session(session);
     if (!request) {
       res.status(404).json({ message: 'Attendance correction request not found.' });
-      await session.abortTransaction();
-      session.endSession();
-      return;
-    }
-
-    // Block manual status updates if an active workflow is monitoring this attendance correction request.
-    const activeWorkflow = await WorkflowInstance.findOne({
-      organizationId: orgId,
-      refModel: 'AttendanceCorrectionRequest',
-      refId: id,
-      status: 'ACTIVE'
-    }).session(session);
-
-    if (activeWorkflow) {
-      res.status(400).json({
-        message: 'Cannot manually approve/reject this request. An active workflow is monitoring its status.'
-      });
       await session.abortTransaction();
       session.endSession();
       return;

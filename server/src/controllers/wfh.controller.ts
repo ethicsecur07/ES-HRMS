@@ -21,8 +21,6 @@ import { getIO } from '../sockets/socketHandler.js';
 import { AuthRequest } from '../types/index.js';
 import { LeaveBalanceService } from '../domains/leave-engine/services/LeaveBalanceService.js';
 import { logger } from '../utils/logger.js';
-import { WorkflowRunner } from '../domains/workflow-engine/WorkflowRunner.js';
-import { WorkflowInstance } from '../models/WorkflowInstance.js';
 
 async function resolveEmployeeId(req: AuthRequest): Promise<string | null> {
   if (!req.user) return null;
@@ -116,14 +114,6 @@ export const applyWFH = async (req: AuthRequest, res: Response): Promise<void> =
       expectedTasks,
       status: 'PENDING',
     });
-
-    // Trigger Workflow if active template exists
-    await WorkflowRunner.triggerWorkflow(
-      orgId.toString(),
-      'WFH_REQUEST',
-      'Leave',
-      wfh.id
-    );
 
     await createAuditLog(
       'WFH_APPLY',
@@ -223,21 +213,6 @@ export const updateWFHStatus = async (req: AuthRequest, res: Response): Promise<
 
     if (wfh.status !== 'PENDING') {
       res.status(400).json({ message: `Cannot update a WFH request that is already ${wfh.status}.` });
-      return;
-    }
-
-    // Block manual status updates if an active workflow is monitoring the WFH request.
-    const activeWorkflow = await WorkflowInstance.findOne({
-      organizationId: orgId,
-      refModel: 'Leave',
-      refId: id,
-      status: 'ACTIVE'
-    });
-
-    if (activeWorkflow) {
-      res.status(400).json({
-        message: 'Cannot manually update this WFH request. An active workflow is monitoring its status.'
-      });
       return;
     }
 

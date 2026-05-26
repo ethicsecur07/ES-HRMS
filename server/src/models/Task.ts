@@ -16,6 +16,16 @@ export interface ITask extends Document {
   dependencies: mongoose.Types.ObjectId[];
   storyPoints: number;
   actualHours: number;
+  tags?: string[];
+  checklist?: { label: string; done: boolean }[];
+  attachments?: { filename: string; url: string; fileType?: string; uploadedByName: string; uploadedAt: string }[];
+  reworkCount: number;
+  reworkComments?: { comment: string; by: string; byName: string; at: string }[];
+  reviewNotes?: string;
+  completionNotes?: string;
+  progressSummary?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +56,36 @@ const taskSchema = new Schema<ITask>(
     dependencies: [{ type: Schema.Types.ObjectId, ref: 'Task' }],
     storyPoints: { type: Number, default: 0 },
     actualHours: { type: Number, default: 0 },
+    tags: [{ type: String }],
+    checklist: [
+      {
+        label: { type: String, required: true },
+        done: { type: Boolean, default: false },
+      },
+    ],
+    attachments: [
+      {
+        filename: { type: String, required: true },
+        url: { type: String, required: true },
+        fileType: { type: String },
+        uploadedByName: { type: String, required: true },
+        uploadedAt: { type: String, required: true },
+      },
+    ],
+    reworkCount: { type: Number, default: 0 },
+    reworkComments: [
+      {
+        comment: { type: String, required: true },
+        by: { type: String, required: true },
+        byName: { type: String, required: true },
+        at: { type: String, required: true },
+      },
+    ],
+    reviewNotes: { type: String },
+    completionNotes: { type: String },
+    progressSummary: { type: String },
+    submittedAt: { type: String },
+    reviewedAt: { type: String },
   },
   { timestamps: true }
 );

@@ -10,6 +10,7 @@ export interface SSOUserProfile {
   lastName?: string;
   avatar?: string;
   groups?: string[];
+  roles?: string[];
   department?: string;
   raw: Record<string, any>; // raw profile from provider
 }

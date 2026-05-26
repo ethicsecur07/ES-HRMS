@@ -13,10 +13,8 @@ import { FinanceManagementChart } from '../Components/SpecifiedComponents/AdminA
 import { HolidayEnhancedCalendar } from '../Components/SpecifiedComponents/HolidayEnhancedCalendar';
 import { EmployeeTaskSummary } from '../Components/SpecifiedComponents/EmployeeTaskSummary';
 import { Card } from '../Components/WrapperComponents/Card';
-import { Button } from '../Components/WrapperComponents/Button';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import type { TaskReport } from '../types';
-import { PlusCircle } from 'lucide-react';
 import { LeaveApplyModal } from '../Components/SpecifiedComponents/LeaveApplyModal';
 import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
@@ -92,27 +90,8 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-8 text-left animate-in fade-in duration-300">
-      {/* Dynamic Header Banner */}
-      {role === 'EMPLOYEE' && (
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-card to-muted border border-border shadow-sm">
-          <div>
-            <h2 className="text-3xl font-extrabold text-foreground tracking-tight">
-              Employee Workspace
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1 font-medium">
-              Daily attendance check-in, leave balances, and mandatory task reporting
-            </p>
-          </div>
-
-          <Button
-            onClick={() => setShowLeaveModal(true)}
-            className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all scale-105"
-          >
-            <PlusCircle className="w-5 h-5 mr-2" />
-            APPLY LEAVE / WFH
-          </Button>
-        </div>
-      )}
+      
+      
 
       {/* 1. EMPLOYEE DASHBOARD */}
       {role === 'EMPLOYEE' && (
@@ -147,10 +126,7 @@ export const DashboardPage: React.FC = () => {
       {/* 2. MANAGER DASHBOARD */}
       {role === 'MANAGER' && (
         <div className="space-y-8">
-          <div className="p-6 rounded-2xl bg-card border border-border shadow-sm">
-            <h3 className="text-xl font-bold">Manager Workspace</h3>
-            <p className="text-sm text-muted-foreground">Oversee department performance and team tasks.</p>
-          </div>
+         
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <Card className="space-y-4 border-l-4 border-l-primary shadow-md p-6 bg-card">
@@ -181,10 +157,7 @@ export const DashboardPage: React.FC = () => {
       {/* 3. HR DASHBOARD */}
       {role === 'HR' && (
         <div className="space-y-8">
-          <div className="p-6 rounded-2xl bg-card border border-border shadow-sm">
-            <h3 className="text-xl font-bold">HR Workspace</h3>
-            <p className="text-sm text-muted-foreground">Manage organization policies, recruitment, and approvals.</p>
-          </div>
+         
           <AdminAnalyticsCharts stats={stats} />
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

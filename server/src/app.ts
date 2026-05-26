@@ -11,7 +11,6 @@ import leaveRoutes from './routes/leave.routes.js';
 import wfhRoutes from './routes/wfh.routes.js';
 import payrollRoutes from './routes/payroll.routes.js';
 import v2PayrollRoutes from './domains/payroll-engine/payroll.routes.js';
-import v2WorkflowRoutes from './domains/workflow-engine/workflow.routes.js';
 import v2LeaveRoutes from './domains/leave-engine/leavev2.routes.js';
 
 import { securityHeaders, secureMiddleware } from './middlewares/helmetEnhancements.js';
@@ -105,7 +104,6 @@ app.use('/metrics', metricsMiddleware);
   app.use('/api/analytics', analyticsRoutes);
   app.use('/api/permissions', permissionRoutes);
   app.use('/api/tasks', taskRoutes);
-  app.use('/api/v2/workflows', v2WorkflowRoutes); // Workflow Engine
   app.use('/api/v2/auth', v2AuthRoutes); // Enterprise Auth & SSO Engine
   app.use('/api/v2/leave', v2LeaveRoutes); // Enterprise Leave Engine V2
   app.use('/api/finance', financeRoutes);

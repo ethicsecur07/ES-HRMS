@@ -7,6 +7,6 @@ const router = (0, express_1.Router)();
 router.use(auth_middleware_js_1.authenticate);
 router.post('/', expense_controller_js_1.createExpense);
 router.get('/', expense_controller_js_1.getExpenses);
-router.post('/workflow/:id/approve', expense_controller_js_1.approveExpense);
-router.post('/workflow/:id/reject', expense_controller_js_1.rejectExpense);
+router.post('/:id/approve', expense_controller_js_1.approveExpense);
+router.post('/:id/reject', expense_controller_js_1.rejectExpense);
 exports.default = router;

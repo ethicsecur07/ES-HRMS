@@ -9,7 +9,18 @@ import { Button } from '../WrapperComponents/Button';
 import { Modal } from '../WrapperComponents/Modal';
 import { Input } from '../WrapperComponents/Input';
 import { TaskReportForm } from './TaskReportForm';
-import { Clock, CheckCircle2, ShieldCheck, MapPin, Compass, AlertOctagon, Info } from 'lucide-react';
+import { Clock, CheckCircle2, MapPin, Compass, AlertOctagon, Info } from 'lucide-react';
+
+const formatElapsedTime = (ms: number): string => {
+  if (ms < 0) ms = 0;
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((v) => (v < 10 ? '0' + v : v))
+    .join(':');
+};
 
 export const AttendanceCheckIn: React.FC = () => {
   const { user } = useAuthStore();
@@ -55,6 +66,10 @@ export const AttendanceCheckIn: React.FC = () => {
         typeof a.employeeId === 'object' &&
         (a.employeeId._id === user?.employeeId || a.employeeId._id === user?._id))
   );
+
+  const isCheckedIn = myAttendance && !myAttendance.logoutTime;
+  const elapsedMs = isCheckedIn ? currentTime.getTime() - new Date(myAttendance.loginTime).getTime() : 0;
+  const elapsedStr = formatElapsedTime(elapsedMs);
 
   const checkInMutation = useMutation({
     mutationFn: (override?: string) =>
@@ -183,7 +198,9 @@ export const AttendanceCheckIn: React.FC = () => {
         <div className="space-y-3 text-left">
           <div>
             <h2 className="text-3xl font-extrabold text-foreground tracking-tight">
-              {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              {isCheckedIn
+                ? elapsedStr
+                : currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </h2>
             <p className="text-sm font-medium text-muted-foreground mt-0.5">
               {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -191,12 +208,7 @@ export const AttendanceCheckIn: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap gap-4 items-center pt-2">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-primary" />
-              <span className="text-xs font-semibold text-foreground tracking-wide">
-                Device: <span className="text-muted-foreground font-normal">{navigator.userAgent.slice(0, 40)}...</span>
-              </span>
-            </div>
+           
             {attendanceSettings?.fences && attendanceSettings.fences.length > 0 && (
               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-black uppercase tracking-wider text-primary">
                 <MapPin className="w-3.5 h-3.5" /> Geofencing Active

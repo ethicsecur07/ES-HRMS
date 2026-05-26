@@ -272,7 +272,7 @@ export const RecruitmentPage: React.FC = () => {
         onClose={() => setShowAddModal(false)}
         title="Add New Candidate"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 px-2">
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="First Name *"

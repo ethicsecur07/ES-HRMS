@@ -158,21 +158,54 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       organizationId: org._id,
     });
 
-    if (!user && provider.autoProvision) {
+    // Map role from Azure AD App Roles if available
+    let resolvedRole: string | null = null;
+    if (authResult.profile.roles && authResult.profile.roles.length > 0) {
+      const rolesUpper = authResult.profile.roles.map((r: string) => r.toUpperCase());
+      if (rolesUpper.includes('ADMIN')) resolvedRole = 'ADMIN';
+      else if (rolesUpper.includes('HR')) resolvedRole = 'HR';
+      else if (rolesUpper.includes('MANAGER')) resolvedRole = 'MANAGER';
+      else if (rolesUpper.includes('TEAM_LEAD') || rolesUpper.includes('TEAMLEAD')) resolvedRole = 'TEAM_LEAD';
+      else if (rolesUpper.includes('EMPLOYEE')) resolvedRole = 'EMPLOYEE';
+    }
+
+    if (user) {
+      // Dynamic updates on login
+      user.name = authResult.profile.name || user.name;
+      if (resolvedRole) {
+        user.role = resolvedRole as any;
+      }
+      if (authResult.profile.avatar) {
+        user.profileImage = authResult.profile.avatar;
+      }
+      user.ssoData = {
+        provider: providerType,
+        azureRoles: authResult.profile.roles || [],
+        mappedRole: resolvedRole || undefined,
+        lastSyncedAt: new Date()
+      };
+      await user.save();
+    } else if (provider.autoProvision) {
       user = await User.create({
         organizationId: org._id,
         name: authResult.profile.name,
         email: authResult.profile.email,
-        role: provider.defaultRoleCode || 'EMPLOYEE',
+        role: (resolvedRole || provider.defaultRoleCode || 'EMPLOYEE') as any,
         isActive: true,
         profileImage: authResult.profile.avatar,
+        ssoData: {
+          provider: providerType,
+          azureRoles: authResult.profile.roles || [],
+          mappedRole: resolvedRole || undefined,
+          lastSyncedAt: new Date()
+        }
       });
       await createAuditLog(
         'USER_AUTO_PROVISIONED',
         `${user.name} via ${providerType} SSO`,
         'AUTH',
         'User Account',
-        `Auto-provisioned from ${providerType}`,
+        `Auto-provisioned from ${providerType} with role ${user.role}`,
         org._id
       );
     }

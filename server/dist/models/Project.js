@@ -58,6 +58,17 @@ const projectSchema = new mongoose_1.Schema({
             status: { type: String, enum: ['PENDING', 'COMPLETED'], default: 'PENDING' },
         },
     ],
+    projectType: {
+        type: String,
+        default: 'General',
+    },
+    priority: {
+        type: String,
+        enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+        default: 'MEDIUM',
+    },
+    teamLeadId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' },
+    tags: [{ type: String }],
 }, { timestamps: true });
 projectSchema.index({ organizationId: 1, name: 1 }, { unique: true });
 exports.Project = mongoose_1.default.model('Project', projectSchema);

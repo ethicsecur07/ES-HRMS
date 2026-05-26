@@ -15,6 +15,12 @@ export interface User {
   lastLogin?: string;
   createdAt?: string;
   updatedAt?: string;
+  ssoData?: {
+    provider: string;
+    azureRoles: string[];
+    mappedRole?: string;
+    lastSyncedAt: string;
+  };
 }
 
 export interface EmergencyContact {

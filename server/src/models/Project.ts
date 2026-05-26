@@ -1,12 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface ISprint {
-  name: string;
-  startDate: string;
-  endDate: string;
-  status: 'PLANNING' | 'ACTIVE' | 'COMPLETED';
-}
-
 export interface IProject extends Document {
   organizationId: mongoose.Types.ObjectId;
   name: string;
@@ -24,6 +17,10 @@ export interface IProject extends Document {
     dueDate: string;
     status: 'PENDING' | 'COMPLETED';
   }[];
+  projectType: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  teamLeadId?: mongoose.Types.ObjectId;
+  tags?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +49,17 @@ const projectSchema = new Schema<IProject>(
         status: { type: String, enum: ['PENDING', 'COMPLETED'], default: 'PENDING' },
       },
     ],
+    projectType: {
+      type: String,
+      default: 'General',
+    },
+    priority: {
+      type: String,
+      enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+      default: 'MEDIUM',
+    },
+    teamLeadId: { type: Schema.Types.ObjectId, ref: 'User' },
+    tags: [{ type: String }],
   },
   { timestamps: true }
 );
