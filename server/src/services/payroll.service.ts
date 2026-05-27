@@ -8,6 +8,7 @@ import { Expense } from '../models/Expense.js';
 import { SalaryStructure } from '../models/payroll/SalaryStructure.js';
 import { SalaryComponent } from '../models/payroll/SalaryComponent.js';
 import { TaxSlab } from '../models/payroll/TaxSlab.js';
+import { PayrollConfig, DEFAULT_PAYROLL_CONFIG } from '../models/payroll/PayrollConfig.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -126,6 +127,118 @@ async function getReimbursements(
   return expenses.reduce((sum, exp) => sum + exp.amount, 0);
 }
 
+/**
+ * Calculate payroll using PayrollConfig (CTC breakup approach).
+ * Uses the org-level payroll configuration for percentage-based CTC splitting.
+ */
+async function calculateWithPayrollConfig(
+  emp: any,
+  config: any,
+  organizationId: string,
+  month: string
+) {
+  const ctcMonthly = emp.salary || 0;
+  const ctcAnnual = ctcMonthly * 12;
+
+  // Earnings calculation
+  const basic = Math.round(ctcMonthly * config.basicSalaryPercent / 100);
+  const hra = Math.round(basic * config.hraPercent / 100);
+  const conveyance = config.conveyanceMonthly;
+  const performanceIncentive = config.performanceIncentiveMonthly;
+  const otherAllowances = config.otherAllowancesMonthly;
+
+  // Employer contributions (part of CTC, not part of gross)
+  const pfEmployer = Math.round(basic * config.pfEmployerPercent / 100);
+  const gratuity = Math.round(basic * config.gratuityPercent / 100);
+
+  // Gross = CTC/Month - Employer contributions that are part of CTC
+  // Special Allowance fills the gap
+  const grossBeforeSpecial = basic + hra + conveyance + performanceIncentive + otherAllowances;
+
+  // ESI employer (conditional)
+  let esiEmployer = 0;
+  if (config.applyEsiOnlyIfGrossBelow21000) {
+    if (grossBeforeSpecial < 21000) {
+      esiEmployer = Math.round(grossBeforeSpecial * config.esiEmployerPercent / 100);
+    }
+  } else {
+    esiEmployer = Math.round(grossBeforeSpecial * config.esiEmployerPercent / 100);
+  }
+
+  const insurance = config.insuranceMonthly;
+  const totalEmployerContributions = pfEmployer + gratuity + esiEmployer + insurance;
+
+  // Special allowance = CTC/Month - all explicit components - employer contributions
+  const specialAllowance = Math.max(0, Math.round(ctcMonthly - grossBeforeSpecial - totalEmployerContributions));
+  const grossPay = grossBeforeSpecial + specialAllowance;
+
+  // Deductions (from employee)
+  const pfEmployee = Math.round(basic * config.pfEmployeePercent / 100);
+  const professionalTax = config.professionalTaxMonthly;
+  const tds = config.incomeTaxTdsMonthly;
+  const totalDeductions = pfEmployee + professionalTax + tds;
+
+  // Net Pay
+  const netPay = Math.round(grossPay - totalDeductions);
+
+  // Leave deductions
+  const dailyRate = grossPay / 30;
+  const { deductionAmount: leaveDeductions } = await calculateLeaveDeductions(
+    emp._id.toString(),
+    organizationId,
+    month,
+    dailyRate
+  );
+
+  // Overtime
+  const hourlyRate = dailyRate / 8;
+  const overtimePay = await calculateOvertime(emp._id.toString(), organizationId, month, hourlyRate);
+
+  // Reimbursements
+  const reimbursements = await getReimbursements(emp._id.toString(), organizationId, month);
+
+  const finalNetPay = Math.max(0, Math.round(netPay - leaveDeductions + overtimePay + reimbursements));
+  const finalTotalDeductions = totalDeductions + leaveDeductions;
+
+  return {
+    ctcAnnual,
+    grossPay,
+    baseSalary: basic,
+    overtime: overtimePay,
+    bonus: 0,
+    reimbursements,
+    tax: tds,
+    leaveDeductions,
+    deductions: finalTotalDeductions,
+    finalSalary: finalNetPay,
+    // Payslip details
+    allowances: {
+      basic,
+      hra,
+      conveyance,
+      medical: 0,
+      bonus: 0,
+      overtime: overtimePay,
+      specialAllowance,
+      performanceIncentive,
+    },
+    deductionsBreakdown: {
+      professionalTax,
+      providentFund: pfEmployee,
+      leaveDeductions,
+      latePenalties: 0,
+      tax: 0,
+      tds,
+    },
+    employerContributions: {
+      pfEmployer,
+      gratuity,
+      esi: esiEmployer,
+      insurance,
+    },
+  };
+}
+
 export const calculateMonthlyPayroll = async (
   month: string,
   organizationId: string
@@ -136,114 +249,78 @@ export const calculateMonthlyPayroll = async (
     }
 
     const employees = await Employee.find({ isActive: true, organizationId });
+
+    // Fetch org default payroll config
+    let defaultConfig = await PayrollConfig.findOne({ organizationId, employeeId: null });
+    const defaultConfigValues = defaultConfig ? defaultConfig.toObject() : { ...DEFAULT_PAYROLL_CONFIG };
+
     const generatedPayrolls = [];
 
-    // Pre-fetch all components for fast lookup
+    // Pre-fetch all components for SalaryStructure-based fallback
     const allComponents = await SalaryComponent.find({ organizationId, isActive: true });
     const componentMap = new Map(allComponents.map(c => [c._id.toString(), c]));
 
     for (const emp of employees) {
-      // 1. Fetch Salary Structure
+      // Check if employee has an active SalaryStructure
       const structure = await SalaryStructure.findOne({
         employeeId: emp._id,
         status: 'ACTIVE'
       });
 
-      const baseSalary = structure ? structure.baseSalary : emp.salary;
-      const dailyRate = baseSalary / 30;
-      const hourlyRate = dailyRate / 8;
-
-      let allowancesTotal = 0;
-      let deductionsTotal = 0;
-
-      const allowances: any = { basic: baseSalary, hra: 0, conveyance: 0, medical: 0, bonus: 0, overtime: 0 };
-      const deductions: any = { professionalTax: 0, providentFund: 0, leaveDeductions: 0, latePenalties: 0, tax: 0 };
+      let payrollData: any;
 
       if (structure) {
-        for (const strComp of structure.components) {
-          const compInfo = componentMap.get(strComp.componentId.toString());
-          if (compInfo) {
-            let amount = 0;
-            if (compInfo.calculationType === 'FIXED' && strComp.fixedValue) {
-              amount = strComp.fixedValue;
-            } else if (compInfo.calculationType === 'FORMULA' && compInfo.formula) {
-              // Basic formula evaluation: e.g. "Basic * 0.4". Replace "Basic" with baseSalary
-              try {
-                const formulaStr = compInfo.formula.replace(/Basic/gi, baseSalary.toString());
-                // Safe eval using Function
-                amount = new Function(`return ${formulaStr}`)();
-              } catch (e) {
-                logger.warn(`Failed to evaluate formula ${compInfo.formula} for component ${compInfo.name}`);
-              }
-            }
+        // Use legacy SalaryStructure-based calculation
+        payrollData = await calculateWithSalaryStructure(
+          emp, structure, componentMap, organizationId, month
+        );
+      } else {
+        // Check if employee has a custom payroll config
+        const empConfig = await PayrollConfig.findOne({ organizationId, employeeId: emp._id });
+        const finalConfigValues = empConfig ? empConfig.toObject() : defaultConfigValues;
 
-            if (compInfo.type === 'EARNING') allowancesTotal += amount;
-            if (compInfo.type === 'DEDUCTION' || compInfo.type === 'CONTRIBUTION') deductionsTotal += amount;
-
-            // Map to common fields for payslip if they match
-            const nameLower = compInfo.name.toLowerCase();
-            if (nameLower.includes('hra')) allowances.hra += amount;
-            else if (nameLower.includes('conveyance')) allowances.conveyance += amount;
-            else if (nameLower.includes('medical')) allowances.medical += amount;
-            else if (nameLower.includes('pf') || nameLower.includes('provident')) deductions.providentFund += amount;
-            else if (nameLower.includes('professional')) deductions.professionalTax += amount;
-          }
-        }
+        // Use PayrollConfig-based CTC breakup calculation
+        payrollData = await calculateWithPayrollConfig(
+          emp, finalConfigValues, organizationId, month
+        );
       }
 
-      // 2. Overtime
-      const overtimePay = await calculateOvertime(emp._id.toString(), organizationId, month, hourlyRate);
-      allowances.overtime = overtimePay;
-
-      // 3. Leave Deductions
-      const { deductionAmount: leaveDeductions } = await calculateLeaveDeductions(
-        emp._id.toString(),
-        organizationId,
-        month,
-        dailyRate
-      );
-      deductions.leaveDeductions = leaveDeductions;
-      
-      // 4. Reimbursements
-      const reimbursements = await getReimbursements(emp._id.toString(), organizationId, month);
-
-      // 5. Tax Calculation
-      // Annualized income = (Base + Allowances) * 12
-      const annualizedIncome = (baseSalary + allowancesTotal) * 12;
-      const tax = await calculateTax(organizationId, annualizedIncome);
-      deductions.tax = tax;
-
-      const totalDeductions = deductionsTotal + leaveDeductions + tax;
-      const finalSalary = Math.round(baseSalary + allowancesTotal + overtimePay + reimbursements - totalDeductions);
-
-      // 6. Generate Payroll Record
+      // Generate Payroll Record
       const payroll = await Payroll.findOneAndUpdate(
         { employeeId: emp._id, month, organizationId },
         {
           organizationId,
-          baseSalary,
-          overtime: overtimePay,
-          bonus: allowances.bonus,
-          reimbursements,
-          tax,
-          leaveDeductions,
-          deductions: totalDeductions,
-          finalSalary,
+          ctcAnnual: payrollData.ctcAnnual || emp.salary || 0,
+          grossPay: payrollData.grossPay || 0,
+          baseSalary: payrollData.baseSalary,
+          overtime: payrollData.overtime,
+          bonus: payrollData.bonus,
+          reimbursements: payrollData.reimbursements,
+          tax: payrollData.tax,
+          leaveDeductions: payrollData.leaveDeductions,
+          deductions: payrollData.deductions,
+          finalSalary: payrollData.finalSalary,
           paidStatus: 'PENDING',
         },
         { upsert: true, new: true }
       );
 
-      // 7. Generate Payslip Record
-      const payslip = await Payslip.findOneAndUpdate(
+      // Generate Payslip Record
+      await Payslip.findOneAndUpdate(
         { employeeId: emp._id, month, organizationId },
         {
           organizationId,
           payrollId: payroll._id,
-          allowances,
-          deductions,
-          reimbursements,
-          netSalary: finalSalary
+          allowances: payrollData.allowances,
+          deductions: payrollData.deductionsBreakdown,
+          employerContributions: payrollData.employerContributions || {
+            pfEmployer: 0,
+            gratuity: 0,
+            esi: 0,
+            insurance: 0,
+          },
+          reimbursements: payrollData.reimbursements,
+          netSalary: payrollData.finalSalary,
         },
         { upsert: true, new: true }
       );
@@ -258,3 +335,97 @@ export const calculateMonthlyPayroll = async (
     throw error;
   }
 };
+
+/**
+ * Legacy SalaryStructure-based calculation (kept for backward compatibility).
+ */
+async function calculateWithSalaryStructure(
+  emp: any,
+  structure: any,
+  componentMap: Map<string, any>,
+  organizationId: string,
+  month: string
+) {
+  const baseSalary = structure.baseSalary;
+  const dailyRate = baseSalary / 30;
+  const hourlyRate = dailyRate / 8;
+
+  let allowancesTotal = 0;
+  let deductionsTotal = 0;
+
+  const allowances: any = { basic: baseSalary, hra: 0, conveyance: 0, medical: 0, bonus: 0, overtime: 0, specialAllowance: 0, performanceIncentive: 0 };
+  const deductions: any = { professionalTax: 0, providentFund: 0, leaveDeductions: 0, latePenalties: 0, tax: 0, tds: 0 };
+
+  for (const strComp of structure.components) {
+    const compInfo = componentMap.get(strComp.componentId.toString());
+    if (compInfo) {
+      let amount = 0;
+      if (compInfo.calculationType === 'FIXED' && strComp.fixedValue) {
+        amount = strComp.fixedValue;
+      } else if (compInfo.calculationType === 'FORMULA' && compInfo.formula) {
+        try {
+          const formulaStr = compInfo.formula.replace(/Basic/gi, baseSalary.toString());
+          amount = new Function(`return ${formulaStr}`)();
+        } catch (e) {
+          logger.warn(`Failed to evaluate formula ${compInfo.formula} for component ${compInfo.name}`);
+        }
+      }
+
+      if (compInfo.type === 'EARNING') allowancesTotal += amount;
+      if (compInfo.type === 'DEDUCTION' || compInfo.type === 'CONTRIBUTION') deductionsTotal += amount;
+
+      const nameLower = compInfo.name.toLowerCase();
+      if (nameLower.includes('hra')) allowances.hra += amount;
+      else if (nameLower.includes('conveyance')) allowances.conveyance += amount;
+      else if (nameLower.includes('medical')) allowances.medical += amount;
+      else if (nameLower.includes('pf') || nameLower.includes('provident')) deductions.providentFund += amount;
+      else if (nameLower.includes('professional')) deductions.professionalTax += amount;
+    }
+  }
+
+  // Overtime
+  const overtimePay = await calculateOvertime(emp._id.toString(), organizationId, month, hourlyRate);
+  allowances.overtime = overtimePay;
+
+  // Leave Deductions
+  const { deductionAmount: leaveDeductions } = await calculateLeaveDeductions(
+    emp._id.toString(),
+    organizationId,
+    month,
+    dailyRate
+  );
+  deductions.leaveDeductions = leaveDeductions;
+
+  // Reimbursements
+  const reimbursements = await getReimbursements(emp._id.toString(), organizationId, month);
+
+  // Tax Calculation
+  const annualizedIncome = (baseSalary + allowancesTotal) * 12;
+  const tax = await calculateTax(organizationId, annualizedIncome);
+  deductions.tax = tax;
+
+  const totalDeductions = deductionsTotal + leaveDeductions + tax;
+  const grossPay = baseSalary + allowancesTotal;
+  const finalSalary = Math.round(grossPay + overtimePay + reimbursements - totalDeductions);
+
+  return {
+    ctcAnnual: (emp.salary || grossPay) * 12,
+    grossPay,
+    baseSalary,
+    overtime: overtimePay,
+    bonus: allowances.bonus,
+    reimbursements,
+    tax,
+    leaveDeductions,
+    deductions: totalDeductions,
+    finalSalary,
+    allowances,
+    deductionsBreakdown: deductions,
+    employerContributions: {
+      pfEmployer: 0,
+      gratuity: 0,
+      esi: 0,
+      insurance: 0,
+    },
+  };
+}

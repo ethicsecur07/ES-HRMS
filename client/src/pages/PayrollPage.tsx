@@ -1,53 +1,69 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { payrollApi } from '../api_service/payrollApi';
-import { payrollV2Api } from '../api_service/payrollV2Api';
-import type { PayrollRun } from '../api_service/payrollV2Api';
 import { employeeApi } from '../api_service/employeeApi';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
-import { Input, Select } from '../Components/WrapperComponents/Input';
-import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import { PayrollSlipModal } from '../Components/SpecifiedComponents/PayrollSlipModal';
+import { PayrollSetupModal } from '../Components/SpecifiedComponents/PayrollSetupModal';
 import type { Payroll, Employee } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import { exportToExcel } from '../utils/exportUtils';
 import {
   CreditCard,
   Eye,
   CheckCircle2,
-  RefreshCw,
   Settings2,
-  RotateCcw,
-  FileJson,
-  Coins,
-  TrendingUp,
-  Loader2
+  Search,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
+
+const MONTHS = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
+
+const currentYear = new Date().getFullYear();
+const YEARS = Array.from({ length: 5 }, (_, i) => ({
+  value: String(currentYear - 2 + i),
+  label: String(currentYear - 2 + i),
+}));
 
 export const PayrollPage: React.FC = () => {
   const { role } = useAuthStore();
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
 
-  // Tab State
-  const [activeTab, setActiveTab] = useState<'statements' | 'processing'>('statements');
-
   // Statements view states
   const [selectedPayroll, setSelectedPayroll] = useState<Payroll | null>(null);
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showSetupModal, setShowSetupModal] = useState(false);
   const [nameFilter, setNameFilter] = useState('');
-  const [monthFilter, setMonthFilter] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
 
-  // Processing view states
-  const [runCycleInput, setRunCycleInput] = useState('');
-  const [syncPeriodInput, setSyncPeriodInput] = useState('');
-  const [erpPlatform, setErpPlatform] = useState<'XERO' | 'QUICKBOOKS' | 'SAGE'>('XERO');
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Queries
-  const { data: payrolls, isLoading: payLoading } = useQuery({
+  const { data: payrolls, isLoading: payLoading, isError: payError } = useQuery({
     queryKey: ['payrolls'],
     queryFn: payrollApi.getAll,
   });
@@ -57,77 +73,53 @@ export const PayrollPage: React.FC = () => {
     queryFn: () => employeeApi.getAll().then(res => res.employees),
   });
 
-  const { data: payrollRuns, isLoading: runsLoading, refetch: refetchRuns } = useQuery({
-    queryKey: ['payrollRuns'],
-    queryFn: payrollV2Api.getRuns,
-    enabled: (role === 'ADMIN' || role === 'HR') && activeTab === 'processing',
-  });
-
   // Filters
   const filteredPayrolls = useMemo(() => {
     if (!payrolls) return [];
     return payrolls.filter((item) => {
       const empId = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId._id : item.employeeId) : '';
       const emp = employees?.find((e) => e._id === empId);
-      const empName = emp?.fullName || 'Logapriyan M';
+      const empName = emp?.fullName || '';
 
-      const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
-      const matchMonth = !monthFilter || item.month.includes(monthFilter);
+      const matchName = !nameFilter || empName.toLowerCase().includes(nameFilter.toLowerCase());
+      const monthStr = `${selectedYear}-${selectedMonth}`;
+      const matchMonth = item.month === monthStr;
 
       return matchName && matchMonth;
     });
-  }, [payrolls, employees, nameFilter, monthFilter]);
+  }, [payrolls, employees, nameFilter, selectedMonth, selectedYear]);
+
+  // Pagination
+  const totalRecords = filteredPayrolls.length;
+  const totalPages = Math.ceil(totalRecords / rowsPerPage) || 1;
+  const paginatedPayrolls = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredPayrolls.slice(start, start + rowsPerPage);
+  }, [filteredPayrolls, currentPage, rowsPerPage]);
+
+  // Reset page on filter change
+  const handleFilterChange = () => {
+    setCurrentPage(1);
+  };
 
   // Mutations
+  const generatePayrollMutation = useMutation({
+    mutationFn: () => payrollApi.generateMonthlyPayroll(`${selectedYear}-${selectedMonth}`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['payrolls'] });
+      addToast('Payroll Generated', `Successfully generated payroll for ${data.length} employees.`, 'success');
+    },
+    onError: (error: any) => {
+      addToast('Generation Failed', error?.response?.data?.message || error.message || 'Could not generate payroll.', 'error');
+    },
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: Payroll['paidStatus'] }) =>
       payrollApi.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payrolls'] });
       addToast('Status Updated', 'Payroll disbursement status updated.', 'success');
-    },
-  });
-
-  const triggerRunMutation = useMutation({
-    mutationFn: payrollV2Api.triggerRun,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['payrolls'] });
-      refetchRuns();
-      addToast('Run Triggered', `Bulk processing started for ${data.run.runCycle}.`, 'success');
-      setRunCycleInput('');
-    },
-    onError: (error: any) => {
-      addToast('Pipeline Failed', error.message || 'Could not launch bulk run.', 'error');
-    },
-  });
-
-  const rollbackMutation = useMutation({
-    mutationFn: payrollV2Api.rollbackRun,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['payrolls'] });
-      refetchRuns();
-      addToast('Run Rolled Back', `Successfully rolled back calculations for ${data.run.runCycle}.`, 'warning');
-    },
-    onError: (error: any) => {
-      addToast('Rollback Failed', error.message || 'Could not revert payroll run.', 'error');
-    },
-  });
-
-  const exportErpMutation = useMutation({
-    mutationFn: async () => payrollV2Api.exportJournal(syncPeriodInput, erpPlatform),
-    onSuccess: (res) => {
-      addToast('ERP Export Completed', `Double entry ledger synced via ${erpPlatform}.`, 'success');
-      // Create a blob file of the export data and download it
-      const element = document.createElement('a');
-      const file = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
-      element.href = URL.createObjectURL(file);
-      element.download = `ES-HRMS-ERP-Journal-${syncPeriodInput}-${erpPlatform}.json`;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
-    },
-    onError: (error: any) => {
-      addToast('ERP Export Failed', error.message || 'Make sure at least one payroll is in PAID status for this period.', 'error');
     },
   });
 
@@ -140,147 +132,27 @@ export const PayrollPage: React.FC = () => {
     }
   };
 
-  const handleTriggerRunSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!runCycleInput) return;
-    triggerRunMutation.mutate(runCycleInput);
+  const handleExport = () => {
+    if (!filteredPayrolls.length) {
+      addToast('No Data', 'No payroll records to export.', 'warning');
+      return;
+    }
+    const exportData = filteredPayrolls.map((p) => {
+      const empId = p.employeeId ? (typeof p.employeeId === 'object' ? p.employeeId._id : p.employeeId) : '';
+      const emp = employees?.find((e) => e._id === empId);
+      return {
+        'Employee Name': emp?.fullName || 'N/A',
+        'CTC (Annual)': p.ctcAnnual || 0,
+        'Gross Pay': p.grossPay || 0,
+        'Deductions': p.deductions || 0,
+        'Net Pay': p.finalSalary || 0,
+        'Status': p.paidStatus,
+        'Period': p.month,
+      };
+    });
+    exportToExcel(exportData, `Payroll_${selectedYear}-${selectedMonth}`);
+    addToast('Exported', 'Payroll data exported to Excel.', 'success');
   };
-
-  const handleErpSyncSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!syncPeriodInput) return;
-    exportErpMutation.mutate();
-  };
-
-  // Columns for Payroll Statements Table
-  const statementColumns = [
-    {
-      header: 'Employee',
-      accessor: (row: Payroll) => {
-        const emp = employees?.find((e) => e._id === (row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId._id : row.employeeId) : ''));
-        return (
-          <div className="flex items-center gap-2 text-left">
-            <span className="font-bold text-xs text-foreground">{emp?.fullName || 'Logapriyan M'}</span>
-            {emp?.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') && (
-              <span className="text-[10px] text-muted-foreground font-mono">({emp.employeeCode})</span>
-            )}
-          </div>
-        );
-      },
-    },
-    { header: 'Pay Period', accessor: 'month', className: 'font-mono text-xs' },
-    { header: 'Base Salary', accessor: (row: Payroll) => <span className="font-mono text-xs">{formatCurrency(row.baseSalary)}</span> },
-    { header: 'Bonus / Incentives', accessor: (row: Payroll) => <span className="font-mono text-xs text-primary">+{formatCurrency(row.bonus)}</span> },
-    { header: 'Deductions', accessor: (row: Payroll) => <span className="font-mono text-xs text-muted-foreground">-{formatCurrency(row.deductions)}</span> },
-    { header: 'Net Final Salary', accessor: (row: Payroll) => <span className="font-mono font-extrabold text-xs text-primary">{formatCurrency(row.finalSalary)}</span> },
-    {
-      header: 'Status',
-      accessor: (row: Payroll) => (
-        <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${
-          row.paidStatus === 'PAID'
-            ? 'bg-primary/10 text-primary border-primary/20'
-            : row.paidStatus === 'PROCESSING'
-            ? 'bg-foreground/10 text-foreground border-border'
-            : 'bg-muted text-muted-foreground border-border'
-        }`}>
-          {row.paidStatus}
-        </span>
-      ),
-    },
-    {
-      header: 'Actions',
-      accessor: (row: Payroll) => (
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleViewPayslip(row)}>
-            <Eye className="w-4 h-4 mr-1" /> Payslip
-          </Button>
-
-          {(role === 'ADMIN' || role === 'HR') && row.paidStatus !== 'PAID' && (
-            <Button
-              size="sm"
-              onClick={() => updateStatusMutation.mutate({ id: row._id, status: 'PAID' })}
-              isLoading={updateStatusMutation.isPending}
-            >
-              <CheckCircle2 className="w-4 h-4 mr-1" /> Mark Paid
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  // Columns for Payroll Run Logs Table
-  const runColumns = [
-    {
-      header: 'Run Cycle Period',
-      accessor: (row: PayrollRun) => <span className="font-mono font-bold text-xs text-foreground">{row.runCycle}</span>,
-    },
-    {
-      header: 'Created At',
-      accessor: (row: PayrollRun) => <span className="font-mono text-xs">{new Date(row.createdAt).toLocaleDateString()}</span>,
-    },
-    {
-      header: 'Status',
-      accessor: (row: PayrollRun) => {
-        if (row.status === 'COMPLETED') {
-          return (
-            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
-              Completed
-            </span>
-          );
-        }
-        if (row.status === 'PROCESSING') {
-          return (
-            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-foreground/10 text-foreground border border-border animate-pulse">
-              Processing
-            </span>
-          );
-        }
-        if (row.status === 'FAILED') {
-          return (
-            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-destructive/10 text-destructive border border-destructive/20" title={row.errorLog}>
-              Failed
-            </span>
-          );
-        }
-        return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-muted text-muted-foreground border border-border">
-            Pending
-          </span>
-        );
-      },
-    },
-    {
-      header: 'Processed Staff',
-      accessor: (row: PayrollRun) => <span className="font-mono text-xs">{row.processedEmployeesCount} Employees</span>,
-    },
-    {
-      header: 'Total Payroll Payout',
-      accessor: (row: PayrollRun) => <span className="font-mono font-bold text-xs text-primary">{formatCurrency(row.totalPayout)}</span>,
-    },
-    {
-      header: 'Actions',
-      accessor: (row: PayrollRun) => (
-        <div className="flex justify-end">
-          {(row.status === 'COMPLETED' || row.status === 'FAILED') && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-destructive/30 hover:bg-destructive/10 text-destructive font-semibold"
-              onClick={() => {
-                if (window.confirm(`Are you absolutely sure you want to rollback all calculated payroll items for period ${row.runCycle}?`)) {
-                  rollbackMutation.mutate(row.runCycle);
-                }
-              }}
-              isLoading={rollbackMutation.isPending && rollbackMutation.variables === row.runCycle}
-            >
-              <RotateCcw className="w-3.5 h-3.5 mr-1" /> Rollback
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
 
   if (payLoading || empLoading) {
     return (
@@ -305,158 +177,216 @@ export const PayrollPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs navigation for HR / Admin */}
-      {(role === 'ADMIN' || role === 'HR') && (
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setActiveTab('statements')}
-            className={`px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'statements'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Coins className="w-4 h-4" /> Employee Compensations
-          </button>
-          <button
-            onClick={() => setActiveTab('processing')}
-            className={`px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'processing'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Settings2 className="w-4 h-4" /> Bulk Processing & ERP Sync
-          </button>
-        </div>
-      )}
 
-      {activeTab === 'statements' ? (
-        /* STATEMENTS VIEW */
-        <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
-            <div className="flex-1 w-full">
-              <Input
-                placeholder="Search payroll by employee name..."
+        <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-5">
+          {/* Filter / Action Bar */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-[280px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                placeholder="Search"
                 value={nameFilter}
-                onChange={(e) => setNameFilter(e.target.value)}
+                onChange={(e) => { setNameFilter(e.target.value); handleFilterChange(); }}
+                className="flex h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
               />
             </div>
-            <div className="w-full sm:w-64">
-              <Input
-                type="month"
-                value={monthFilter}
-                onChange={(e) => setMonthFilter(e.target.value)}
-              />
-            </div>
+
+            {/* Month Dropdown */}
+            <select
+              value={selectedMonth}
+              onChange={(e) => { setSelectedMonth(e.target.value); handleFilterChange(); }}
+              className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
+            >
+              {MONTHS.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+
+            {/* Year Dropdown */}
+            <select
+              value={selectedYear}
+              onChange={(e) => { setSelectedYear(e.target.value); handleFilterChange(); }}
+              className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
+            >
+              {YEARS.map((y) => (
+                <option key={y.value} value={y.value}>{y.label}</option>
+              ))}
+            </select>
+
+            {/* Generate Payroll Button (ADMIN/HR only) */}
+            {(role === 'ADMIN' || role === 'HR') && (
+              <Button
+                onClick={() => generatePayrollMutation.mutate()}
+                isLoading={generatePayrollMutation.isPending}
+                className="bg-primary text-white font-bold tracking-wider shadow-md shadow-primary/20"
+              >
+                Generate Payroll
+              </Button>
+            )}
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Payroll Setup Button (ADMIN/HR only) */}
+            {(role === 'ADMIN' || role === 'HR') && (
+              <Button
+                variant="outline"
+                onClick={() => setShowSetupModal(true)}
+                className="font-semibold"
+              >
+                <Settings2 className="w-4 h-4 mr-1.5" />
+                Payroll Setup
+              </Button>
+            )}
+
+            {/* Export Button */}
+            <Button
+              onClick={handleExport}
+              className="bg-primary text-white font-bold shadow-md shadow-primary/20"
+            >
+              <Download className="w-4 h-4 mr-1.5" />
+              Export
+            </Button>
           </div>
 
-          <TableWrapper
-            columns={statementColumns}
-            data={filteredPayrolls}
-          />
+          {/* Error Banner */}
+          {payError && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>Failed to load payslip list.</span>
+            </div>
+          )}
+
+          {/* Payroll Table */}
+          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+                  <th className="p-4">Employee Name</th>
+                  <th className="p-4">CTC (Annual)</th>
+                  <th className="p-4">Gross Pay</th>
+                  <th className="p-4">Deductions</th>
+                  <th className="p-4">Net Pay</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border text-sm">
+                {paginatedPayrolls.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                      No matching records found. Generate payroll to create slips.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedPayrolls.map((payroll) => {
+                    const empId = payroll.employeeId ? (typeof payroll.employeeId === 'object' ? payroll.employeeId._id : payroll.employeeId) : '';
+                    const emp = employees?.find((e) => e._id === empId);
+                    return (
+                      <tr key={payroll._id} className="hover:bg-muted/30 transition-colors">
+                        {/* Employee Name */}
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-foreground">{emp?.fullName || 'Unknown'}</span>
+                            {emp?.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') && (
+                              <span className="text-[10px] text-muted-foreground font-mono">({emp.employeeCode})</span>
+                            )}
+                          </div>
+                        </td>
+                        {/* CTC (Annual) */}
+                        <td className="p-4">
+                          <span className="font-mono text-xs">{formatCurrency(payroll.ctcAnnual || (emp?.salary ? emp.salary * 12 : 0))}</span>
+                        </td>
+                        {/* Gross Pay */}
+                        <td className="p-4">
+                          <span className="font-mono text-xs">{formatCurrency(payroll.grossPay || payroll.baseSalary)}</span>
+                        </td>
+                        {/* Deductions */}
+                        <td className="p-4">
+                          <span className="font-mono text-xs text-destructive">-{formatCurrency(payroll.deductions)}</span>
+                        </td>
+                        {/* Net Pay */}
+                        <td className="p-4">
+                          <span className="font-mono font-extrabold text-xs text-primary">{formatCurrency(payroll.finalSalary)}</span>
+                        </td>
+                        {/* Status */}
+                        <td className="p-4">
+                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${
+                            payroll.paidStatus === 'PAID'
+                              ? 'bg-primary/10 text-primary border-primary/20'
+                              : payroll.paidStatus === 'PROCESSING'
+                              ? 'bg-foreground/10 text-foreground border-border'
+                              : 'bg-muted text-muted-foreground border-border'
+                          }`}>
+                            {payroll.paidStatus}
+                          </span>
+                        </td>
+                        {/* Actions */}
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleViewPayslip(payroll)}>
+                              <Eye className="w-4 h-4 mr-1" /> Payslip
+                            </Button>
+                            {(role === 'ADMIN' || role === 'HR') && payroll.paidStatus !== 'PAID' && (
+                              <Button
+                                size="sm"
+                                onClick={() => updateStatusMutation.mutate({ id: payroll._id, status: 'PAID' })}
+                                isLoading={updateStatusMutation.isPending}
+                              >
+                                <CheckCircle2 className="w-4 h-4 mr-1" /> Mark Paid
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span>Showing:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                className="h-8 rounded-md border border-border bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              >
+                {[5, 10, 20, 50].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="text-xs">
+              Showing <span className="font-medium">{totalRecords === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1}</span> to{' '}
+              <span className="font-medium">{Math.min(currentPage * rowsPerPage, totalRecords)}</span> out of{' '}
+              <span className="font-medium">{totalRecords}</span> records
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </Card>
-      ) : (
-        /* BULK RUNS & ERP PROCESSING VIEW */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Controls Panel */}
-          <div className="space-y-8">
-            {/* Trigger Form */}
-            <Card className="p-6 border-l-4 border-l-primary shadow-lg bg-card space-y-6">
-              <h3 className="text-lg font-black text-foreground flex items-center gap-2 border-b border-border pb-3 tracking-tight">
-                <TrendingUp className="w-5 h-5 text-primary" /> Trigger Bulk Run
-              </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Initiate calculation algorithms across all active employee contract structures for a target month, computing base allowances, tax brackets, and attendance penalties.
-              </p>
 
-              <form onSubmit={handleTriggerRunSubmit} className="space-y-4">
-                <Input
-                  label="Target Run Cycle Period *"
-                  type="month"
-                  value={runCycleInput}
-                  onChange={(e) => setRunCycleInput(e.target.value)}
-                  required
-                />
-                <Button
-                  type="submit"
-                  className="w-full bg-primary text-white font-black tracking-wider text-xs"
-                  isLoading={triggerRunMutation.isPending}
-                >
-                  TRIGGER RUN CYCLE
-                </Button>
-              </form>
-            </Card>
-
-            {/* ERP Synchronization */}
-            <Card className="p-6 border border-border shadow-md bg-card space-y-6">
-              <h3 className="text-lg font-black text-foreground flex items-center gap-2 border-b border-border pb-3 tracking-tight">
-                <FileJson className="w-5 h-5 text-primary" /> ERP Ledger Sync
-              </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Export double-entry accounts payable journal ledgers for payroll expenses, grouping credit liability and debit expense components.
-              </p>
-
-              <form onSubmit={handleErpSyncSubmit} className="space-y-4">
-                <Input
-                  label="Target Month Period *"
-                  type="month"
-                  value={syncPeriodInput}
-                  onChange={(e) => setSyncPeriodInput(e.target.value)}
-                  required
-                />
-                <Select
-                  label="Target Platform *"
-                  value={erpPlatform}
-                  onChange={(e) => setErpPlatform(e.target.value as any)}
-                  options={[
-                    { value: 'XERO', label: 'Xero Accounts' },
-                    { value: 'QUICKBOOKS', label: 'QuickBooks Online' },
-                    { value: 'SAGE', label: 'Sage Financials' },
-                  ]}
-                />
-                <Button
-                  type="submit"
-                  className="w-full bg-foreground text-background font-black tracking-wider text-xs shadow-md"
-                  isLoading={exportErpMutation.isPending}
-                >
-                  SYNC & DOWNLOAD JOURNAL
-                </Button>
-              </form>
-            </Card>
-          </div>
-
-          {/* Runs Monitor Table */}
-          <div className="lg:col-span-2 space-y-8">
-            <Card className="p-6 border border-border shadow-md space-y-4 text-left">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <h3 className="text-lg font-black text-foreground flex items-center gap-2 tracking-tight">
-                  <RefreshCw className="w-5 h-5 text-primary" /> Active Pipeline Logs
-                </h3>
-                <button
-                  onClick={() => refetchRuns()}
-                  className="text-muted-foreground hover:text-foreground transition-colors p-1"
-                  title="Refresh status logs"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
-
-              {runsLoading ? (
-                <div className="h-60 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                </div>
-              ) : (
-                <TableWrapper
-                  columns={runColumns}
-                  data={payrollRuns || []}
-                  rowsPerPage={6}
-                />
-              )}
-            </Card>
-          </div>
-        </div>
-      )}
 
       {/* Payslip Modal */}
       <PayrollSlipModal
@@ -464,6 +394,12 @@ export const PayrollPage: React.FC = () => {
         onClose={() => setShowModal(false)}
         payroll={selectedPayroll}
         employee={selectedEmp}
+      />
+
+      {/* Payroll Setup Modal */}
+      <PayrollSetupModal
+        isOpen={showSetupModal}
+        onClose={() => setShowSetupModal(false)}
       />
     </div>
   );

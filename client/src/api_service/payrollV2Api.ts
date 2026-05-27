@@ -4,10 +4,10 @@ export interface PayrollRun {
   _id: string;
   organizationId: string;
   runCycle: string; // YYYY-MM
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-  processedEmployeesCount: number;
-  totalPayout: number;
-  errorLog?: string;
+  status: 'DRAFT' | 'LOCKED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'ROLLED_BACK';
+  totalProcessedCount: number;
+  totalPayoutAmount: number;
+  processingLog: string[];
   createdAt: string;
 }
 
@@ -17,8 +17,11 @@ export const payrollV2Api = {
     return response.data;
   },
 
-  triggerRun: async (runCycle: string) => {
-    const response = await axiosInstance.post<{ message: string; run: PayrollRun }>('/v2/payroll/runs/trigger', { runCycle });
+  triggerRun: async ({ startCycle, endCycle }: { startCycle: string; endCycle: string }) => {
+    const response = await axiosInstance.post<{ message: string; run: PayrollRun; runs: PayrollRun[] }>('/v2/payroll/runs/trigger', { 
+      startCycle, 
+      endCycle 
+    });
     return response.data;
   },
 

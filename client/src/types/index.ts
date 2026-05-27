@@ -150,6 +150,8 @@ export interface Payroll {
   _id: string;
   employeeId: string | Employee;
   month: string; // YYYY-MM
+  ctcAnnual: number;
+  grossPay: number;
   baseSalary: number;
   deductions: number;
   bonus: number;
@@ -157,6 +159,29 @@ export interface Payroll {
   paidStatus: 'PAID' | 'PENDING' | 'PROCESSING';
   paymentDate?: string;
   payslipUrl?: string;
+}
+
+export interface PayrollConfig {
+  _id?: string | null;
+  organizationId?: string;
+  employeeId?: string | null;
+  // Earnings (CTC Breakup)
+  basicSalaryPercent: number;
+  hraPercent: number;
+  conveyanceMonthly: number;
+  performanceIncentiveMonthly: number;
+  otherAllowancesMonthly: number;
+  // Deductions
+  pfEmployeePercent: number;
+  professionalTaxMonthly: number;
+  incomeTaxTdsMonthly: number;
+  // Employer Contributions
+  pfEmployerPercent: number;
+  gratuityPercent: number;
+  esiEmployerPercent: number;
+  insuranceMonthly: number;
+  // Toggle
+  applyEsiOnlyIfGrossBelow21000: boolean;
 }
 
 export interface AuditLog {
