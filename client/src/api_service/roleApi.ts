@@ -10,6 +10,7 @@ export interface RoleData {
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
+  members?: any[];
 }
 
 export const roleApi = {

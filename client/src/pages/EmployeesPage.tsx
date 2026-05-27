@@ -338,7 +338,7 @@ export const EmployeesPage: React.FC = () => {
 
 
   const handleSyncMicrosoft = async () => {
-    if (!window.confirm('Are you sure you want to sync employees from your Microsoft Directory? This will auto-provision or update accounts for users with @ethicsecur.co.in corporate email.')) {
+    if (!window.confirm('Are you sure you want to sync employees from your Microsoft Directory? This will auto-provision or update accounts for users with @ethicsecur.co.in or @ethicsecur.com corporate email.')) {
       return;
     }
 
@@ -348,7 +348,7 @@ export const EmployeesPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       addToast(
         'Directory Synced',
-        `Microsoft sync complete! Onboarded: ${result.createdCount} | Updated: ${result.updatedCount}. (Filtered to @ethicsecur.co.in domain)`,
+        `Microsoft sync complete! Onboarded: ${result.createdCount} | Updated: ${result.updatedCount}. (Filtered to @ethicsecur.co.in or @ethicsecur.com domains)`,
         'success'
       );
     } catch (error: any) {

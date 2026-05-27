@@ -38,6 +38,7 @@ import { useTenantStore } from './store/useTenantStore';
 import { useAuthStore } from './store/useAuthStore';
 const LeavePolicyPage = lazy(() => import('./pages/LeavePolicyPage').then(m => ({ default: m.LeavePolicyPage })));
 import { PermissionProvider } from './hooks/usePermission';
+import { authApi } from './api_service/authApi';
 import axios from 'axios';
 
 const queryClient = new QueryClient({
@@ -54,21 +55,37 @@ export const App: React.FC = () => {
   const fetchTenantConfig = useTenantStore((state) => state.fetchTenantConfig);
   const isLoading = useTenantStore((state) => state.isLoading);
 
-  const { isAuthenticated, token, setToken, logout } = useAuthStore();
+  const { isAuthenticated, token, setToken, login, logout } = useAuthStore();
   const [isAuthLoading, setIsAuthLoading] = useState(isAuthenticated && !token);
 
   useEffect(() => {
     const bootstrapAuth = async () => {
       if (isAuthenticated && !token) {
         try {
-          const envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-          const refreshUrl = `${envApiUrl.replace(/\/$/, '')}/auth/refresh`;
+          // Dynamically determine the backend API base URL based on where the browser is accessing from.
+          const getBaseUrl = () => {
+            const envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+            if (envApiUrl && !envApiUrl.includes('localhost')) {
+              return envApiUrl;
+            }
+            return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+          };
+          const refreshUrl = `${getBaseUrl().replace(/\/$/, '')}/auth/refresh`;
           const response = await axios.post(refreshUrl, {}, { withCredentials: true });
           
           const payload = response.data;
           const newToken = payload?.data?.token || payload?.token;
           if (newToken) {
             setToken(newToken);
+            // Fetch fresh user profile to ensure user and role in store are completely in sync with the new token
+            try {
+              const userResponse = await authApi.getMe();
+              if (userResponse?.user) {
+                login(userResponse.user, newToken);
+              }
+            } catch (err) {
+              console.error('Failed to sync user profile after silent refresh:', err);
+            }
           } else {
             logout();
           }
@@ -84,7 +101,7 @@ export const App: React.FC = () => {
     };
 
     bootstrapAuth();
-  }, [isAuthenticated, token, setToken, logout]);
+  }, [isAuthenticated, token, setToken, login, logout]);
 
   useEffect(() => {
     const resolveTenant = async () => {

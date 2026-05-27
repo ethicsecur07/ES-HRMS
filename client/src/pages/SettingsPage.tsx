@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { analyticsApi } from '../api_service/analyticsApi';
-import { departmentApi } from '../api_service/departmentApi';
-import { designationApi } from '../api_service/designationApi';
 import { authV2Api } from '../api_service/authV2Api';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -18,8 +16,6 @@ import {
   Trash2,
   Users,
   ShieldCheck,
-  Briefcase,
-  FolderTree,
   X,
   Fingerprint,
   Globe,
@@ -34,9 +30,7 @@ export const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const isAdmin = user?.role === 'ADMIN';
-  const [activeSubTab, setActiveSubTab] = useState<'global' | 'departments' | 'designations' | 'sso'>(
-    isAdmin ? 'global' : 'departments'
-  );
+  const [activeSubTab, setActiveSubTab] = useState<'global' | 'sso'>('global');
 
   // --- SSO Configuration Queries & Mutations ---
   const { data: authProviders = [], isLoading: isAuthProvidersLoading } = useQuery({
@@ -397,26 +391,8 @@ export const SettingsPage: React.FC = () => {
     });
   };
 
-  // --- Departments Queries & Mutations ---
-  const { data: departments = [], isLoading: isDeptsLoading } = useQuery({
-    queryKey: ['departments'],
-    queryFn: departmentApi.getAll,
-  });
-
-
-
-  // --- Designations Queries & Mutations ---
-  const { data: designations = [], isLoading: isDesigsLoading } = useQuery({
-    queryKey: ['designations'],
-    queryFn: () => designationApi.getAll(),
-  });
-
-
-
   const isLoading =
     (isAdmin && isSettingsLoading) ||
-    isDeptsLoading ||
-    isDesigsLoading ||
     (activeSubTab === 'sso' && isAuthProvidersLoading);
 
   if (isLoading) {
@@ -436,7 +412,7 @@ export const SettingsPage: React.FC = () => {
             System & Organization Settings
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Configure company global policies, whitelisted networks, departments, and designations.
+            Configure company global policies, whitelisted networks, and single sign-on parameters.
           </p>
         </div>
       </div>
@@ -469,28 +445,6 @@ export const SettingsPage: React.FC = () => {
             </button>
           </>
         )}
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('departments')}
-          className={`px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
-            activeSubTab === 'departments'
-              ? 'border-primary text-primary font-extrabold'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <FolderTree className="w-4 h-4" /> Departments
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('designations')}
-          className={`px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
-            activeSubTab === 'designations'
-              ? 'border-primary text-primary font-extrabold'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Briefcase className="w-4 h-4" /> Designations
-        </button>
         <NavLink
           to="/settings/roles"
           className={({ isActive }) =>
@@ -572,104 +526,6 @@ export const SettingsPage: React.FC = () => {
             </Button>
           </div>
         </form>
-      )}
-
-      {activeSubTab === 'departments' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-bold text-foreground">Departments Directory</h3>
-            <span className="text-xs text-muted-foreground bg-muted border border-border px-3 py-1 rounded-lg">
-              Managed via Microsoft Directory Sync
-            </span>
-          </div>
-
-          <Card className="overflow-hidden shadow-md p-0 border border-border">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-muted/40 border-b border-border">
-                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Code</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Department Name</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Head of Department</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {departments.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="p-8 text-center text-sm text-muted-foreground">
-                        No departments found. Please sync from Microsoft Directory.
-                      </td>
-                    </tr>
-                  ) : (
-                    departments.map((dept: any) => (
-                      <tr key={dept._id} className="hover:bg-muted/10 transition-colors">
-                        <td className="p-4 text-sm font-mono font-bold text-primary">{dept.code}</td>
-                        <td className="p-4 text-sm font-semibold text-foreground">{dept.name}</td>
-                        <td className="p-4 text-sm text-muted-foreground">{dept.headOfDepartment || 'Not Assigned'}</td>
-                        <td className="p-4 text-xs">
-                          <span className={`px-2.5 py-1 rounded-full font-bold ${dept.isActive ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                            {dept.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {activeSubTab === 'designations' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-bold text-foreground">Designations Directory</h3>
-            <span className="text-xs text-muted-foreground bg-muted border border-border px-3 py-1 rounded-lg">
-              Managed via Microsoft Directory Sync
-            </span>
-          </div>
-
-          <Card className="overflow-hidden shadow-md p-0 border border-border">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-muted/40 border-b border-border">
-                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Code</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Designation Name</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Department</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {designations.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="p-8 text-center text-sm text-muted-foreground">
-                        No designations found. Please sync from Microsoft Directory.
-                      </td>
-                    </tr>
-                  ) : (
-                    designations.map((desig: any) => (
-                      <tr key={desig._id} className="hover:bg-muted/10 transition-colors">
-                        <td className="p-4 text-sm font-mono font-bold text-primary">{desig.code}</td>
-                        <td className="p-4 text-sm font-semibold text-foreground">{desig.name}</td>
-                        <td className="p-4 text-sm text-muted-foreground">
-                          {desig.departmentId?.name || (typeof desig.departmentId === 'string' ? desig.departmentId : 'Unassigned')}
-                        </td>
-                        <td className="p-4 text-xs">
-                          <span className={`px-2.5 py-1 rounded-full font-bold ${desig.isActive ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                            {desig.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
       )}
 
       {activeSubTab === 'sso' && isAdmin && (
