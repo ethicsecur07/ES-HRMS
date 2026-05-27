@@ -22,7 +22,7 @@ export interface HRDocument {
     department: string;
   } | string;
   name: string;
-  category: 'CONTRACT' | 'PASSPORT' | 'VISA' | 'ID_PROOF' | 'CERTIFICATE' | 'OTHER';
+  category: 'RESUME' | 'OFFER_LETTER' | 'CERTIFICATE' | 'TAX_DOCUMENT' | 'PAYSLIP' | 'ASSET' | 'OTHER';
   fileUrl: string;
   version: number;
   versions: DocumentVersion[];
@@ -65,6 +65,11 @@ export const documentApi = {
       category: string;
       version: number;
     }>(`/documents/${id}/download`);
+    return response.data;
+  },
+
+  deleteDocument: async (id: string) => {
+    const response = await axiosInstance.delete<{ success: boolean; message: string }>(`/documents/${id}`);
     return response.data;
   },
 };

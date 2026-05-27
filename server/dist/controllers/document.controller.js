@@ -3,9 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.downloadDocument = exports.addDocumentVersion = exports.uploadDocument = exports.getDocuments = void 0;
+exports.deleteDocument = exports.downloadDocument = exports.addDocumentVersion = exports.uploadDocument = exports.getDocuments = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
-const HRDocument_js_1 = require("../models/HRDocument.js");
+const EmployeeDocument_js_1 = require("../models/EmployeeDocument.js");
 const Employee_js_1 = require("../models/Employee.js");
 const getDocuments = async (req, res, next) => {
     try {
@@ -27,9 +27,9 @@ const getDocuments = async (req, res, next) => {
         if (req.query.category) {
             query.category = req.query.category;
         }
-        const documents = await HRDocument_js_1.HRDocument.find(query)
+        const documents = await EmployeeDocument_js_1.EmployeeDocument.find(query)
             .populate('employeeId', 'fullName employeeCode email department')
-            .populate('versions.uploadedBy', 'name email')
+            .populate('uploadedBy', 'name email')
             .sort({ createdAt: -1 });
         res.json(documents);
     }
@@ -42,7 +42,7 @@ const uploadDocument = async (req, res, next) => {
     try {
         const orgId = req.user?.organizationId;
         const { employeeId: userEmpId, role, id: userId } = req.user || {};
-        const { employeeId: targetEmpId, name, category, fileUrl, expiresAt, signatureStatus } = req.body;
+        const { employeeId: targetEmpId, name, category, fileUrl } = req.body;
         const finalTargetEmpId = role === 'EMPLOYEE' ? userEmpId : targetEmpId;
         if (!finalTargetEmpId) {
             res.status(400).json({ message: 'Employee ID is required.' });
@@ -58,22 +58,13 @@ const uploadDocument = async (req, res, next) => {
             res.status(400).json({ message: 'Target employee not found in this organization.' });
             return;
         }
-        const document = new HRDocument_js_1.HRDocument({
+        const document = new EmployeeDocument_js_1.EmployeeDocument({
             organizationId: orgId,
             employeeId: finalTargetEmpId,
             name,
             category,
             fileUrl,
-            version: 1,
-            expiresAt,
-            signatureStatus: signatureStatus || 'NOT_REQUIRED',
-            versions: [{
-                    version: 1,
-                    fileUrl,
-                    uploadedAt: new Date(),
-                    uploadedBy: userId,
-                }],
-            isActive: true,
+            uploadedBy: userId,
         });
         await document.save();
         res.status(201).json(document);
@@ -84,44 +75,8 @@ const uploadDocument = async (req, res, next) => {
 };
 exports.uploadDocument = uploadDocument;
 const addDocumentVersion = async (req, res, next) => {
-    try {
-        const orgId = req.user?.organizationId;
-        const { employeeId, role, id: userId } = req.user || {};
-        const { id } = req.params;
-        const { fileUrl } = req.body;
-        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
-            res.status(400).json({ message: 'Invalid document ID format.' });
-            return;
-        }
-        if (!fileUrl) {
-            res.status(400).json({ message: 'File URL is required.' });
-            return;
-        }
-        const document = await HRDocument_js_1.HRDocument.findOne({ _id: id, organizationId: orgId });
-        if (!document) {
-            res.status(404).json({ message: 'Document not found.' });
-            return;
-        }
-        // If standard employee, check that they own this document
-        if (role === 'EMPLOYEE' && document.employeeId.toString() !== employeeId) {
-            res.status(403).json({ message: 'Forbidden. You do not own this document.' });
-            return;
-        }
-        const nextVersion = document.version + 1;
-        document.version = nextVersion;
-        document.fileUrl = fileUrl;
-        document.versions.push({
-            version: nextVersion,
-            fileUrl,
-            uploadedAt: new Date(),
-            uploadedBy: userId,
-        });
-        await document.save();
-        res.json(document);
-    }
-    catch (err) {
-        next(err);
-    }
+    // Bypassed for EmployeeDocument flat structure, keeping signature compatibility
+    res.status(200).json({ message: 'Versioning is not supported for flat employee documents.' });
 };
 exports.addDocumentVersion = addDocumentVersion;
 const downloadDocument = async (req, res, next) => {
@@ -133,7 +88,7 @@ const downloadDocument = async (req, res, next) => {
             res.status(400).json({ message: 'Invalid document ID format.' });
             return;
         }
-        const document = await HRDocument_js_1.HRDocument.findOne({ _id: id, organizationId: orgId });
+        const document = await EmployeeDocument_js_1.EmployeeDocument.findOne({ _id: id, organizationId: orgId });
         if (!document) {
             res.status(404).json({ message: 'Document not found.' });
             return;
@@ -143,12 +98,11 @@ const downloadDocument = async (req, res, next) => {
             res.status(403).json({ message: 'Forbidden. You do not have access to this document.' });
             return;
         }
-        // Return direct download url or secure access payload
         res.json({
             name: document.name,
             fileUrl: document.fileUrl,
             category: document.category,
-            version: document.version,
+            version: 1,
         });
     }
     catch (err) {
@@ -156,3 +110,23 @@ const downloadDocument = async (req, res, next) => {
     }
 };
 exports.downloadDocument = downloadDocument;
+const deleteDocument = async (req, res, next) => {
+    try {
+        const orgId = req.user?.organizationId;
+        const { id } = req.params;
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            res.status(400).json({ message: 'Invalid document ID format.' });
+            return;
+        }
+        const result = await EmployeeDocument_js_1.EmployeeDocument.deleteOne({ _id: id, organizationId: orgId });
+        if (result.deletedCount === 0) {
+            res.status(404).json({ message: 'Document not found.' });
+            return;
+        }
+        res.json({ success: true, message: 'Document deleted successfully.' });
+    }
+    catch (err) {
+        next(err);
+    }
+};
+exports.deleteDocument = deleteDocument;

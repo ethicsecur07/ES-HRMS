@@ -43,16 +43,35 @@ const rbacGuard = (moduleCode, action) => {
             let activePermissions = await (0, redisClient_js_1.redisGet)(cacheKey);
             if (!activePermissions) {
                 // Cache Miss: Perform Database Lookups
+                const roleIds = [];
+                // 1. Fetch custom roles assigned in RoleMember collection
+                const { RoleMember } = await import('../models/RoleMember.js');
+                const customRoleMembers = await RoleMember.find({
+                    organizationId: orgId,
+                    userId: userId,
+                });
+                for (const rm of customRoleMembers) {
+                    if (rm.roleId) {
+                        roleIds.push(rm.roleId.toString());
+                    }
+                }
+                // 2. Fetch user's primary system role
                 const userRole = await Role_js_1.Role.findOne({
                     organizationId: orgId,
                     code: user.role,
                     isActive: true,
                 });
-                const roleIds = [];
-                if (userRole) {
+                if (userRole && !roleIds.includes(userRole._id.toString())) {
                     roleIds.push(userRole._id.toString());
-                    let currentParentId = userRole.parentRoleId;
-                    const maxDepth = 10;
+                }
+                // 3. Recursively compile parent roles for all assigned roles
+                const compiledRoleIds = [...roleIds];
+                const maxDepth = 10;
+                for (const rId of roleIds) {
+                    let currentParentId = null;
+                    const roleObj = await Role_js_1.Role.findOne({ _id: rId, organizationId: orgId, isActive: true });
+                    if (roleObj)
+                        currentParentId = roleObj.parentRoleId;
                     let depth = 0;
                     while (currentParentId && depth < maxDepth) {
                         const parentRole = await Role_js_1.Role.findOne({
@@ -62,7 +81,10 @@ const rbacGuard = (moduleCode, action) => {
                         });
                         if (!parentRole)
                             break;
-                        roleIds.push(parentRole._id.toString());
+                        const parentIdStr = parentRole._id.toString();
+                        if (!compiledRoleIds.includes(parentIdStr)) {
+                            compiledRoleIds.push(parentIdStr);
+                        }
                         currentParentId = parentRole.parentRoleId;
                         depth++;
                     }
@@ -72,7 +94,7 @@ const rbacGuard = (moduleCode, action) => {
                     module: moduleCode,
                     $or: [
                         { userId: userId },
-                        { roleId: { $in: roleIds } },
+                        { roleId: { $in: compiledRoleIds } },
                     ],
                 });
                 const directPermissions = permissions.filter((p) => p.userId?.toString() === userId.toString());

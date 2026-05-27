@@ -8,4 +8,5 @@ router.get('/', auth_middleware_js_1.authenticate, document_controller_js_1.getD
 router.post('/', auth_middleware_js_1.authenticate, document_controller_js_1.uploadDocument);
 router.post('/:id/versions', auth_middleware_js_1.authenticate, document_controller_js_1.addDocumentVersion);
 router.get('/:id/download', auth_middleware_js_1.authenticate, document_controller_js_1.downloadDocument);
+router.delete('/:id', auth_middleware_js_1.authenticate, document_controller_js_1.deleteDocument);
 exports.default = router;

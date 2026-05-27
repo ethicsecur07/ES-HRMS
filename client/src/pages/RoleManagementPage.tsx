@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roleApi, type RoleData } from '../api_service/roleApi';
+import { employeeApi } from '../api_service/employeeApi';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
@@ -22,6 +23,47 @@ export const RoleManagementPage: React.FC = () => {
   const [description, setDescription] = useState('');
   const [parentRoleId, setParentRoleId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
+
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [memberSearch, setMemberSearch] = useState('');
+
+  // Fetch all employees to allow mapping of users to roles
+  const { data: employeesData } = useQuery({
+    queryKey: ['employees-all'],
+    queryFn: () => employeeApi.getAll({ limit: 1000 }),
+  });
+  const employees = employeesData?.employees || [];
+
+  const filteredEmployees = employees.filter(emp =>
+    emp.fullName.toLowerCase().includes(memberSearch.toLowerCase()) ||
+    emp.email.toLowerCase().includes(memberSearch.toLowerCase())
+  );
+
+  // Fetch current role members when editing
+  const { data: currentMembers = null } = useQuery({
+    queryKey: ['role-members', editingRole?._id],
+    queryFn: () => roleApi.getMembers(editingRole?._id!),
+    enabled: !!editingRole?._id,
+  });
+
+  const updateMembersMutation = useMutation({
+    mutationFn: ({ id, userIds }: { id: string; userIds: string[] }) => roleApi.updateMembers(id, userIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['role-members', editingRole?._id] });
+    },
+    onError: (err: any) => {
+      addToast('Error', err.response?.data?.message || 'Could not update role members', 'error');
+    }
+  });
+
+  React.useEffect(() => {
+    if (currentMembers && (currentMembers as any).success && (currentMembers as any).data) {
+      const ids = (currentMembers as any).data.map((m: any) => m.userId?._id || m.userId);
+      setSelectedUserIds(ids.filter(Boolean));
+    } else {
+      setSelectedUserIds([]);
+    }
+  }, [currentMembers]);
 
   // Fetch Roles
   const { data: roles = [], isLoading } = useQuery({
@@ -128,6 +170,10 @@ export const RoleManagementPage: React.FC = () => {
       updateMutation.mutate({
         id: editingRole._id,
         data: { name, code, description, parentRoleId, isActive },
+      });
+      updateMembersMutation.mutate({
+        id: editingRole._id,
+        userIds: selectedUserIds
       });
     } else {
       createMutation.mutate({ name, code, description, parentRoleId, isActive });
@@ -364,6 +410,53 @@ export const RoleManagementPage: React.FC = () => {
             />
             <label htmlFor="isActive" className="text-xs font-bold text-foreground cursor-pointer uppercase tracking-wider">Role Active</label>
           </div>
+
+          {editingRole && (
+            <div className="space-y-2.5 pt-4 border-t border-border mt-4">
+              <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-primary" /> Assign Members
+              </h5>
+              <div className="mb-2">
+                <Input
+                  placeholder="Filter users..."
+                  value={memberSearch}
+                  onChange={e => setMemberSearch(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="max-h-48 overflow-y-auto border border-border rounded-xl p-3 bg-muted/20 space-y-2">
+                {filteredEmployees.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No users found</p>
+                ) : (
+                  filteredEmployees.map(emp => {
+                    const uId = emp.userId;
+                    if (!uId) return null; // Only show employees with linked user accounts
+                    const isChecked = selectedUserIds.includes(uId);
+                    return (
+                      <label key={emp._id} className="flex items-center gap-3 cursor-pointer p-1.5 hover:bg-muted/40 rounded-lg transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setSelectedUserIds(selectedUserIds.filter(id => id !== uId));
+                            } else {
+                              setSelectedUserIds([...selectedUserIds, uId]);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-background"
+                        />
+                        <div className="text-xs leading-none">
+                          <p className="font-bold text-foreground">{emp.fullName}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{emp.email}</p>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>CANCEL</Button>

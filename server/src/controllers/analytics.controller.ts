@@ -204,6 +204,46 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
         teamSize: proj.teamMemberIds?.length || 0,
       };
     });
+    const totalProjects = await Project.countDocuments({ organizationId: orgId });
+    const activeProjects = await Project.countDocuments({ status: 'ACTIVE', organizationId: orgId });
+
+    // Project Onboard Count: Count unique employees assigned to active projects
+    const activeProjectsList = await Project.find({ status: 'ACTIVE', organizationId: orgId }).select('teamMemberIds');
+    const uniqueAssignedEmployees = new Set<string>();
+    activeProjectsList.forEach(proj => {
+      if (proj.teamMemberIds) {
+        proj.teamMemberIds.forEach(id => uniqueAssignedEmployees.add(id.toString()));
+      }
+    });
+    const projectOnboardCount = uniqueAssignedEmployees.size;
+    const projectAssignments = activeProjectsList.reduce((acc, proj) => acc + (proj.teamMemberIds?.length || 0), 0);
+
+    // Group active employees by department and count
+    // Match organizationId as both ObjectId and string to be resilient
+    let employeeTrendsDepartmentWise: Record<string, number> = {};
+    try {
+      let orgObjectId: mongoose.Types.ObjectId | null = null;
+      try { orgObjectId = new mongoose.Types.ObjectId(orgId.toString()); } catch { /* not a valid ObjectId string */ }
+
+      const matchStage = orgObjectId
+        ? { $match: { isActive: true, $or: [{ organizationId: orgObjectId }, { organizationId: orgId.toString() }] } }
+        : { $match: { isActive: true, organizationId: orgId.toString() } };
+
+      const departmentTrendsResult = await Employee.aggregate([
+        matchStage,
+        { $group: { _id: '$department', employeeCount: { $sum: 1 } } }
+      ]);
+
+      console.log('[Analytics] departmentTrendsResult raw:', JSON.stringify(departmentTrendsResult));
+
+      employeeTrendsDepartmentWise = departmentTrendsResult.reduce((acc: Record<string, number>, curr) => {
+        const key = curr._id ? String(curr._id).trim() : 'Unassigned';
+        acc[key] = (acc[key] || 0) + curr.employeeCount;
+        return acc;
+      }, {});
+    } catch (deptErr: any) {
+      console.error('[Analytics] Department trends aggregate failed:', deptErr?.message);
+    }
 
     res.status(200).json({
       totalEmployees,
@@ -219,6 +259,11 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       overallProductivity,
       financeData,
       projectProductivity,
+      totalProjects,
+      activeProjects,
+      projectOnboardCount,
+      projectAssignments,
+      employeeTrendsDepartmentWise,
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

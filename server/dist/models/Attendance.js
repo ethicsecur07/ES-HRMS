@@ -84,7 +84,17 @@ const attendanceSchema = new mongoose_1.Schema({
         description: { type: String },
         isResolved: { type: Boolean, default: false },
         resolvedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' }
-    }
+    },
+    editHistory: [
+        {
+            field: { type: String, required: true },
+            oldValue: { type: String, required: true },
+            newValue: { type: String, required: true },
+            updatedBy: { type: String, required: true },
+            time: { type: Date, default: Date.now },
+            ip: { type: String, required: true }
+        }
+    ]
 }, { timestamps: true });
 // Prevent duplicate attendance per day
 attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });

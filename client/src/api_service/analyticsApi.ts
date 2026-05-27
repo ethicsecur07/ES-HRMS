@@ -4,6 +4,10 @@ import type { AuditLog, CompanySettings } from '../types';
 export const analyticsApi = {
   getDashboardStats: async () => {
     const response = await axiosInstance.get('/analytics/dashboard-stats');
+    if (import.meta.env.DEV) {
+      console.log('[analyticsApi] Full dashboard stats response:', response.data);
+      console.log('[analyticsApi] employeeTrendsDepartmentWise:', (response.data as any)?.employeeTrendsDepartmentWise);
+    }
     return response.data;
   },
 

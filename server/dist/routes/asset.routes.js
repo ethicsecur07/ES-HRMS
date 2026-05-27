@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const asset_controller_js_1 = require("../controllers/asset.controller.js");
+const auth_middleware_js_1 = require("../middlewares/auth.middleware.js");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_js_1.authenticate);
+router.get('/', asset_controller_js_1.getAssets);
+router.get('/employee/:employeeId', asset_controller_js_1.getEmployeeAssets);
+router.post('/', (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), asset_controller_js_1.createAsset);
+router.put('/:id', (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), asset_controller_js_1.updateAsset);
+router.delete('/:id', (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), asset_controller_js_1.deleteAsset);
+exports.default = router;

@@ -8,18 +8,29 @@ export const getConversation = async (req: Request, res: Response): Promise<void
     const userId = (req as any).user.id;
     const { otherUserId } = req.params;
 
-    const messages = await Message.find({
-      $or: [
-        { senderId: userId, receiverId: otherUserId },
-        { senderId: otherUserId, receiverId: userId }
-      ]
-    }).sort({ createdAt: 1 });
+    let query;
+    if (otherUserId === 'broadcast' || otherUserId.startsWith('group_')) {
+      // For broadcast and group chats, messages are queried by their channel identifier
+      query = { receiverId: otherUserId };
+    } else {
+      // 1:1 chat query
+      query = {
+        $or: [
+          { senderId: userId, receiverId: otherUserId },
+          { senderId: otherUserId, receiverId: userId }
+        ]
+      };
+    }
 
-    // Mark received messages as read
-    await Message.updateMany(
-      { senderId: otherUserId, receiverId: userId, read: false },
-      { read: true }
-    );
+    const messages = await Message.find(query).sort({ createdAt: 1 });
+
+    // Mark received messages as read (only relevant for 1:1 chats)
+    if (otherUserId !== 'broadcast' && !otherUserId.startsWith('group_')) {
+      await Message.updateMany(
+        { senderId: otherUserId, receiverId: userId, read: false },
+        { read: true }
+      );
+    }
 
     res.status(200).json({ data: { messages } });
   } catch (error: any) {
@@ -43,18 +54,26 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
     // Emit via socket directly for chat
     const io = getIO();
     if (io) {
-      io.to(`user_${receiverId}`).emit('receive_message', message);
+      if (receiverId === 'broadcast') {
+        io.to(`org_${(req as any).user.organizationId}`).emit('receive_message', message);
+      } else if (receiverId.startsWith('group_')) {
+        io.to(receiverId).emit('receive_message', message);
+      } else {
+        io.to(`user_${receiverId}`).emit('receive_message', message);
+      }
     }
 
-    // Also trigger notification service
-    await notificationService.dispatchNotification({
-      organizationId: (req as any).user.organizationId,
-      recipientId: receiverId,
-      title: 'New Message',
-      message: `You have a new message.`,
-      channels: ['IN_APP'], // Could be Push or Email depending on settings
-      type: 'CHAT'
-    });
+    // Only dispatch notification for 1:1 messages to avoid broadcast spam
+    if (receiverId !== 'broadcast' && !receiverId.startsWith('group_')) {
+      await notificationService.dispatchNotification({
+        organizationId: (req as any).user.organizationId,
+        recipientId: receiverId,
+        title: 'New Message',
+        message: `You have a new message.`,
+        channels: ['IN_APP'],
+        type: 'CHAT'
+      });
+    }
 
     res.status(201).json({ data: message });
   } catch (error: any) {

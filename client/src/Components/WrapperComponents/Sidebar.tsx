@@ -18,7 +18,6 @@ import {
   ListTodo,
   Network,
   FolderOpen,
-  Receipt,
   MessageSquare
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -102,9 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       case '/audit-logs': return ShieldCheck;
       case '/settings': return Settings;
       case '/settings/leave-policy': return Shield;
-      case '/lifecycle': return ListTodo;
       case '/organization': return Network;
-      case '/self-service': return Receipt;
       case '/documents': return FolderOpen;
       case '/chat': return MessageSquare;
       case '/projects': return ListTodo;

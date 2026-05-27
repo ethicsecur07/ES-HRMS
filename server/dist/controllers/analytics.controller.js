@@ -169,6 +169,27 @@ const getDashboardStats = async (req, res) => {
                 teamSize: proj.teamMemberIds?.length || 0,
             };
         });
+        const totalProjects = await Project_js_1.Project.countDocuments({ organizationId: orgId });
+        const activeProjects = await Project_js_1.Project.countDocuments({ status: 'ACTIVE', organizationId: orgId });
+        // Project Onboard Count: Count unique employees assigned to active projects
+        const activeProjectsList = await Project_js_1.Project.find({ status: 'ACTIVE', organizationId: orgId }).select('teamMemberIds');
+        const uniqueAssignedEmployees = new Set();
+        activeProjectsList.forEach(proj => {
+            if (proj.teamMemberIds) {
+                proj.teamMemberIds.forEach(id => uniqueAssignedEmployees.add(id.toString()));
+            }
+        });
+        const projectOnboardCount = uniqueAssignedEmployees.size;
+        const projectAssignments = activeProjectsList.reduce((acc, proj) => acc + (proj.teamMemberIds?.length || 0), 0);
+        // Group active employees by department and count
+        const departmentTrendsResult = await Employee_js_1.Employee.aggregate([
+            { $match: { isActive: true, organizationId: new mongoose_1.default.Types.ObjectId(orgId.toString()) } },
+            { $group: { _id: '$department', employeeCount: { $sum: 1 } } }
+        ]);
+        const employeeTrendsDepartmentWise = departmentTrendsResult.reduce((acc, curr) => {
+            acc[curr._id || 'Unassigned'] = curr.employeeCount;
+            return acc;
+        }, {});
         res.status(200).json({
             totalEmployees,
             presentToday,
@@ -183,6 +204,11 @@ const getDashboardStats = async (req, res) => {
             overallProductivity,
             financeData,
             projectProductivity,
+            totalProjects,
+            activeProjects,
+            projectOnboardCount,
+            projectAssignments,
+            employeeTrendsDepartmentWise,
         });
     }
     catch (error) {

@@ -1,22 +1,104 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { formatCurrency } from '../../utils/formatters';
+import { employeeApi } from '../../api_service/employeeApi';
 import { Card } from '../WrapperComponents/Card';
-import { Users, TrendingUp, DollarSign, FolderKanban, CheckSquare } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, FolderKanban, Building2 } from 'lucide-react';
 
 import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
-  LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
+  AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, LabelList,
 } from 'recharts';
 
 interface AdminAnalyticsChartsProps {
   stats: any;
 }
 
+// ── Department Label Resolution ───────────────────────────────────────────────
+// Uses case-insensitive keyword matching so minor casing/spacing differences
+// in the DB don't break the mapping.
+const resolveDeptLabel = (rawName: string): string => {
+  const n = rawName.trim().toLowerCase();
+
+  // Development group: contains 'mern', 'development', or 'developer'
+  if (n.includes('mern') || n.includes('development') || n.includes('developer')) return 'Development';
+
+  // Digital Marketing group: 'digital marketing' OR standalone 'marketing'
+  if (n.includes('digital') || n === 'marketing') return 'Digital Marketing';
+
+  // BA group: 'bis-tec' (without 'h') or 'business analysis'
+  if ((n.includes('bis') && n.includes('tec') && !n.includes('tech')) || n.includes('business analysis')) return 'BA';
+
+  // BDA group: 'bis-tech' (with 'h') or 'business data'
+  if ((n.includes('bis') && n.includes('tech')) || n.includes('business data')) return 'BDA';
+
+  // Return original (trimmed) for anything else
+  return rawName.trim();
+};
+
+// Vibrant palette per display label
+const DEPT_COLOR_MAP: Record<string, string> = {
+  'Development':       '#6366f1',
+  'Digital Marketing': '#ec4899',
+  'BA':                '#f59e0b',
+  'BDA':               '#10b981',
+};
+
+
+
+// ── Custom Bar Label ─────────────────────────────────────────────────────────
+const CustomBarLabel = (props: any) => {
+  const { x, y, width, value } = props;
+  if (!value) return null;
+  return (
+    <text
+      x={x + width / 2}
+      y={y - 6}
+      fill="#e2e8f0"
+      fontSize={12}
+      fontWeight={700}
+      textAnchor="middle"
+    >
+      {value}
+    </text>
+  );
+};
+
+// ── Custom Tooltip ────────────────────────────────────────────────────────────
+const CustomDeptTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.length) return null;
+  const color = payload[0]?.fill || '#6366f1';
+  return (
+    <div
+      style={{
+        background: 'hsl(var(--card))',
+        border: '1px solid hsl(var(--border))',
+        borderRadius: 10,
+        padding: '10px 16px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+      }}
+    >
+      <p style={{ color, fontWeight: 800, fontSize: 13, marginBottom: 4 }}>{payload[0]?.payload?.name}</p>
+      <p style={{ color: '#e2e8f0', fontSize: 12 }}>
+        👥 <strong>{payload[0]?.value}</strong> employees
+      </p>
+    </div>
+  );
+};
+
 export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stats }) => {
+  // ── Fetch all active employees to compute department breakdown ──────────────
+  // We fetch directly from the employees API (same source as Employee Directory)
+  // because the analytics aggregate is unreliable. limit=500 covers any real org.
+  const { data: empData, isLoading: empLoading } = useQuery({
+    queryKey: ['employees-dept-trends'],
+    queryFn: () => employeeApi.getAll({ isActive: true, limit: 500 }),
+    staleTime: 1000 * 60 * 5, // cache 5 minutes
+  });
+
   if (!stats) return null;
 
-
-  // Mocking payroll trend data for the chart as the backend only returns current month cost
+  // Payroll trend data (mocked months around current cost)
   const payrollTrendData = [
     { month: 'Jan', cost: stats.monthlyPayrollCost * 0.9 },
     { month: 'Feb', cost: stats.monthlyPayrollCost * 0.95 },
@@ -25,103 +107,203 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
     { month: 'May', cost: stats.monthlyPayrollCost },
   ];
 
+  // ── Derive project stats from projectProductivity (always correct) ──────────
+  // The countDocuments backend calls can fail due to orgId type mismatch,
+  // but projectProductivity always returns the real project list.
+  const projectList: any[] = Array.isArray(stats.projectProductivity)
+    ? stats.projectProductivity
+    : [];
+
+  const derivedTotalProjects    = projectList.length;
+  const derivedActiveProjects   = projectList.filter(
+    (p) => p.status === 'ACTIVE' || p.status === 'IN_PROGRESS'
+  ).length;
+
+  // Prefer backend value if > 0, otherwise use derived value
+  const totalProjects     = (stats.totalProjects    > 0) ? stats.totalProjects    : derivedTotalProjects;
+  const activeProjects    = (stats.activeProjects   > 0) ? stats.activeProjects   : derivedActiveProjects;
+
+  // ── Build department chart data from live employees list ───────────────────
+  // Get the employees array — handle both wrapped { employees: [] } and raw []
+  const allEmployees: any[] = Array.isArray(empData)
+    ? empData
+    : (empData as any)?.employees ?? [];
+
+  const mergedDeptMap: Record<string, number> = {};
+  allEmployees.forEach((emp) => {
+    if (!emp.department) return;
+    const label = resolveDeptLabel(emp.department);
+    mergedDeptMap[label] = (mergedDeptMap[label] || 0) + 1;
+  });
+
+  // Preferred display order — only show these 4 groups, nothing else
+  const PREFERRED_ORDER = ['Development', 'Digital Marketing', 'BA', 'BDA'];
+
+  const departmentTrendData = PREFERRED_ORDER
+    .filter(label => label in mergedDeptMap)
+    .map(label => ({
+      name: label,
+      employeeCount: mergedDeptMap[label],
+      fill: DEPT_COLOR_MAP[label],
+    }));
+
+  const totalDeptEmployees = departmentTrendData.reduce((s, d) => s + d.employeeCount, 0);
+
   return (
     <div className="space-y-6 text-left">
-      {/* Top High-Level Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* ── Top Metric Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {/* Total Employees */}
         <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Total Employees
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Total Employees</p>
             <h3 className="text-3xl font-extrabold text-foreground">{stats.totalEmployees ?? 0}</h3>
             <p className="text-xs text-primary font-bold mt-2 flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" /> 100% Active Staff
+              <TrendingUp className="w-3.5 h-3.5" /> Active Staff
             </p>
           </div>
-          <div className="p-4 rounded-2xl bg-primary/10 text-primary">
-            <Users className="w-7 h-7" />
-          </div>
+          <div className="p-4 rounded-2xl bg-primary/10 text-primary"><Users className="w-7 h-7" /></div>
         </Card>
 
-
-        {/* Project Ongoing */}
-        <Card className="border-l-4 border-l-foreground flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
+        {/* Total Projects */}
+        <Card className="border-l-4 border-l-indigo-500 flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Projects Ongoing
-            </p>
-            <h3 className="text-3xl font-extrabold text-foreground">{stats.projectOngoing ?? 0}</h3>
-            <p className="text-xs text-primary font-bold mt-2 flex items-center gap-1">
-              <FolderKanban className="w-3.5 h-3.5" /> Ongoing Projects
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Total Projects</p>
+            <h3 className="text-3xl font-extrabold text-foreground">{totalProjects}</h3>
+            <p className="text-xs text-indigo-500 font-bold mt-2 flex items-center gap-1">
+              <FolderKanban className="w-3.5 h-3.5" /> All Projects
             </p>
           </div>
-          <div className="p-4 rounded-2xl bg-primary/10 text-primary">
-            <FolderKanban className="w-7 h-7" />
-          </div>
+          <div className="p-4 rounded-2xl bg-indigo-500/10 text-indigo-500"><FolderKanban className="w-7 h-7" /></div>
         </Card>
 
-        {/* Project Completed */}
-        <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
+        {/* Active Projects */}
+        <Card className="border-l-4 border-l-emerald-500 flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Projects Completed
-            </p>
-            <h3 className="text-3xl font-extrabold text-foreground">{stats.projectCompleted ?? 0}</h3>
-            <p className="text-xs text-primary font-bold mt-2 flex items-center gap-1">
-              <CheckSquare className="w-3.5 h-3.5" /> Completed Projects
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Active Projects</p>
+            <h3 className="text-3xl font-extrabold text-foreground">{activeProjects}</h3>
+            <p className="text-xs text-emerald-500 font-bold mt-2 flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5" /> Active Projects
             </p>
           </div>
-          <div className="p-4 rounded-2xl bg-primary/10 text-primary">
-            <CheckSquare className="w-7 h-7" />
-          </div>
+          <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-500"><FolderKanban className="w-7 h-7" /></div>
         </Card>
 
-
+       
 
         {/* Monthly Payroll Cost */}
         <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Monthly Payroll Cost
-            </p>
-            <h3 className="text-3xl font-extrabold text-foreground font-mono">
-              {formatCurrency(stats.monthlyPayrollCost ?? 0)}
-            </h3>
-            <p className="text-xs text-muted-foreground font-medium mt-2">Status: Disbursed & Processing</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Monthly Payroll Cost</p>
+            <h3 className="text-3xl font-extrabold text-foreground font-mono">{formatCurrency(stats.monthlyPayrollCost ?? 0)}</h3>
+            <p className="text-xs text-muted-foreground font-medium mt-2">Status: Disbursed</p>
           </div>
-          <div className="p-4 rounded-2xl bg-primary/10 text-primary">
-            <DollarSign className="w-7 h-7" />
-          </div>
+          <div className="p-4 rounded-2xl bg-primary/10 text-primary"><DollarSign className="w-7 h-7" /></div>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Employee Trends (Department Breakdown - Recharts LineChart) */}
-        <Card className="flex flex-col justify-between p-6 bg-card">
-          <div className="mb-4 flex items-center justify-between">
+        {/* ── Department Employee Trends ────────────────────────────────── */}
+        <Card className="flex flex-col p-6 bg-card">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-5">
             <div>
-              <h3 className="text-lg font-bold text-foreground tracking-tight mb-0.5">Employee Trends</h3>
-              <p className="text-xs text-muted-foreground">Average Productivity by Department</p>
+              <h3 className="text-lg font-bold text-foreground tracking-tight mb-0.5 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" />
+                Department Employee Trends
+              </h3>
+              <p className="text-xs text-muted-foreground">Active employee count per department</p>
             </div>
-            <span className="px-3 py-1 bg-muted text-foreground text-xs font-bold rounded-lg border border-border">
-              Overall: {stats.overallProductivity ?? 0}%
-            </span>
+            <div className="px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-xl border border-primary/20 shrink-0">
+              {totalDeptEmployees} Total
+            </div>
           </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={stats.deptsData} margin={{ top: 20, right: 20, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }} />
-                <Line type="monotone" dataKey="avgProductivity" name="Productivity %" stroke="hsl(var(--foreground))" strokeWidth={3} dot={{ r: 6, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--card))' }} activeDot={{ r: 8 }} />
-              </LineChart>
-            </ResponsiveContainer>
+
+          {/* Bar Chart */}
+          {empLoading ? (
+            <div className="h-56 w-full flex flex-col gap-3 justify-end px-2">
+              {[60, 80, 45, 70].map((h, i) => (
+                <div key={i} className="flex items-end gap-4">
+                  <div
+                    className="rounded-t-lg animate-pulse"
+                    style={{ height: `${h}%`, flex: 1, background: 'rgba(255,255,255,0.07)' }}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={departmentTrendData}
+                  margin={{ top: 28, right: 10, left: -25, bottom: 5 }}
+                  barCategoryGap="30%"
+                >
+                  <defs>
+                    {departmentTrendData.map((d, i) => (
+                      <linearGradient key={d.name} id={`grad-dept-${i}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={d.fill} stopOpacity={1} />
+                        <stop offset="100%" stopColor={d.fill} stopOpacity={0.35} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <RechartsTooltip content={<CustomDeptTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                  <Bar dataKey="employeeCount" name="Employees" radius={[8, 8, 0, 0]} maxBarSize={56}>
+                    {departmentTrendData.map((_entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={`url(#grad-dept-${index})`}
+                        stroke={departmentTrendData[index].fill}
+                        strokeWidth={1}
+                      />
+                    ))}
+                    <LabelList content={<CustomBarLabel />} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+
+          {/* Legend row with count badges */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {departmentTrendData.map((d) => (
+              <div
+                key={d.name}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold"
+                style={{
+                  borderColor: d.fill + '40',
+                  background: d.fill + '15',
+                  color: d.fill,
+                }}
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.fill }} />
+                {d.name}
+                <span
+                  className="ml-1 px-1.5 py-0.5 rounded-md text-white font-bold text-[10px] leading-tight"
+                  style={{ background: d.fill }}
+                >
+                  {d.employeeCount}
+                </span>
+              </div>
+            ))}
           </div>
         </Card>
 
-        {/* Payroll Analytics (Recharts AreaChart) */}
+        {/* ── Payroll Analytics ─────────────────────────────────────────── */}
         <Card className="flex flex-col justify-between p-6 bg-card">
           <div className="mb-4">
             <h3 className="text-lg font-bold text-foreground tracking-tight mb-0.5">Payroll Analytics</h3>
@@ -139,14 +321,17 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(val) => `$${val / 1000}k`} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <RechartsTooltip cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }} formatter={(val: any) => formatCurrency(Number(val))} contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }} />
+                <RechartsTooltip
+                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
+                  formatter={(val: any) => formatCurrency(Number(val))}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                />
                 <Area type="monotone" dataKey="cost" name="Payroll Cost" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorCost)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </Card>
       </div>
-
     </div>
   );
 };
@@ -209,7 +394,10 @@ export const FinanceManagementChart: React.FC<FinanceManagementChartProps> = ({ 
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <RechartsTooltip formatter={(val: any) => formatCurrency(Number(val))} contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }} />
+            <RechartsTooltip
+              formatter={(val: any) => formatCurrency(Number(val))}
+              contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+            />
             <Legend />
           </PieChart>
         </ResponsiveContainer>

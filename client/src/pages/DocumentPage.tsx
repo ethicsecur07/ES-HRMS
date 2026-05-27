@@ -1,547 +1,569 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
-import { documentApi, type HRDocument } from '../api_service/documentApi';
+import { documentApi } from '../api_service/documentApi';
 import { employeeApi } from '../api_service/employeeApi';
+import { payrollApi } from '../api_service/payrollApi';
+import { assetApi } from '../api_service/assetApi';
 import { authApi } from '../api_service/authApi';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
-import { Input, Select } from '../Components/WrapperComponents/Input';
-import { Modal } from '../Components/WrapperComponents/Modal';
-import { formatDate } from '../utils/formatters';
+import { Input } from '../Components/WrapperComponents/Input';
+import { usePermission } from '../hooks/usePermission';
 import {
   FolderOpen,
   FileText,
   Search,
-  Plus,
   Upload,
   Download,
-  Calendar,
-  History,
-  AlertTriangle,
   User,
-  Tags,
-  FileCheck
+  Trash2,
+  Loader2,
+  Paperclip,
+  Cpu
 } from 'lucide-react';
 
+type DocCategory = 'RESUME' | 'OFFER_LETTER' | 'CERTIFICATE' | 'TAX_DOCUMENT' | 'PAYSLIP' | 'ASSET' | 'OTHER';
+
 export const DocumentPage: React.FC = () => {
-  const { role } = useAuthStore();
+  const { role, user } = useAuthStore();
   const { addToast } = useNotificationStore();
+  const { hasPermission } = usePermission();
   const queryClient = useQueryClient();
 
   const isHRAdmin = role === 'ADMIN' || role === 'HR';
+  const canUpload = hasPermission('DOCUMENTS', 'create') || isHRAdmin;
+  const canDelete = hasPermission('DOCUMENTS', 'delete') || isHRAdmin;
 
-  // Filters State
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-  const [employeeFilter, setEmployeeFilter] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // Selected Employee State
+  const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+  
+  // Active Category Tab
+  const [activeTab, setActiveTab] = useState<DocCategory>('RESUME');
 
-  // Version History Toggle State
-  const [expandedDocs, setExpandedDocs] = useState<Record<string, boolean>>({});
+  // Sidebar employee search & department filter
+  const [empSearch, setEmpSearch] = useState('');
 
-  // Modal States
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showVersionModal, setShowVersionModal] = useState<string | null>(null);
+  // Search filter for documents list
+  const [docSearch, setDocSearch] = useState('');
 
   // File Upload State
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgressUrl, setUploadProgressUrl] = useState('');
+  const [uploadedUrl, setUploadedUrl] = useState('');
+  const [newDocName, setNewDocName] = useState('');
 
-  // Form State - New Document
-  const [docForm, setDocForm] = useState({
-    employeeId: '',
-    name: '',
-    category: 'CONTRACT' as HRDocument['category'],
-    fileUrl: '',
-    expiresAt: '',
-    signatureStatus: 'NOT_REQUIRED' as HRDocument['signatureStatus'],
-  });
-
-  // Queries
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => employeeApi.getAll().then(res => res.employees),
+  // 1. Fetch Employees (for Sidebar)
+  const { data: employeesData } = useQuery({
+    queryKey: ['employees-sidebar'],
+    queryFn: () => employeeApi.getAll({ limit: 1000 }),
     enabled: isHRAdmin,
   });
+  const employees = employeesData?.employees || [];
 
-  const { data: documents, isLoading } = useQuery({
-    queryKey: ['documents', employeeFilter, selectedCategory],
-    queryFn: () => documentApi.getDocuments({
-      employeeId: isHRAdmin ? employeeFilter || undefined : undefined,
-      category: selectedCategory === 'ALL' ? undefined : selectedCategory
-    }),
+  // Automatically select logged-in employee if standard staff
+  useEffect(() => {
+    if (!isHRAdmin && user?.employeeId) {
+      setSelectedEmpId(user.employeeId);
+    } else if (isHRAdmin && employees.length > 0 && !selectedEmpId) {
+      // Pre-select first employee for Admin/HR convenience
+      setSelectedEmpId(employees[0]._id);
+    }
+  }, [isHRAdmin, user, employees, selectedEmpId]);
+
+  // Selected Employee Profile
+  const activeEmployee = useMemo(() => {
+    return employees.find(emp => emp._id === selectedEmpId) || null;
+  }, [employees, selectedEmpId]);
+
+  // Fetch active employee details if viewing as self (since employees list is only for HRAdmin)
+  const { data: myEmployeeDetails } = useQuery({
+    queryKey: ['employee-self-details', user?.employeeId],
+    queryFn: () => employeeApi.getById(user?.employeeId as string),
+    enabled: !isHRAdmin && !!user?.employeeId,
   });
 
-  // Mutations
+  const displayedEmployee = isHRAdmin ? activeEmployee : (myEmployeeDetails || null);
+
+  // 2. Fetch Employee Documents
+  const { data: documents = [], isLoading: isDocsLoading } = useQuery({
+    queryKey: ['documents', selectedEmpId, activeTab],
+    queryFn: () => documentApi.getDocuments({
+      employeeId: selectedEmpId || undefined,
+      category: activeTab
+    }),
+    enabled: !!selectedEmpId && activeTab !== 'PAYSLIP' && activeTab !== 'ASSET',
+  });
+
+  // 3. Fetch Payslips (for PAYSLIP tab)
+  const { data: allPayrolls = [], isLoading: isPayrollLoading } = useQuery({
+    queryKey: ['payrolls-all-docs'],
+    queryFn: payrollApi.getAll,
+    enabled: !!selectedEmpId && activeTab === 'PAYSLIP',
+  });
+
+  const employeePayslips = useMemo(() => {
+    return allPayrolls.filter(p => {
+      const pEmpId = typeof p.employeeId === 'object' ? p.employeeId?._id : p.employeeId;
+      return pEmpId === selectedEmpId;
+    });
+  }, [allPayrolls, selectedEmpId]);
+
+  // 4. Fetch Assigned Assets (for ASSET tab)
+  const { data: employeeAssets = [], isLoading: isAssetsLoading } = useQuery({
+    queryKey: ['employee-assets-docs', selectedEmpId],
+    queryFn: () => assetApi.getEmployeeAssets(selectedEmpId),
+    enabled: !!selectedEmpId && activeTab === 'ASSET',
+  });
+
+  // Upload Mutation
   const uploadDocMutation = useMutation({
     mutationFn: documentApi.uploadDocument,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
-      addToast('Document Registered', 'New document has been successfully saved to index.', 'success');
-      setShowUploadModal(false);
-      setDocForm({
-        employeeId: '',
-        name: '',
-        category: 'CONTRACT',
-        fileUrl: '',
-        expiresAt: '',
-        signatureStatus: 'NOT_REQUIRED',
-      });
-      setUploadProgressUrl('');
+      queryClient.invalidateQueries({ queryKey: ['documents', selectedEmpId, activeTab] });
+      addToast('Document Uploaded', 'Document successfully indexed under selected folder.', 'success');
+      setUploadedUrl('');
+      setNewDocName('');
+      setIsUploading(false);
     },
     onError: (err: any) => {
-      addToast('Registration Failed', err.message || 'Could not upload document.', 'error');
+      addToast('Upload Failed', err.response?.data?.message || err.message || 'Failed to save document.', 'error');
+      setIsUploading(false);
     }
   });
 
-  const addVersionMutation = useMutation({
-    mutationFn: ({ id, fileUrl }: { id: string; fileUrl: string }) => documentApi.addVersion(id, fileUrl),
+  // Delete Mutation
+  const deleteDocMutation = useMutation({
+    mutationFn: documentApi.deleteDocument,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
-      addToast('New Version Added', 'Version index incremented successfully.', 'success');
-      setShowVersionModal(null);
-      setUploadProgressUrl('');
+      queryClient.invalidateQueries({ queryKey: ['documents', selectedEmpId, activeTab] });
+      addToast('Document Deleted', 'Document reference deleted successfully.', 'info');
     },
     onError: (err: any) => {
-      addToast('Version Upload Failed', err.message || 'Could not upload version.', 'error');
+      addToast('Delete Failed', err.response?.data?.message || err.message || 'Could not delete document.', 'error');
     }
   });
 
-  // Handle Cloudinary Upload
-  const handleFileUpload = async (file: File) => {
+  // Handle Cloudinary File Upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     setIsUploading(true);
     try {
       const url = await authApi.uploadImage(file);
-      addToast('File Securely Uploaded', 'Document reference saved.', 'success');
-      setUploadProgressUrl(url);
-      setDocForm(prev => ({ ...prev, fileUrl: url }));
+      setUploadedUrl(url);
+      setNewDocName(file.name);
+      addToast('Secure File Uploaded', 'Reference loaded. Click Save to complete.', 'success');
     } catch (err: any) {
-      addToast('Upload Failed', err.message || 'Could not upload file.', 'error');
+      addToast('File Upload Failed', err.message || 'Failed to upload document file.', 'error');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleDownload = async (id: string) => {
-    try {
-      const data = await documentApi.downloadDocument(id);
-      window.open(data.fileUrl, '_blank');
-      addToast('Download Initiated', `Opening: ${data.name}`, 'success');
-    } catch (err: any) {
-      addToast('Download Failed', err.message || 'Access denied or link expired.', 'error');
-    }
+  const handleSaveDocument = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadedUrl || !newDocName.trim()) return;
+
+    uploadDocMutation.mutate({
+      employeeId: selectedEmpId,
+      name: newDocName.trim(),
+      category: activeTab,
+      fileUrl: uploadedUrl,
+    });
   };
 
-  // Toggle Version view
-  const toggleVersions = (id: string) => {
-    setExpandedDocs(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  // Filter categories helper
-  const categoriesList = [
-    { value: 'ALL', label: 'All Folders' },
-    { value: 'CONTRACT', label: 'Contracts' },
-    { value: 'PASSPORT', label: 'Passports' },
-    { value: 'VISA', label: 'Visas' },
-    { value: 'ID_PROOF', label: 'ID Proofs' },
-    { value: 'CERTIFICATE', label: 'Certificates' },
-    { value: 'OTHER', label: 'Others' },
-  ];
-
-  // Dynamic filter for client-side search query
-  const filteredDocuments = useMemo(() => {
-    if (!documents) return [];
-    return documents.filter(doc =>
-      doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter sidebar employees by search
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp =>
+      emp.fullName.toLowerCase().includes(empSearch.toLowerCase()) ||
+      (emp.department || '').toLowerCase().includes(empSearch.toLowerCase()) ||
+      (emp.employeeCode || '').toLowerCase().includes(empSearch.toLowerCase())
     );
-  }, [documents, searchQuery]);
+  }, [employees, empSearch]);
 
-  // Expiration Checker
-  const getExpirationStatus = (expiresAtStr?: string) => {
-    if (!expiresAtStr) return null;
-    const expiresAt = new Date(expiresAtStr);
-    const today = new Date();
-    const diffTime = expiresAt.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Filter documents by search
+  const filteredDocs = useMemo(() => {
+    return documents.filter(doc =>
+      doc.name.toLowerCase().includes(docSearch.toLowerCase())
+    );
+  }, [documents, docSearch]);
 
-    if (diffDays <= 0) {
-      return { text: 'Expired', style: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
-    }
-    if (diffDays <= 30) {
-      return { text: `Expires in ${diffDays}d`, style: 'bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse' };
-    }
-    return { text: `Valid until ${formatDate(expiresAtStr)}`, style: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
-  };
+  const categoriesList: { value: DocCategory; label: string }[] = [
+    { value: 'RESUME', label: 'Resume' },
+    { value: 'OFFER_LETTER', label: 'Offer Letter' },
+    { value: 'CERTIFICATE', label: 'Certificates' },
+    { value: 'TAX_DOCUMENT', label: 'Tax Documents' },
+    { value: 'PAYSLIP', label: 'Payslips' },
+    { value: 'ASSET', label: 'Assigned Assets' },
+    { value: 'OTHER', label: 'Other Uploads' },
+  ];
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
-      {/* Title & Header */}
+      {/* Title Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border shadow-sm">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
             <FolderOpen className="w-6 h-6 text-primary" />
-            Document Management
+            Document Directory
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Store, catalog, trace revisions, and track expiration of critical organizational agreements
+            Access, upload, and manage files, contracts, dynamic payslips, and hardware resources.
           </p>
         </div>
-
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-          <Button onClick={() => setShowUploadModal(true)} className="flex items-center gap-1.5 shadow-lg">
-            <Plus className="w-4 h-4" /> Upload Document
-          </Button>
-        </div>
       </div>
 
-      {/* Main Dual Pane Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        {/* Left Side Folder Categories */}
-        <div className="space-y-4">
-          <Card className="p-4 space-y-1 bg-card/60 backdrop-blur-sm border border-border/80">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mb-2 flex items-center gap-1">
-              <Tags className="w-3.5 h-3.5" /> File Folders
-            </p>
-            {categoriesList.map(cat => (
-              <button
-                key={cat.value}
-                onClick={() => setSelectedCategory(cat.value)}
-                className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 ${
-                  selectedCategory === cat.value
-                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/10'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                <span>{cat.label}</span>
-                {selectedCategory === cat.value && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
-              </button>
-            ))}
-          </Card>
+        {/* Left Pane - Sidebar Employee Directory (HR/Admin Only) */}
+        {isHRAdmin && (
+          <div className="space-y-4 lg:col-span-1">
+            <Card className="p-4 space-y-4 border border-border/80 bg-card/75 backdrop-blur-md">
+              <h3 className="text-xs font-extrabold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-primary" /> Staff Directory
+              </h3>
+              
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search staff..."
+                  value={empSearch}
+                  onChange={(e) => setEmpSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-background border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                />
+              </div>
 
-          {isHRAdmin && (
-            <Card className="p-4 space-y-3 bg-card/60 backdrop-blur-sm border border-border/80">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
-                <User className="w-3.5 h-3.5" /> Employee Filter
-              </p>
-              <select
-                value={employeeFilter}
-                onChange={(e) => setEmployeeFilter(e.target.value)}
-                className="w-full bg-background text-foreground border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-              >
-                <option value="">All Employees</option>
-                {employees?.map(emp => (
-                  <option key={emp._id} value={emp._id}>{emp.fullName}</option>
-                ))}
-              </select>
-            </Card>
-          )}
-        </div>
-
-        {/* Right Side File Grid */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-4 top-3.5 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search documents by filename..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 py-3 text-sm rounded-2xl bg-card"
-            />
-          </div>
-
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
-              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-xs font-bold uppercase tracking-widest">Loading Document Registry...</p>
-            </div>
-          ) : filteredDocuments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border rounded-2xl bg-muted/10">
-              <FileText className="w-12 h-12 text-muted-foreground/45 mb-3" />
-              <p className="font-bold text-sm">No Documents Found</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Upload a new document or modify your filters to begin.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredDocuments.map(doc => {
-                const isExp = getExpirationStatus(doc.expiresAt);
-                const isExpanded = !!expandedDocs[doc._id];
-                const empName = typeof doc.employeeId === 'object' ? doc.employeeId.fullName : 'Employee';
-
-                return (
-                  <Card key={doc._id} className="border border-border/80 bg-card hover:shadow-md transition-all duration-200 p-5 flex flex-col justify-between space-y-4 relative group">
-                    {/* Header info */}
-                    <div className="space-y-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-bold text-sm text-foreground tracking-tight group-hover:text-primary transition-colors pr-8 leading-snug truncate" title={doc.name}>
-                          {doc.name}
-                        </h4>
-                        <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 absolute right-5 top-5">
-                          v{doc.version}
-                        </span>
+              <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-1">
+                {filteredEmployees.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">No employees found</p>
+                ) : (
+                  filteredEmployees.map(emp => (
+                    <button
+                      key={emp._id}
+                      onClick={() => { setSelectedEmpId(emp._id); setDocSearch(''); }}
+                      className={`w-full text-left p-2.5 rounded-xl text-xs transition-all flex items-center gap-3 border ${
+                        selectedEmpId === emp._id
+                          ? 'bg-primary/10 border-primary text-primary font-bold shadow-sm'
+                          : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary font-bold uppercase border border-primary/10">
+                        {emp.fullName.charAt(0)}
                       </div>
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 font-medium">
-                        <span className="uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted font-bold text-[9px] border border-border">{doc.category}</span>
-                        {isHRAdmin && <span>• Owned by: <strong className="text-foreground">{empName}</strong></span>}
-                      </p>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate leading-none mb-0.5">{emp.fullName}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono truncate">{emp.employeeCode} | {emp.department}</p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
 
-                    {/* Expiration and signatures statuses */}
-                    <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                      {isExp && (
-                        <span className={`px-2.5 py-0.5 rounded-full font-bold border flex items-center gap-1 ${isExp.style}`}>
-                          <Calendar className="w-3 h-3" />
-                          {isExp.text}
-                        </span>
-                      )}
+        {/* Right Pane - Detail View */}
+        <div className={isHRAdmin ? 'lg:col-span-3 space-y-6' : 'lg:col-span-4 space-y-6'}>
+          {displayedEmployee ? (
+            <>
+              {/* Employee Summary Card */}
+              <Card className="p-6 border-l-4 border-l-primary bg-card/60 backdrop-blur-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-foreground leading-none">{displayedEmployee.fullName}</h3>
+                  <p className="text-xs text-muted-foreground mt-1.5 font-medium flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-muted border border-border font-bold uppercase text-[9px]">{displayedEmployee.employeeCode}</span>
+                    <span>•</span>
+                    <span>{displayedEmployee.department}</span>
+                    <span>•</span>
+                    <span>{displayedEmployee.designation}</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-mono mt-1">{displayedEmployee.email}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className={`px-2.5 py-1 rounded-full font-bold border ${
+                    displayedEmployee.isActive 
+                      ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                  }`}>
+                    {displayedEmployee.isActive ? 'Active Employee' : 'Inactive'}
+                  </span>
+                </div>
+              </Card>
 
-                      <span className={`px-2.5 py-0.5 rounded-full font-bold border flex items-center gap-1 ${
-                        doc.signatureStatus === 'SIGNED'
-                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                          : doc.signatureStatus === 'PENDING'
-                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse'
-                          : 'bg-muted text-muted-foreground border-border/60'
-                      }`}>
-                        <FileCheck className="w-3 h-3" />
-                        {doc.signatureStatus === 'SIGNED' ? 'Signed' : doc.signatureStatus === 'PENDING' ? 'Signature Pending' : 'No Signature Required'}
-                      </span>
-                    </div>
+              {/* Tabs Navbar */}
+              <div className="flex border-b border-border overflow-x-auto scrollbar-none gap-2">
+                {categoriesList.map(tab => (
+                  <button
+                    key={tab.value}
+                    onClick={() => { setActiveTab(tab.value); setDocSearch(''); }}
+                    className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 whitespace-nowrap transition-all ${
+                      activeTab === tab.value
+                        ? 'border-primary text-primary font-extrabold'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-                      <Button size="sm" onClick={() => handleDownload(doc._id)} className="flex-1 text-xs py-1.5 px-3 flex items-center justify-center gap-1">
-                        <Download className="w-3.5 h-3.5" /> Download
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setShowVersionModal(doc._id)} className="text-xs py-1.5 px-3 flex items-center justify-center gap-1 border-border/60">
-                        <Upload className="w-3.5 h-3.5" /> New Version
-                      </Button>
-                      
-                      {/* Revision timeline toggle */}
-                      {doc.versions && doc.versions.length > 0 && (
-                        <button
-                          onClick={() => toggleVersions(doc._id)}
-                          className="p-1.5 rounded-xl border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200"
-                          title="View Revisions History"
-                        >
-                          <History className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+              {/* Tab Panels */}
+              <div className="space-y-4">
+                {/* Standard Documents Panel (RESUME, OFFER_LETTER, CERTIFICATE, TAX_DOCUMENT, OTHER) */}
+                {activeTab !== 'PAYSLIP' && activeTab !== 'ASSET' && (
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start animate-in fade-in duration-200">
+                    {/* Documents List - takes 2 columns */}
+                    <div className="xl:col-span-2 space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder={`Search ${activeTab.replace('_', ' ').toLowerCase()} files...`}
+                          value={docSearch}
+                          onChange={(e) => setDocSearch(e.target.value)}
+                          className="pl-9 py-1.5 text-xs bg-card"
+                        />
+                      </div>
 
-                    {/* Expanded Version list timeline */}
-                    {isExpanded && doc.versions && (
-                      <div className="mt-3 pt-3 border-t border-dashed border-border space-y-2.5 bg-muted/20 p-3 rounded-xl">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                          <History className="w-3 h-3" /> Revisions Timeline
-                        </p>
-                        <div className="space-y-3 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[1px] before:bg-border/60">
-                          {doc.versions.map((ver) => {
-                            const uploaderName = typeof ver.uploadedBy === 'object' ? ver.uploadedBy.name : 'System';
-                            return (
-                              <div key={ver.version} className="flex items-start gap-3 pl-5 relative">
-                                <div className="absolute left-[5px] top-[5px] w-1.5 h-1.5 rounded-full bg-primary border border-background z-10" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-xs font-bold text-foreground">Version {ver.version}</span>
-                                    <span className="text-[9px] text-muted-foreground font-mono">{new Date(ver.uploadedAt).toLocaleDateString()}</span>
-                                  </div>
-                                  <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                                    Uploaded by: <strong className="text-foreground">{uploaderName}</strong>
-                                  </p>
-                                  <a href={ver.fileUrl} target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline font-mono mt-0.5 block truncate">
-                                    {ver.fileUrl}
-                                  </a>
-                                </div>
-                              </div>
-                            );
-                          })}
+                      {isDocsLoading ? (
+                        <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center">
+                          <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+                          <span className="text-xs uppercase font-bold tracking-wider">Loading Files...</span>
                         </div>
+                      ) : filteredDocs.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl bg-muted/10">
+                          <FileText className="w-10 h-10 text-muted-foreground/45 mb-2.5" />
+                          <p className="font-bold text-xs">No Files Uploaded</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Use the upload box on the right to add folders.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {filteredDocs.map(doc => (
+                            <Card key={doc._id} className="p-4 border border-border/80 bg-card hover:shadow-sm transition-all duration-200 flex flex-col justify-between space-y-3 relative group">
+                              <div className="space-y-1 pr-6">
+                                <h4 className="font-bold text-xs text-foreground truncate pr-6 group-hover:text-primary transition-colors" title={doc.name}>
+                                  {doc.name}
+                                </h4>
+                                <p className="text-[9px] text-muted-foreground font-mono">
+                                  Uploaded: {new Date(doc.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
+                                <Button
+                                  size="sm"
+                                  onClick={() => window.open(doc.fileUrl, '_blank')}
+                                  className="flex-1 text-[10px] py-1 px-2.5 flex items-center justify-center gap-1"
+                                >
+                                  <Download className="w-3 h-3" /> Open
+                                </Button>
+                                {canDelete && (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => {
+                                      if (confirm(`Are you sure you want to delete ${doc.name}?`)) {
+                                        deleteDocMutation.mutate(doc._id);
+                                      }
+                                    }}
+                                    className="p-1 px-2 text-[10px]"
+                                    title="Delete Document"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload File Box - takes 1 column */}
+                    {canUpload && (
+                      <div className="xl:col-span-1">
+                        <Card className="p-5 border border-border/80 bg-card/65 space-y-4">
+                          <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                            <Upload className="w-4 h-4 text-primary" /> Upload Reference
+                          </h4>
+                          <form onSubmit={handleSaveDocument} className="space-y-4">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase block">Choose Local File</label>
+                              <label className="flex items-center justify-center gap-2 p-6 rounded-xl border border-dashed border-border hover:bg-muted/30 cursor-pointer transition-colors text-center w-full">
+                                {isUploading ? (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                                    <span className="text-[10px] text-muted-foreground font-medium">Uploading to cloud storage...</span>
+                                  </div>
+                                ) : uploadedUrl ? (
+                                  <div className="flex flex-col items-center gap-1">
+                                    <Paperclip className="w-6 h-6 text-emerald-500" />
+                                    <span className="text-[10px] text-emerald-600 font-bold">File loaded successfully</span>
+                                    <span className="text-[9px] text-muted-foreground truncate max-w-[200px]">{newDocName}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center gap-1.5">
+                                    <Upload className="w-6 h-6 text-muted-foreground/60" />
+                                    <span className="text-[10px] text-muted-foreground font-semibold">Click to select files</span>
+                                  </div>
+                                )}
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  onChange={handleFileUpload}
+                                  disabled={isUploading}
+                                />
+                              </label>
+                            </div>
+
+                            {uploadedUrl && (
+                              <Input
+                                label="Document Label / Title *"
+                                value={newDocName}
+                                onChange={(e) => setNewDocName(e.target.value)}
+                                required
+                              />
+                            )}
+
+                            <Button
+                              type="submit"
+                              className="w-full text-xs font-bold uppercase tracking-wider bg-primary text-white shadow-md py-2.5"
+                              isLoading={uploadDocMutation.isPending}
+                              disabled={isUploading || !uploadedUrl}
+                            >
+                              Save Document
+                            </Button>
+                          </form>
+                        </Card>
                       </div>
                     )}
-                  </Card>
-                );
-              })}
+                  </div>
+                )}
+
+                {/* Payslips Tab Panel */}
+                {activeTab === 'PAYSLIP' && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    {isPayrollLoading ? (
+                      <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+                        <span className="text-xs uppercase font-bold tracking-wider">Loading payroll data...</span>
+                      </div>
+                    ) : employeePayslips.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl bg-muted/10">
+                        <FileText className="w-10 h-10 text-muted-foreground/45 mb-2.5" />
+                        <p className="font-bold text-xs">No Payslips Generated</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Run payroll cycles under the payroll tab to generate payslips.</p>
+                      </div>
+                    ) : (
+                      <Card className="overflow-hidden border border-border p-0">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="bg-muted/40 border-b border-border">
+                                <th className="p-3 font-bold text-muted-foreground uppercase">Payout Month</th>
+                                <th className="p-3 font-bold text-muted-foreground uppercase">Base Salary</th>
+                                <th className="p-3 font-bold text-muted-foreground uppercase">Deductions</th>
+                                <th className="p-3 font-bold text-muted-foreground uppercase">Net Payout</th>
+                                <th className="p-3 font-bold text-muted-foreground uppercase">Status</th>
+                                <th className="p-3 font-bold text-muted-foreground uppercase text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/60">
+                              {employeePayslips.map(p => (
+                                <tr key={p._id} className="hover:bg-muted/10 transition-colors">
+                                  <td className="p-3 font-bold text-foreground">{p.month}</td>
+                                  <td className="p-3 font-mono">₹{p.baseSalary.toLocaleString()}</td>
+                                  <td className="p-3 font-mono text-rose-500">-₹{p.deductions.toLocaleString()}</td>
+                                  <td className="p-3 font-mono font-bold text-primary">₹{p.finalSalary.toLocaleString()}</td>
+                                  <td className="p-3">
+                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase ${
+                                      p.paidStatus === 'PAID'
+                                        ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                                        : 'bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse'
+                                    }`}>
+                                      {p.paidStatus}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    {p.payslipUrl ? (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => window.open(p.payslipUrl, '_blank')}
+                                        className="text-[10px] py-1 px-2.5 flex items-center gap-1 ml-auto"
+                                      >
+                                        <Download className="w-3 h-3" /> Download Payslip
+                                      </Button>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground italic">Payslip PDF not generated</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
+                {/* Assigned Assets Tab Panel */}
+                {activeTab === 'ASSET' && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    {isAssetsLoading ? (
+                      <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+                        <span className="text-xs uppercase font-bold tracking-wider">Loading assigned assets...</span>
+                      </div>
+                    ) : employeeAssets.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl bg-muted/10">
+                        <Cpu className="w-10 h-10 text-muted-foreground/45 mb-2.5" />
+                        <p className="font-bold text-xs">No Assets Assigned</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Assign hardware/software assets under the assets tab.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {employeeAssets.map(asset => (
+                          <Card key={asset._id} className="p-4 border border-border/80 bg-card/65 flex flex-col justify-between space-y-3">
+                            <div>
+                              <div className="flex justify-between items-start gap-2">
+                                <h4 className="font-bold text-sm text-foreground truncate" title={asset.name}>
+                                  {asset.name}
+                                </h4>
+                                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-muted border border-border text-muted-foreground">
+                                  {asset.type}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground font-mono mt-1">S/N: {asset.serialNumber}</p>
+                              {asset.notes && (
+                                <p className="text-[10px] text-muted-foreground/80 italic mt-2 line-clamp-2">
+                                  Note: {asset.notes}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground font-semibold">
+                              <span>Allocated Status:</span>
+                              <span className="inline-flex px-2 py-0.5 rounded-full font-bold uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                {asset.status}
+                              </span>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-border rounded-2xl bg-muted/15">
+              <FolderOpen className="w-16 h-16 text-muted-foreground/40 mb-3" />
+              <p className="font-bold text-sm">Please Select a Staff Member</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Select an employee from the left sidebar directory to review and manage folders.</p>
             </div>
           )}
         </div>
       </div>
-
-      {/* Modal - Upload Document */}
-      <Modal
-        isOpen={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-        title="Upload HR Document"
-        maxWidth="max-w-md"
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            uploadDocMutation.mutate({
-              name: docForm.name,
-              category: docForm.category,
-              fileUrl: docForm.fileUrl,
-              expiresAt: docForm.expiresAt ? new Date(docForm.expiresAt).toISOString() : undefined,
-              signatureStatus: docForm.signatureStatus,
-              employeeId: isHRAdmin ? docForm.employeeId || undefined : undefined
-            });
-          }}
-          className="space-y-4"
-        >
-          {isHRAdmin && (
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground uppercase">Target Employee *</label>
-              <select
-                value={docForm.employeeId}
-                onChange={(e) => setDocForm(p => ({ ...p, employeeId: e.target.value }))}
-                className="w-full bg-background text-foreground border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                required
-              >
-                <option value="">Select Employee...</option>
-                {employees?.map(emp => (
-                  <option key={emp._id} value={emp._id}>{emp.fullName}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <Input
-            label="Document Label / Name *"
-            placeholder="e.g. Visa_Renewal_2026.pdf"
-            value={docForm.name}
-            onChange={(e) => setDocForm(p => ({ ...p, name: e.target.value }))}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Document Category *"
-              value={docForm.category}
-              onChange={(e) => setDocForm(p => ({ ...p, category: e.target.value as any }))}
-              options={[
-                { value: 'CONTRACT', label: 'Contract Agreement' },
-                { value: 'PASSPORT', label: 'Passport Copy' },
-                { value: 'VISA', label: 'Visa & Residency' },
-                { value: 'ID_PROOF', label: 'National ID Proof' },
-                { value: 'CERTIFICATE', label: 'Certificates & Degrees' },
-                { value: 'OTHER', label: 'Other Document' },
-              ]}
-            />
-
-            <Select
-              label="Signature Obligation *"
-              value={docForm.signatureStatus}
-              onChange={(e) => setDocForm(p => ({ ...p, signatureStatus: e.target.value as any }))}
-              options={[
-                { value: 'NOT_REQUIRED', label: 'No Signature Required' },
-                { value: 'PENDING', label: 'Require Signature' },
-              ]}
-            />
-          </div>
-
-          <Input
-            label="Expiration Date"
-            type="date"
-            value={docForm.expiresAt}
-            onChange={(e) => setDocForm(p => ({ ...p, expiresAt: e.target.value }))}
-          />
-
-          {/* Uploader UI */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-muted-foreground uppercase block">Upload File *</label>
-            <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border hover:bg-muted text-xs font-medium cursor-pointer transition-colors w-max">
-              <Upload className="w-4 h-4 text-muted-foreground" />
-              <span>{isUploading ? 'Uploading Reference...' : uploadProgressUrl ? 'File Uploaded' : 'Choose Document File'}</span>
-              <input
-                type="file"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileUpload(file);
-                }}
-                disabled={isUploading}
-              />
-            </label>
-
-            {uploadProgressUrl && (
-              <p className="text-[10px] text-emerald-500 font-medium truncate">
-                Secure link: {uploadProgressUrl}
-              </p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" type="button" onClick={() => setShowUploadModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={uploadDocMutation.isPending} disabled={isUploading || !docForm.fileUrl}>
-              Upload Reference
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal - Upload New Version */}
-      <Modal
-        isOpen={!!showVersionModal}
-        onClose={() => { setShowVersionModal(null); setUploadProgressUrl(''); }}
-        title="Upload Document Revision"
-        maxWidth="max-w-md"
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (showVersionModal) {
-              addVersionMutation.mutate({
-                id: showVersionModal,
-                fileUrl: uploadProgressUrl
-              });
-            }
-          }}
-          className="space-y-4"
-        >
-          <div className="flex items-start gap-3 p-4 bg-muted/40 rounded-xl border border-border text-xs">
-            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">Revising Existing File</p>
-              <p className="text-muted-foreground mt-0.5">Uploading a new file will automatically increment the document's version number by 1, preserving the historical changes and authorship.</p>
-            </div>
-          </div>
-
-          {/* Version uploader */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-muted-foreground uppercase block">Select Revised Document *</label>
-            <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border hover:bg-muted text-xs font-medium cursor-pointer transition-colors w-max">
-              <Upload className="w-4 h-4 text-muted-foreground" />
-              <span>{isUploading ? 'Uploading Reference...' : uploadProgressUrl ? 'File Ready' : 'Choose New Version File'}</span>
-              <input
-                type="file"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileUpload(file);
-                }}
-                disabled={isUploading}
-              />
-            </label>
-
-            {uploadProgressUrl && (
-              <p className="text-[10px] text-emerald-500 font-medium truncate">
-                Attached secure link: {uploadProgressUrl}
-              </p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" type="button" onClick={() => { setShowVersionModal(null); setUploadProgressUrl(''); }}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={addVersionMutation.isPending} disabled={isUploading || !uploadProgressUrl}>
-              Apply Revision
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 };

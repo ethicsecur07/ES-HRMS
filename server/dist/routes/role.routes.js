@@ -12,4 +12,6 @@ router.get('/:id', role_controller_js_1.getRoleById);
 router.post('/', role_controller_js_1.createRole);
 router.put('/:id', role_controller_js_1.updateRole);
 router.delete('/:id', role_controller_js_1.deleteRole);
+router.get('/:id/members', role_controller_js_1.getRoleMembers);
+router.post('/:id/members', role_controller_js_1.updateRoleMembers);
 exports.default = router;

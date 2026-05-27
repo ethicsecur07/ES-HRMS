@@ -63,6 +63,7 @@ export class EmployeeService {
       // 3. Create Employee record
       const [employee] = await Employee.create([{
         ...employeeData,
+        isActive: true,
         organizationId: orgId,
       }], { session });
 
@@ -249,6 +250,7 @@ export class EmployeeService {
 
     const total = await Employee.countDocuments(query);
     const employees = await Employee.find(query)
+      .select('-salary -emergencyContact')
       .populate('departmentId', 'name code')
       .populate('designationId', 'name code')
       .sort(sortObj)
@@ -256,8 +258,8 @@ export class EmployeeService {
       .limit(limitNum);
 
     const employeeIds = employees.map(emp => emp._id);
-    const users = await User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId ssoData');
-    const userMap = new Map(users.map(u => [u.employeeId?.toString(), { userId: u._id.toString(), ssoData: u.ssoData }]));
+    const users = await User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId ssoData role');
+    const userMap = new Map(users.map(u => [u.employeeId?.toString(), { userId: u._id.toString(), ssoData: u.ssoData, role: u.role }]));
 
     const enrichedEmployees = employees.map(emp => {
       const empObj = emp.toObject();
@@ -265,7 +267,8 @@ export class EmployeeService {
       return {
         ...empObj,
         userId: userData?.userId || null,
-        ssoData: userData?.ssoData || null
+        ssoData: userData?.ssoData || null,
+        role: userData?.role || 'EMPLOYEE'
       };
     });
 
