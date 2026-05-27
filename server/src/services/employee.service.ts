@@ -433,10 +433,10 @@ export class EmployeeService {
       nextLink = pageData['@odata.nextLink'] || null;
     }
 
-    // 4. Filter strictly to @ethicsecur.co.in accounts
+    // 4. Filter strictly to @ethicsecur.co.in and @ethicsecur.com accounts
     const filteredUsers = msUsers.filter((user: any) => {
       const email = (user.mail || user.userPrincipalName || '').toLowerCase().trim();
-      return email.endsWith('@ethicsecur.co.in');
+      return email.endsWith('@ethicsecur.co.in') || email.endsWith('@ethicsecur.com');
     });
 
     let createdCount = 0;
@@ -524,21 +524,42 @@ export class EmployeeService {
           await employee.save();
 
           // Sync User details
-          await User.findOneAndUpdate(
-            { employeeId: employee._id, organizationId: orgId },
-            {
+          let user = await User.findOne({
+            $or: [
+              { employeeId: employee._id },
+              { email: email }
+            ],
+            organizationId: orgId
+          });
+
+          const ssoData = {
+            provider: 'MICROSOFT',
+            azureRoles: msUser.roles || [],
+            jobTitle: msJobTitle,
+            department: msDeptName,
+            lastSyncedAt: new Date()
+          };
+
+          if (user) {
+            user.name = fullName;
+            user.email = email;
+            user.employeeId = employee._id; // Ensure linked
+            user.isActive = true;
+            user.ssoData = ssoData;
+            await user.save();
+          } else {
+            const hashedPassword = await PasswordService.hashPassword('EthicSec@2026');
+            await User.create({
+              organizationId: orgId,
               name: fullName,
               email,
+              password: hashedPassword,
+              role: 'EMPLOYEE',
+              employeeId: employee._id,
               isActive: true,
-              ssoData: {
-                provider: 'MICROSOFT',
-                azureRoles: msUser.roles || [],
-                jobTitle: msJobTitle,
-                department: msDeptName,
-                lastSyncedAt: new Date()
-              }
-            }
-          );
+              ssoData
+            });
+          }
           updatedCount++;
         } else {
           // Onboard new employee

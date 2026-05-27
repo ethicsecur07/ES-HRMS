@@ -123,7 +123,7 @@ export const rbacGuard = (
         });
 
         const directPermissions = permissions.filter((p) => p.userId?.toString() === userId.toString());
-        const rolePermissions = permissions.filter((p) => !p.userId && roleIds.includes(p.roleId?.toString() || ''));
+        const rolePermissions = permissions.filter((p) => !p.userId && compiledRoleIds.includes(p.roleId?.toString() || ''));
         activePermissions = directPermissions.length > 0 ? directPermissions : rolePermissions;
 
         // Save to Redis (Cache for 15 minutes)

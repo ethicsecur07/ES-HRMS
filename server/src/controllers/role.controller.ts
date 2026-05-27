@@ -3,6 +3,7 @@ import { Role } from '../models/Role.js';
 import { AuthRequest } from '../types/index.js';
 import { RoleMember } from '../models/RoleMember.js';
 import mongoose from 'mongoose';
+import { redisClearPattern } from '../utils/redisClient.js';
 
 /**
  * Get all roles for the authenticated user's organization.
@@ -15,8 +16,25 @@ export const getRoles = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    const roles = await Role.find({ organizationId: orgId }).populate('parentRoleId', 'name code');
-    res.status(200).json({ success: true, data: roles });
+    const roles = await Role.find({ organizationId: orgId }).populate('parentRoleId', 'name code').lean();
+    
+    // Fetch all role members for this organization
+    const members = await RoleMember.find({ organizationId: orgId })
+      .populate({
+        path: 'userId',
+        select: 'name email role employeeId isActive',
+      })
+      .lean();
+
+    const rolesWithMembers = roles.map((role: any) => {
+      const roleMembers = members.filter((m: any) => m.roleId.toString() === role._id.toString());
+      return {
+        ...role,
+        members: roleMembers.map((m: any) => m.userId).filter(Boolean),
+      };
+    });
+
+    res.status(200).json({ success: true, data: rolesWithMembers });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Failed to retrieve roles.', error: error.message });
   }
@@ -35,13 +53,25 @@ export const getRoleById = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const role = await Role.findOne({ _id: id, organizationId: orgId }).populate('parentRoleId', 'name code');
+    const role = await Role.findOne({ _id: id, organizationId: orgId }).populate('parentRoleId', 'name code').lean();
     if (!role) {
       res.status(404).json({ success: false, message: 'Role not found.' });
       return;
     }
 
-    res.status(200).json({ success: true, data: role });
+    const members = await RoleMember.find({ roleId: id, organizationId: orgId })
+      .populate({
+        path: 'userId',
+        select: 'name email role employeeId isActive',
+      })
+      .lean();
+
+    const roleWithMembers = {
+      ...role,
+      members: members.map((m: any) => m.userId).filter(Boolean),
+    };
+
+    res.status(200).json({ success: true, data: roleWithMembers });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'Failed to retrieve role.', error: error.message });
   }
@@ -86,8 +116,16 @@ export const createRole = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     // Validate parentRoleId exists in this org
-    if (parentRoleId) {
-      const parentExists = await Role.findOne({ _id: parentRoleId, organizationId: orgId });
+    let resolvedParentRoleId = parentRoleId;
+    if (parentRoleId && typeof parentRoleId === 'object') {
+      resolvedParentRoleId = (parentRoleId as any)._id || parentRoleId;
+    }
+    if (resolvedParentRoleId === 'null' || resolvedParentRoleId === 'undefined' || resolvedParentRoleId === '') {
+      resolvedParentRoleId = null;
+    }
+
+    if (resolvedParentRoleId) {
+      const parentExists = await Role.findOne({ _id: resolvedParentRoleId, organizationId: orgId });
       if (!parentExists) {
         res.status(400).json({ success: false, message: 'Specified parent role does not exist.' });
         return;
@@ -99,11 +137,14 @@ export const createRole = async (req: AuthRequest, res: Response): Promise<void>
       name: name.trim(),
       code: formattedCode,
       description,
-      parentRoleId: parentRoleId || null,
+      parentRoleId: resolvedParentRoleId || null,
       isActive: isActive ?? true
     });
 
     await newRole.save();
+
+    // Invalidate Redis RBAC cache for this organization
+    await redisClearPattern(`rbac:${orgId}:*`);
 
     res.status(201).json({ success: true, message: 'Role created successfully.', data: newRole });
   } catch (error: any) {
@@ -132,8 +173,21 @@ export const updateRole = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    // Do not allow modifying ADMIN role code or parent
-    if (role.code === 'ADMIN' && (code && code !== 'ADMIN' || parentRoleId)) {
+    let resolvedParentRoleId = parentRoleId;
+    if (parentRoleId && typeof parentRoleId === 'object') {
+      resolvedParentRoleId = (parentRoleId as any)._id || parentRoleId;
+    }
+    if (resolvedParentRoleId === 'null' || resolvedParentRoleId === 'undefined' || resolvedParentRoleId === '') {
+      resolvedParentRoleId = null;
+    }
+
+    // Do not allow modifying ADMIN role code or parent hierarchy
+    const currentParentIdStr = role.parentRoleId?.toString() || '';
+    const newParentIdStr = resolvedParentRoleId ? resolvedParentRoleId.toString() : '';
+    if (role.code === 'ADMIN' && (
+      (code && code !== 'ADMIN') ||
+      (parentRoleId !== undefined && newParentIdStr !== currentParentIdStr)
+    )) {
       res.status(400).json({ success: false, message: 'System Administrator role code and hierarchy cannot be modified.' });
       return;
     }
@@ -163,14 +217,14 @@ export const updateRole = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     // Validate parentRoleId if modified (prevent cyclic dependencies)
-    if (parentRoleId) {
-      if (parentRoleId.toString() === id) {
+    if (resolvedParentRoleId) {
+      if (resolvedParentRoleId.toString() === id) {
         res.status(400).json({ success: false, message: 'A role cannot be its own parent.' });
         return;
       }
 
       // Check if the assigned parent has this role as parent (prevent simple cyclic loop)
-      const parentRoleObj = await Role.findOne({ _id: parentRoleId, organizationId: orgId });
+      const parentRoleObj = await Role.findOne({ _id: resolvedParentRoleId, organizationId: orgId });
       if (!parentRoleObj) {
         res.status(400).json({ success: false, message: 'Specified parent role does not exist.' });
         return;
@@ -185,10 +239,13 @@ export const updateRole = async (req: AuthRequest, res: Response): Promise<void>
     role.name = name ? name.trim() : role.name;
     role.code = code ? code.toUpperCase().trim() : role.code;
     role.description = description !== undefined ? description : role.description;
-    role.parentRoleId = parentRoleId !== undefined ? (parentRoleId || null) : role.parentRoleId;
+    role.parentRoleId = parentRoleId !== undefined ? (resolvedParentRoleId || null) : role.parentRoleId;
     role.isActive = isActive !== undefined ? isActive : role.isActive;
 
     await role.save();
+
+    // Invalidate Redis RBAC cache for this organization
+    await redisClearPattern(`rbac:${orgId}:*`);
 
     res.status(200).json({ success: true, message: 'Role updated successfully.', data: role });
   } catch (error: any) {
@@ -232,6 +289,9 @@ export const deleteRole = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     await Role.deleteOne({ _id: id, organizationId: orgId });
+
+    // Invalidate Redis RBAC cache for this organization
+    await redisClearPattern(`rbac:${orgId}:*`);
 
     res.status(200).json({ success: true, message: 'Role deleted successfully.' });
   } catch (error: any) {
@@ -318,6 +378,9 @@ export const updateRoleMembers = async (req: AuthRequest, res: Response): Promis
 
     await session.commitTransaction();
     session.endSession();
+
+    // Invalidate Redis RBAC cache for this organization to apply membership updates immediately
+    await redisClearPattern(`rbac:${orgId}:*`);
 
     res.status(200).json({ success: true, message: 'Role members updated successfully.' });
   } catch (error: any) {
