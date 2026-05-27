@@ -18,27 +18,7 @@ export const registerSubscribers = () => {
     try {
       console.log(`[EVENT HANDLER] Processing 'leave.approved' async tasks for leave ${payload.leaveId}`);
 
-      // 1. Update Payroll Deductions
-      // Let's assume each day of unpaid leave deducts some amount, or we log it in their current monthly payroll record.
-      const deductionAmount = payload.totalDays * 1000; // Mock calculation: $1000 per day
-      
-      const payrollRecord = await Payroll.findOneAndUpdate(
-        { organizationId: payload.organizationId, employeeId: payload.employeeId, month: payload.month },
-        { 
-          $inc: { deductions: deductionAmount },
-          $setOnInsert: { organizationId: payload.organizationId, baseSalary: 50000, finalSalary: 50000 - deductionAmount }
-        },
-        { new: true, upsert: true }
-      );
-
-      // Re-calculate final salary: baseSalary + bonus - deductions
-      if (payrollRecord) {
-        payrollRecord.finalSalary = payrollRecord.baseSalary + payrollRecord.bonus - payrollRecord.deductions;
-        await payrollRecord.save();
-        console.log(`[EVENT HANDLER] Payroll updated. New deductions: ${payrollRecord.deductions}`);
-      }
-
-      // 2. Emit Real-Time Socket Event
+      // 1. Emit Real-Time Socket Event
       const io = getIO();
       if (io) {
         // Emit to the specific employee or general update
@@ -55,13 +35,13 @@ export const registerSubscribers = () => {
         }
       }
 
-      // 3. Create Audit Trail Log
+      // 2. Create Audit Trail Log
       await createAuditLog(
         'LEAVE_APPROVED_EVENT',
         payload.approvedBy,
         'LEAVES',
         payload.leaveId,
-        `Leave approved for ${payload.employeeName} (${payload.totalDays} days). Payroll deductions updated by ${deductionAmount}.`,
+        `Leave approved for ${payload.employeeName} (${payload.totalDays} days).`,
         payload.organizationId
       );
       console.log(`[EVENT HANDLER] Audit log created successfully.`);

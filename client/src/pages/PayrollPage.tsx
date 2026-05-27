@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { payrollApi } from '../api_service/payrollApi';
 import { employeeApi } from '../api_service/employeeApi';
+import { analyticsApi } from '../api_service/analyticsApi';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
@@ -72,6 +73,32 @@ export const PayrollPage: React.FC = () => {
     queryKey: ['employees'],
     queryFn: () => employeeApi.getAll().then(res => res.employees),
   });
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: analyticsApi.getSettings,
+  });
+
+  const startDay = settings?.payrollCycleStartDay || 1;
+
+  const cycleText = useMemo(() => {
+    const yearNum = parseInt(selectedYear);
+    const monthNum = parseInt(selectedMonth);
+    if (startDay <= 1) {
+      const lastDay = new Date(yearNum, monthNum, 0).getDate();
+      return `01/${selectedMonth}/${selectedYear} to ${lastDay < 10 ? '0' + lastDay : lastDay}/${selectedMonth}/${selectedYear}`;
+    } else {
+      const prevDate = new Date(yearNum, monthNum - 2, 1);
+      const prevYear = prevDate.getFullYear();
+      const prevMonth = prevDate.getMonth() + 1;
+      const prevMonthStr = prevMonth < 10 ? `0${prevMonth}` : `${prevMonth}`;
+      const startDayStr = startDay < 10 ? `0${startDay}` : `${startDay}`;
+
+      const endDayVal = startDay - 1;
+      const endDayStr = endDayVal < 10 ? `0${endDayVal}` : `${endDayVal}`;
+      return `${startDayStr}/${prevMonthStr}/${prevYear} to ${endDayStr}/${selectedMonth}/${selectedYear}`;
+    }
+  }, [selectedMonth, selectedYear, startDay]);
 
   // Filters
   const filteredPayrolls = useMemo(() => {
@@ -213,6 +240,12 @@ export const PayrollPage: React.FC = () => {
                 <option key={y.value} value={y.value}>{y.label}</option>
               ))}
             </select>
+
+            {/* Salary Cycle Period Badge */}
+            <div className="flex items-center gap-1.5 px-3.5 h-10 rounded-lg border border-primary/20 bg-primary/5 text-primary text-xs font-bold font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              Cycle: {cycleText}
+            </div>
 
             {/* Generate Payroll Button (ADMIN/HR only) */}
             {(role === 'ADMIN' || role === 'HR') && (

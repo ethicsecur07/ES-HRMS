@@ -44,6 +44,8 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
     pfEmployeePercent: 12,
     professionalTaxMonthly: 200,
     incomeTaxTdsMonthly: 0,
+    lossOfPayPerLeaveDay: 0,
+    lossOfPayPerPermissionHour: 0,
     pfEmployerPercent: 12,
     gratuityPercent: 4.81,
     esiEmployerPercent: 3.25,
@@ -52,11 +54,14 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
   });
 
   // Fetch existing config (automatically refetches when selectedEmployeeId changes)
-  const { data: existingConfig, isLoading } = useQuery({
+  const { data: existingData, isLoading } = useQuery({
     queryKey: ['payrollConfig', selectedEmployeeId],
     queryFn: () => payrollConfigApi.get(selectedEmployeeId),
     enabled: isOpen,
   });
+
+  const existingConfig = existingData?.config;
+  const employeeStats = existingData?.stats;
 
   // Find selected employee object
   const targetEmployee = useMemo(() => {
@@ -90,6 +95,8 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
         pfEmployeePercent: existingConfig.pfEmployeePercent,
         professionalTaxMonthly: existingConfig.professionalTaxMonthly,
         incomeTaxTdsMonthly: existingConfig.incomeTaxTdsMonthly,
+        lossOfPayPerLeaveDay: existingConfig.lossOfPayPerLeaveDay || 0,
+        lossOfPayPerPermissionHour: existingConfig.lossOfPayPerPermissionHour || 0,
         pfEmployerPercent: existingConfig.pfEmployerPercent,
         gratuityPercent: existingConfig.gratuityPercent,
         esiEmployerPercent: existingConfig.esiEmployerPercent,
@@ -131,9 +138,9 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
     const ctcAnnual = ctcMonthly * 12;
     const basic = Math.round(ctcMonthly * formData.basicSalaryPercent / 100);
     const hra = Math.round(basic * formData.hraPercent / 100);
-    const conveyance = formData.conveyanceMonthly;
-    const performance = formData.performanceIncentiveMonthly;
-    const otherAllowances = formData.otherAllowancesMonthly;
+    const conveyance = ctcMonthly > 0 ? formData.conveyanceMonthly : 0;
+    const performance = ctcMonthly > 0 ? formData.performanceIncentiveMonthly : 0;
+    const otherAllowances = ctcMonthly > 0 ? formData.otherAllowancesMonthly : 0;
 
     // Employer contributions
     const pfEmployer = Math.round(basic * formData.pfEmployerPercent / 100);
@@ -143,14 +150,14 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
 
     let esiEmployer = 0;
     if (formData.applyEsiOnlyIfGrossBelow21000) {
-      if (grossBeforeSpecial < 21000) {
+      if (grossBeforeSpecial < 21000 && grossBeforeSpecial > 0) {
         esiEmployer = Math.round(grossBeforeSpecial * formData.esiEmployerPercent / 100);
       }
     } else {
       esiEmployer = Math.round(grossBeforeSpecial * formData.esiEmployerPercent / 100);
     }
 
-    const insurance = formData.insuranceMonthly;
+    const insurance = ctcMonthly > 0 ? formData.insuranceMonthly : 0;
     const totalEmployerContributions = pfEmployer + gratuity + esiEmployer + insurance;
 
     const specialAllowance = Math.max(0, Math.round(ctcMonthly - grossBeforeSpecial - totalEmployerContributions));
@@ -158,8 +165,8 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
 
     // Deductions
     const pfEmployee = Math.round(basic * formData.pfEmployeePercent / 100);
-    const professionalTax = formData.professionalTaxMonthly;
-    const tds = formData.incomeTaxTdsMonthly;
+    const professionalTax = ctcMonthly > 0 ? formData.professionalTaxMonthly : 0;
+    const tds = ctcMonthly > 0 ? formData.incomeTaxTdsMonthly : 0;
     const totalDeductions = pfEmployee + professionalTax + tds;
 
     const netPay = grossPay - totalDeductions;
@@ -243,6 +250,30 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
               </select>
             </div>
           </div>
+
+          {/* Employee Current Cycle Stats Card */}
+          {selectedEmployeeId && employeeStats && (
+            <div className="rounded-xl border border-primary/20 p-4 bg-primary/5 space-y-3 animate-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between border-b border-primary/10 pb-2">
+                <h5 className="text-xs font-bold text-primary uppercase tracking-wider">
+                  Current Cycle Attendance & Leave Stats ({employeeStats.startStr} to {employeeStats.endStr})
+                </h5>
+                <span className="text-[10px] font-mono bg-primary/15 text-primary px-2 py-0.5 rounded-full font-bold">
+                  Run Cycle: {employeeStats.runCycle}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-card border border-border shadow-sm">
+                  <span className="text-xs font-semibold text-muted-foreground">Approved Casual Leaves Taken</span>
+                  <span className="text-sm font-bold text-foreground">{employeeStats.casualLeaveDays} Days</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-card border border-border shadow-sm">
+                  <span className="text-xs font-semibold text-muted-foreground">Approved Permissions Taken</span>
+                  <span className="text-sm font-bold text-foreground">{employeeStats.totalPermissionHours} Hours</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* LEFT COLUMN — Configuration Inputs */}
@@ -453,6 +484,26 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
                       onChange={handleNumberChange('incomeTaxTdsMonthly')}
                       className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                       min={0} step={100}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-primary mb-1 text-left">Loss of Pay per Leave Day (Flat)</label>
+                    <input
+                      type="number"
+                      value={formData.lossOfPayPerLeaveDay || 0}
+                      onChange={handleNumberChange('lossOfPayPerLeaveDay')}
+                      className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                      min={0} step={50}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-primary mb-1 text-left">Loss of Pay per Permission Hour (Flat)</label>
+                    <input
+                      type="number"
+                      value={formData.lossOfPayPerPermissionHour || 0}
+                      onChange={handleNumberChange('lossOfPayPerPermissionHour')}
+                      className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                      min={0} step={10}
                     />
                   </div>
                 </div>

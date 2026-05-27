@@ -143,9 +143,9 @@ async function calculateWithPayrollConfig(
   // Earnings calculation
   const basic = Math.round(ctcMonthly * config.basicSalaryPercent / 100);
   const hra = Math.round(basic * config.hraPercent / 100);
-  const conveyance = config.conveyanceMonthly;
-  const performanceIncentive = config.performanceIncentiveMonthly;
-  const otherAllowances = config.otherAllowancesMonthly;
+  const conveyance = ctcMonthly > 0 ? config.conveyanceMonthly : 0;
+  const performanceIncentive = ctcMonthly > 0 ? config.performanceIncentiveMonthly : 0;
+  const otherAllowances = ctcMonthly > 0 ? config.otherAllowancesMonthly : 0;
 
   // Employer contributions (part of CTC, not part of gross)
   const pfEmployer = Math.round(basic * config.pfEmployerPercent / 100);
@@ -158,14 +158,14 @@ async function calculateWithPayrollConfig(
   // ESI employer (conditional)
   let esiEmployer = 0;
   if (config.applyEsiOnlyIfGrossBelow21000) {
-    if (grossBeforeSpecial < 21000) {
+    if (grossBeforeSpecial < 21000 && grossBeforeSpecial > 0) {
       esiEmployer = Math.round(grossBeforeSpecial * config.esiEmployerPercent / 100);
     }
   } else {
     esiEmployer = Math.round(grossBeforeSpecial * config.esiEmployerPercent / 100);
   }
 
-  const insurance = config.insuranceMonthly;
+  const insurance = ctcMonthly > 0 ? config.insuranceMonthly : 0;
   const totalEmployerContributions = pfEmployer + gratuity + esiEmployer + insurance;
 
   // Special allowance = CTC/Month - all explicit components - employer contributions
@@ -174,8 +174,8 @@ async function calculateWithPayrollConfig(
 
   // Deductions (from employee)
   const pfEmployee = Math.round(basic * config.pfEmployeePercent / 100);
-  const professionalTax = config.professionalTaxMonthly;
-  const tds = config.incomeTaxTdsMonthly;
+  const professionalTax = ctcMonthly > 0 ? config.professionalTaxMonthly : 0;
+  const tds = ctcMonthly > 0 ? config.incomeTaxTdsMonthly : 0;
   const totalDeductions = pfEmployee + professionalTax + tds;
 
   // Net Pay

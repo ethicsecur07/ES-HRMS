@@ -11,6 +11,7 @@ import { ReimbursementClaim } from '../../models/SelfService.js';
 import { Payslip } from '../../models/Payslip.js';
 import { Employee } from '../../models/Employee.js';
 import { PayrollConfig, DEFAULT_PAYROLL_CONFIG } from '../../models/payroll/PayrollConfig.js';
+import { PermissionRequest } from '../../models/PermissionRequest.js';
 import mongoose, { Types } from 'mongoose';
 
 export class PayrollPipeline {
@@ -78,32 +79,58 @@ export class PayrollPipeline {
     let totalPayout = 0;
     
     try {
+      // Fetch Organization for settings first
+      const org = await Organization.findById(run.organizationId);
+      const startDay = org?.settings?.payrollCycleStartDay || 1;
+
       const [year, month] = run.runCycle.split('-');
-      const startStr = `${run.runCycle}-01`;
       const yearNum = parseInt(year);
       const monthNum = parseInt(month);
-      const endDay = new Date(yearNum, monthNum, 0).getDate();
-      const endStr = `${run.runCycle}-${endDay < 10 ? '0' + endDay : endDay}`;
+      
+      let startStr = '';
+      let endStr = '';
+      let endDay = 0;
+
+      if (startDay <= 1) {
+        endDay = new Date(yearNum, monthNum, 0).getDate();
+        startStr = `${run.runCycle}-01`;
+        endStr = `${run.runCycle}-${endDay < 10 ? '0' + endDay : endDay}`;
+      } else {
+        const prevDate = new Date(yearNum, monthNum - 2, 1);
+        const prevYear = prevDate.getFullYear();
+        const prevMonth = prevDate.getMonth() + 1;
+        const prevMonthStr = prevMonth < 10 ? `0${prevMonth}` : `${prevMonth}`;
+        const startDayStr = startDay < 10 ? `0${startDay}` : `${startDay}`;
+        startStr = `${prevYear}-${prevMonthStr}-${startDayStr}`;
+
+        const endDayVal = startDay - 1;
+        const endDayStr = endDayVal < 10 ? `0${endDayVal}` : `${endDayVal}`;
+        endStr = `${run.runCycle}-${endDayStr}`;
+
+        const date1 = new Date(startStr);
+        const date2 = new Date(endStr);
+        endDay = Math.round((date2.getTime() - date1.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      }
       
       const cycleStart = new Date(startStr);
       const cycleEnd = new Date(endStr);
       
-      // Fetch Organization for working days settings
-      const org = await Organization.findById(run.organizationId);
       const activeWorkdays = org?.settings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
       const customHolidays = org?.settings?.customHolidays || [];
       
       // Build list of active working days in the cycle
       const workdaysList: string[] = [];
-      for (let d = 1; d <= endDay; d++) {
-        const dStr = d < 10 ? `0${d}` : `${d}`;
-        const dateStr = `${run.runCycle}-${dStr}`;
-        const dateObj = new Date(dateStr);
-        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' }); // 'Mon', 'Tue', etc.
+      const curDate = new Date(cycleStart);
+      while (curDate <= cycleEnd) {
+        const dStr = curDate.getDate() < 10 ? `0${curDate.getDate()}` : `${curDate.getDate()}`;
+        const mStr = (curDate.getMonth() + 1) < 10 ? `0${(curDate.getMonth() + 1)}` : `${(curDate.getMonth() + 1)}`;
+        const dateStr = `${curDate.getFullYear()}-${mStr}-${dStr}`;
+        const dayName = curDate.toLocaleDateString('en-US', { weekday: 'short' });
         
         if (activeWorkdays.includes(dayName) && !customHolidays.some(h => h.date === dateStr)) {
           workdaysList.push(dateStr);
         }
+        curDate.setDate(curDate.getDate() + 1);
       }
 
       // Fetch all active employees
@@ -162,8 +189,9 @@ export class PayrollPipeline {
             }
           }
 
-          // Calculate Absent days (no attendance and no approved leave on a workday)
+          // Calculate Absent / Auto-Leave days (anyone not logged in is considered on auto-leave for that workday)
           let absentDays = 0;
+          let unloggedLeaveDays = 0;
           for (const dateStr of workdaysList) {
             const att = attendanceRecords.find(a => a.date === dateStr);
             const isPresent = att && (att.status === 'OFFICE' || att.status === 'WFH');
@@ -172,7 +200,7 @@ export class PayrollPipeline {
             const isOnLeave = approvedLeaves.some(l => dateStr >= l.startDate && dateStr <= l.endDate);
             if (isOnLeave) continue;
 
-            absentDays++;
+            unloggedLeaveDays++;
           }
 
           // Calculate Late Penalties (using LeavePolicy settings)
@@ -185,8 +213,41 @@ export class PayrollPipeline {
             lateDeductionDays = Math.floor(lateCount / latePolicy.latePenaltyCount) * 0.5;
           }
 
-          // Total Loss of Pay Days
-          const totalLOPDays = unpaidDays + absentDays + lateDeductionDays;
+          // Fetch employee-specific or organization default configuration
+          const empConfig = await PayrollConfig.findOne({ organizationId: run.organizationId, employeeId: employee._id });
+          const config = empConfig ? empConfig.toObject() : defaultConfigValues;
+
+          // Calculate approved Casual Leave days taken in the month
+          let casualLeaveDays = 0;
+          for (const leave of approvedLeaves) {
+            if (leave.leaveType === 'Casual Leave') {
+              let days = getOverlapDays(leave.startDate, leave.endDate, cycleStart, cycleEnd);
+              if (leave.isHalfDay) days = 0.5;
+              casualLeaveDays += days;
+            }
+          }
+          // Automatically consider any unlogged workday as a Casual Leave day
+          casualLeaveDays += unloggedLeaveDays;
+
+          // Fetch approved Permission requests taken in the month
+          const approvedPermissions = await PermissionRequest.find({
+            organizationId: run.organizationId,
+            employeeId: employee._id,
+            approvalStatus: 'APPROVED',
+            date: { $gte: startStr, $lte: endStr }
+          });
+          const totalPermissionHours = approvedPermissions.reduce((sum, p) => sum + (p.totalHours || 0), 0);
+
+          // Retrieve monthly limits configured by admin
+          const casualLeaveLimit = org?.settings?.monthlyLeaveLimit || 2;
+          const permissionLimit = org?.settings?.monthlyPermissionHours || 3;
+
+          // Compute excess over limits
+          const excessLeaveDays = Math.max(0, casualLeaveDays - casualLeaveLimit);
+          const excessPermissionHours = Math.max(0, totalPermissionHours - permissionLimit);
+
+          // Total base Loss of Pay Days (unpaid, absent, late penalty)
+          const baseLOPDays = unpaidDays + absentDays + lateDeductionDays;
 
           // Calculate Overtime Hours
           let approvedOTHours = 0;
@@ -222,7 +283,7 @@ export class PayrollPipeline {
               Present_Days: Math.max(0, workdaysList.length - absentDays - unpaidDays),
               Late_Days: lateCount,
               OT_Hours: approvedOTHours,
-              Unpaid_Days: totalLOPDays,
+              Unpaid_Days: baseLOPDays,
               Reimbursements: approvedReimbursementAmount
             };
             
@@ -258,9 +319,27 @@ export class PayrollPipeline {
 
             grossSalary = totalEarnings;
             
-            // Apply LOP salary deductions
-            dailyRate = grossSalary / endDay;
-            lopDeductionAmount = Math.round(dailyRate * totalLOPDays);
+            // Calculate Sundays and Divisor Days for per-day rate
+            let sundaysCount = 0;
+            const sunCur = new Date(cycleStart);
+            while (sunCur <= cycleEnd) {
+              if (sunCur.getDay() === 0) {
+                sundaysCount++;
+              }
+              sunCur.setDate(sunCur.getDate() + 1);
+            }
+            const paidCasualLeaveDays = Math.min(casualLeaveLimit, casualLeaveDays);
+            const paidPermissionHours = Math.min(permissionLimit, totalPermissionHours);
+            const paidPermissionDays = paidPermissionHours / 8;
+            const divisorDays = Math.max(1, endDay - sundaysCount - paidCasualLeaveDays - paidPermissionDays);
+
+            // Apply Loss of Pay salary deductions (base LOP days + exceeding leave days + exceeding permission hours)
+            dailyRate = grossSalary / divisorDays;
+            const baseLOPAmount = Math.round(dailyRate * baseLOPDays);
+            const excessLeaveLOPAmount = Math.round(excessLeaveDays * (config.lossOfPayPerLeaveDay || dailyRate));
+            const excessPermissionLOPAmount = Math.round(excessPermissionHours * (config.lossOfPayPerPermissionHour || (dailyRate / 8)));
+            
+            lopDeductionAmount = baseLOPAmount + excessLeaveLOPAmount + excessPermissionLOPAmount;
             totalDeductions = structureDeductions + lopDeductionAmount;
 
             // Apply Overtime Earnings
@@ -314,19 +393,15 @@ export class PayrollPipeline {
             };
 
           } else {
-            // Check for employee-specific PayrollConfig
-            const empConfig = await PayrollConfig.findOne({ organizationId: run.organizationId, employeeId: employee._id });
-            const config = empConfig ? empConfig.toObject() : defaultConfigValues;
-
             const ctcMonthly = employee.salary || 0;
             const ctcAnnual = ctcMonthly * 12;
 
             // Earnings calculation
             basicSalaryVal = Math.round(ctcMonthly * config.basicSalaryPercent / 100);
             const hra = Math.round(basicSalaryVal * config.hraPercent / 100);
-            const conveyance = config.conveyanceMonthly;
-            const performanceIncentive = config.performanceIncentiveMonthly;
-            const otherAllowances = config.otherAllowancesMonthly;
+            const conveyance = ctcMonthly > 0 ? config.conveyanceMonthly : 0;
+            const performanceIncentive = ctcMonthly > 0 ? config.performanceIncentiveMonthly : 0;
+            const otherAllowances = ctcMonthly > 0 ? config.otherAllowancesMonthly : 0;
 
             // Employer contributions (part of CTC)
             const pfEmployer = Math.round(basicSalaryVal * config.pfEmployerPercent / 100);
@@ -337,14 +412,14 @@ export class PayrollPipeline {
             // ESI Employer (conditional)
             let esiEmployer = 0;
             if (config.applyEsiOnlyIfGrossBelow21000) {
-              if (grossBeforeSpecial < 21000) {
+              if (grossBeforeSpecial < 21000 && grossBeforeSpecial > 0) {
                 esiEmployer = Math.round(grossBeforeSpecial * config.esiEmployerPercent / 100);
               }
             } else {
               esiEmployer = Math.round(grossBeforeSpecial * config.esiEmployerPercent / 100);
             }
 
-            const insurance = config.insuranceMonthly;
+            const insurance = ctcMonthly > 0 ? config.insuranceMonthly : 0;
             const totalEmployerContributions = pfEmployer + gratuity + esiEmployer + insurance;
 
             // Special allowance fills the gap
@@ -353,13 +428,31 @@ export class PayrollPipeline {
 
             // Deductions
             const pfEmployee = Math.round(basicSalaryVal * config.pfEmployeePercent / 100);
-            const professionalTax = config.professionalTaxMonthly;
-            const tds = config.incomeTaxTdsMonthly;
+            const professionalTax = ctcMonthly > 0 ? config.professionalTaxMonthly : 0;
+            const tds = ctcMonthly > 0 ? config.incomeTaxTdsMonthly : 0;
             const baseDeductions = pfEmployee + professionalTax + tds;
 
-            // Apply LOP salary deductions
-            dailyRate = grossSalary / endDay;
-            lopDeductionAmount = Math.round(dailyRate * totalLOPDays);
+            // Calculate Sundays and Divisor Days for per-day rate
+            let sundaysCount = 0;
+            const sunCur = new Date(cycleStart);
+            while (sunCur <= cycleEnd) {
+              if (sunCur.getDay() === 0) {
+                sundaysCount++;
+              }
+              sunCur.setDate(sunCur.getDate() + 1);
+            }
+            const paidCasualLeaveDays = Math.min(casualLeaveLimit, casualLeaveDays);
+            const paidPermissionHours = Math.min(permissionLimit, totalPermissionHours);
+            const paidPermissionDays = paidPermissionHours / 8;
+            const divisorDays = Math.max(1, endDay - sundaysCount - paidCasualLeaveDays - paidPermissionDays);
+
+            // Apply Loss of Pay salary deductions (base LOP days + exceeding leave days + exceeding permission hours)
+            dailyRate = grossSalary / divisorDays;
+            const baseLOPAmount = Math.round(dailyRate * baseLOPDays);
+            const excessLeaveLOPAmount = Math.round(excessLeaveDays * (config.lossOfPayPerLeaveDay || dailyRate));
+            const excessPermissionLOPAmount = Math.round(excessPermissionHours * (config.lossOfPayPerPermissionHour || (dailyRate / 8)));
+            
+            lopDeductionAmount = baseLOPAmount + excessLeaveLOPAmount + excessPermissionLOPAmount;
 
             // Apply Overtime Earnings
             const otRate = (basicSalaryVal / 240) * 1.5;

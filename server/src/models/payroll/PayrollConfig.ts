@@ -16,6 +16,10 @@ export interface IPayrollConfig extends Document {
   professionalTaxMonthly: number;       // Fixed monthly amount (default 200)
   incomeTaxTdsMonthly: number;          // Fixed monthly amount (default 0)
 
+  // Loss of Pay Rules
+  lossOfPayPerLeaveDay: number;         // Flat amount (default 0 = dynamic fallback)
+  lossOfPayPerPermissionHour: number;   // Flat amount (default 0 = dynamic fallback)
+
   // Employer Contributions
   pfEmployerPercent: number;            // % of Basic (default 12)
   gratuityPercent: number;              // % of Basic (default 4.81)
@@ -43,6 +47,10 @@ const payrollConfigSchema = new Schema<IPayrollConfig>(
     professionalTaxMonthly: { type: Number, default: 200, min: 0 },
     incomeTaxTdsMonthly: { type: Number, default: 0, min: 0 },
 
+    // Loss of Pay Rules
+    lossOfPayPerLeaveDay: { type: Number, default: 0, min: 0 },
+    lossOfPayPerPermissionHour: { type: Number, default: 0, min: 0 },
+
     // Employer Contributions
     pfEmployerPercent: { type: Number, default: 12, min: 0, max: 100 },
     gratuityPercent: { type: Number, default: 4.81, min: 0, max: 100 },
@@ -69,6 +77,8 @@ export const DEFAULT_PAYROLL_CONFIG = {
   pfEmployeePercent: 12,
   professionalTaxMonthly: 200,
   incomeTaxTdsMonthly: 0,
+  lossOfPayPerLeaveDay: 0,
+  lossOfPayPerPermissionHour: 0,
   pfEmployerPercent: 12,
   gratuityPercent: 4.81,
   esiEmployerPercent: 3.25,

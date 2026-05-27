@@ -176,6 +176,9 @@ export interface PayrollConfig {
   pfEmployeePercent: number;
   professionalTaxMonthly: number;
   incomeTaxTdsMonthly: number;
+  // Loss of Pay Rules
+  lossOfPayPerLeaveDay?: number;
+  lossOfPayPerPermissionHour?: number;
   // Employer Contributions
   pfEmployerPercent: number;
   gratuityPercent: number;
@@ -226,6 +229,7 @@ export interface CompanySettings {
   monthlyPermissionHours: number;
   companyName: string;
   adminEmail: string;
+  payrollCycleStartDay?: number;
 }
 
 export type RecruitmentStage = 'NEW' | 'SCREENING' | 'INTERVIEW' | 'TECHNICAL' | 'HR' | 'OFFER' | 'HIRED';

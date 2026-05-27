@@ -2,10 +2,10 @@ import { axiosInstance } from './axiosInstance';
 import type { PayrollConfig } from '../types';
 
 export const payrollConfigApi = {
-  get: async (employeeId?: string | null): Promise<PayrollConfig> => {
+  get: async (employeeId?: string | null): Promise<{ config: PayrollConfig; stats?: { runCycle: string; startStr: string; endStr: string; casualLeaveDays: number; totalPermissionHours: number } | null }> => {
     const params = employeeId ? { employeeId } : {};
-    const response = await axiosInstance.get<{ config: PayrollConfig }>('/payroll-config', { params });
-    return response.data.config;
+    const response = await axiosInstance.get<{ config: PayrollConfig; stats?: any }>('/payroll-config', { params });
+    return response.data;
   },
 
   save: async (config: Partial<PayrollConfig>): Promise<{ config: PayrollConfig; message: string }> => {

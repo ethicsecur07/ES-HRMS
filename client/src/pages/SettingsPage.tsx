@@ -340,6 +340,7 @@ export const SettingsPage: React.FC = () => {
   const [monthlyLeaveLimit, setMonthlyLeaveLimit] = useState(2);
   const [monthlyWFHLimit, setMonthlyWFHLimit] = useState(1);
   const [monthlyPermissionHours, setMonthlyPermissionHours] = useState(3);
+  const [payrollCycleStartDay, setPayrollCycleStartDay] = useState(1);
   const [officeIPs, setOfficeIPs] = useState<string[]>([]);
   const [newIP, setNewIP] = useState('');
 
@@ -350,6 +351,7 @@ export const SettingsPage: React.FC = () => {
       setMonthlyLeaveLimit(settings.monthlyLeaveLimit);
       setMonthlyWFHLimit(settings.monthlyWFHLimit);
       setMonthlyPermissionHours(settings.monthlyPermissionHours);
+      setPayrollCycleStartDay(settings.payrollCycleStartDay || 1);
       setOfficeIPs(settings.officeWiFiIPs || []);
     }
   }, [settings]);
@@ -388,6 +390,7 @@ export const SettingsPage: React.FC = () => {
       monthlyWFHLimit,
       monthlyPermissionHours,
       officeWiFiIPs: officeIPs,
+      payrollCycleStartDay,
     });
   };
 
@@ -511,11 +514,23 @@ export const SettingsPage: React.FC = () => {
           </Card>
 
           <Card className="space-y-6 border-l-4 border-l-muted-foreground shadow-md">
-            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Monthly Global Allowance Policies</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Monthly Global Allowance Policies & Payroll Cycle</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
               <Input label="Casual Leave Limit (Days/Month) *" type="number" value={monthlyLeaveLimit} onChange={(e) => setMonthlyLeaveLimit(Number(e.target.value))} required />
               <Input label="WFH Limit (Days/Month) *" type="number" value={monthlyWFHLimit} onChange={(e) => setMonthlyWFHLimit(Number(e.target.value))} required />
               <Input label="Permission Limit (Hours/Month) *" type="number" value={monthlyPermissionHours} onChange={(e) => setMonthlyPermissionHours(Number(e.target.value))} required />
+              <Input 
+                label="Salary Cycle Start Day (1-28) *" 
+                type="number" 
+                value={payrollCycleStartDay} 
+                onChange={(e) => {
+                  let val = Number(e.target.value);
+                  if (val < 1) val = 1;
+                  if (val > 28) val = 28;
+                  setPayrollCycleStartDay(val);
+                }} 
+                required 
+              />
             </div>
           </Card>
 

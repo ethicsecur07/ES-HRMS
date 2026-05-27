@@ -5,6 +5,8 @@ import type { Payroll, Employee } from '../../types';
 import { exportPayslipPDF } from '../../utils/exportUtils';
 import { formatCurrency } from '../../utils/formatters';
 import { Download, CheckCircle2, Clock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { analyticsApi } from '../../api_service/analyticsApi';
 
 interface PayrollSlipModalProps {
   isOpen: boolean;
@@ -19,6 +21,35 @@ export const PayrollSlipModal: React.FC<PayrollSlipModalProps> = ({
   payroll,
   employee,
 }) => {
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: analyticsApi.getSettings,
+  });
+
+  const startDay = settings?.payrollCycleStartDay || 1;
+
+  const cyclePeriodStr = React.useMemo(() => {
+    if (!payroll?.month) return 'N/A';
+    const [year, month] = payroll.month.split('-');
+    const yearNum = parseInt(year);
+    const monthNum = parseInt(month);
+
+    if (startDay <= 1) {
+      const lastDay = new Date(yearNum, monthNum, 0).getDate();
+      return `01/${month}/${year} to ${lastDay < 10 ? '0' + lastDay : lastDay}/${month}/${year}`;
+    } else {
+      const prevDate = new Date(yearNum, monthNum - 2, 1);
+      const prevYear = prevDate.getFullYear();
+      const prevMonth = prevDate.getMonth() + 1;
+      const prevMonthStr = prevMonth < 10 ? `0${prevMonth}` : `${prevMonth}`;
+      const startDayStr = startDay < 10 ? `0${startDay}` : `${startDay}`;
+
+      const endDayVal = startDay - 1;
+      const endDayStr = endDayVal < 10 ? `0${endDayVal}` : `${endDayVal}`;
+      return `${startDayStr}/${prevMonthStr}/${prevYear} to ${endDayStr}/${month}/${year}`;
+    }
+  }, [payroll?.month, startDay]);
+
   if (!payroll || !employee) return null;
 
   return (
@@ -59,6 +90,10 @@ export const PayrollSlipModal: React.FC<PayrollSlipModalProps> = ({
           <div>
             <span className="text-xs text-muted-foreground block font-medium">Designation</span>
             <span className="font-semibold text-foreground">{employee.designation}</span>
+          </div>
+          <div className="col-span-2 border-t border-border/40 pt-2.5 mt-0.5">
+            <span className="text-xs text-muted-foreground block font-medium">Salary Cycle Period</span>
+            <span className="font-bold text-primary font-mono">{cyclePeriodStr}</span>
           </div>
         </div>
 

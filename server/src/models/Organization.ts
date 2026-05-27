@@ -19,6 +19,7 @@ export interface IOrganization extends Document {
     monthlyWFHLimit?: number;
     monthlyPermissionHours?: number;
     allowedIPs?: string[];
+    payrollCycleStartDay?: number;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -53,6 +54,7 @@ const organizationSchema = new Schema<IOrganization>(
       monthlyWFHLimit: { type: Number, default: 1 },
       monthlyPermissionHours: { type: Number, default: 3 },
       allowedIPs: { type: [String], default: ['127.0.0.1', '::1'] },
+      payrollCycleStartDay: { type: Number, default: 1, min: 1, max: 28 },
     },
   },
   { timestamps: true }

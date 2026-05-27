@@ -185,7 +185,7 @@ export class LeavePolicyEngine {
 
     // 3. Balance check
     const balanceResult = await this.checkBalance(organizationId, employeeId, leaveType, totalDays);
-    if (!balanceResult.hasEnoughBalance) {
+    if (!balanceResult.hasEnoughBalance && leaveType !== 'Casual Leave' && leaveType !== 'Permission') {
       violations.push({
         code: 'INSUFFICIENT_BALANCE',
         message: `Insufficient balance. Available: ${balanceResult.currentBalance} days, Required: ${totalDays} days.`,
@@ -232,7 +232,7 @@ export class LeavePolicyEngine {
     const remainingHours = parseFloat((limitHours - usedHours).toFixed(2));
 
     return {
-      allowed: requestedHours <= remainingHours,
+      allowed: true, // Always allowed; excess will incur loss of pay during payroll run
       usedHours,
       limitHours,
       remainingHours,

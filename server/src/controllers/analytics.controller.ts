@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Employee } from '../models/Employee.js';
+import { User } from '../models/User.js';
 import { Attendance } from '../models/Attendance.js';
 import { Leave } from '../models/Leave.js';
 import { Payroll } from '../models/Payroll.js';
@@ -12,6 +13,8 @@ import { Task } from '../models/Task.js';
 import { DEPARTMENTS } from '../constants/index.js';
 import { AuthRequest } from '../types/index.js';
 import { LeaveAnalyticsService } from '../domains/leave-engine/services/LeaveAnalyticsService.js';
+import { LeavePolicy } from '../models/LeavePolicy.js';
+import { notificationService } from '../services/notification.service.js';
 
 
 const countTasks = (text?: string): number => {
@@ -296,6 +299,7 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
       monthlyWFHLimit: org.settings?.monthlyWFHLimit || 1,
       monthlyPermissionHours: org.settings?.monthlyPermissionHours || 3,
       officeWiFiIPs: org.settings?.allowedIPs || ['127.0.0.1', '::1'],
+      payrollCycleStartDay: org.settings?.payrollCycleStartDay || 1,
     };
     res.status(200).json({
       ...settingsData,
@@ -309,20 +313,72 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
 export const updateSettings = async (req: Request, res: Response): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    const org = await Organization.findById(authReq.user?.organizationId);
+    const orgId = authReq.user?.organizationId;
+    const org = await Organization.findById(orgId);
     if (!org) {
       res.status(404).json({ message: 'Organization not found' });
       return;
     }
-    const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, officeWiFiIPs } = req.body;
+    const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, officeWiFiIPs, payrollCycleStartDay } = req.body;
     if (companyName) org.name = companyName;
+    
+    const finalLeaveLimit = Number(monthlyLeaveLimit) || org.settings?.monthlyLeaveLimit || 2;
+    const finalWFHLimit = Number(monthlyWFHLimit) || org.settings?.monthlyWFHLimit || 1;
+    const finalPermissionHours = Number(monthlyPermissionHours) || org.settings?.monthlyPermissionHours || 3;
+    const finalPayrollCycleStartDay = Number(payrollCycleStartDay) || org.settings?.payrollCycleStartDay || 1;
+    const cycleStartDayChanged = org.settings?.payrollCycleStartDay !== finalPayrollCycleStartDay;
+
     org.settings = {
-      monthlyLeaveLimit: Number(monthlyLeaveLimit) || org.settings?.monthlyLeaveLimit || 2,
-      monthlyWFHLimit: Number(monthlyWFHLimit) || org.settings?.monthlyWFHLimit || 1,
-      monthlyPermissionHours: Number(monthlyPermissionHours) || org.settings?.monthlyPermissionHours || 3,
+      monthlyLeaveLimit: finalLeaveLimit,
+      monthlyWFHLimit: finalWFHLimit,
+      monthlyPermissionHours: finalPermissionHours,
       allowedIPs: officeWiFiIPs || org.settings?.allowedIPs || ['127.0.0.1', '::1'],
+      payrollCycleStartDay: finalPayrollCycleStartDay,
     };
     await org.save();
+
+    if (cycleStartDayChanged) {
+      Employee.find({ organizationId: orgId, isActive: true })
+        .then(async (employees) => {
+          for (const emp of employees) {
+            const user = await User.findOne({ employeeId: emp._id });
+            if (user) {
+              notificationService.dispatchNotification({
+                organizationId: org._id,
+                recipientId: user._id.toString(),
+                title: 'Payroll & Attendance Cycle Updated',
+                message: `The company payroll cycle start day has been changed to the ${finalPayrollCycleStartDay}th of every month.`,
+                channels: ['IN_APP', 'EMAIL'],
+                type: 'PAYROLL'
+              }).catch(err => console.error('Failed to dispatch settings change notification:', err));
+            }
+          }
+        })
+        .catch((err) => console.error('Failed to find employees for settings change notification:', err));
+    }
+
+    // Dynamically update/create corresponding active LeavePolicy documents
+    // 1. Casual Leave Limit
+    await LeavePolicy.findOneAndUpdate(
+      { organizationId: org._id, leaveType: 'Casual Leave' },
+      { $set: { monthlyAllowance: finalLeaveLimit, isActive: true } },
+      { upsert: true }
+    );
+
+    // 2. WFH Limit
+    await LeavePolicy.findOneAndUpdate(
+      { organizationId: org._id, leaveType: 'WFH' },
+      { $set: { monthlyAllowance: finalWFHLimit, isActive: true } },
+      { upsert: true }
+    );
+
+    // 3. Permission Limit
+    await LeavePolicy.findOneAndUpdate(
+      { organizationId: org._id, leaveType: 'Permission' },
+      { $set: { monthlyAllowance: finalPermissionHours, permissionConversionHours: finalPermissionHours, isActive: true } },
+      { upsert: true }
+    );
+
     res.status(200).json({ message: 'Settings updated successfully', settings: req.body });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
