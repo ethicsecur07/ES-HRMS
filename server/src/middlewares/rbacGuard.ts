@@ -61,19 +61,42 @@ export const rbacGuard = (
 
       if (!activePermissions) {
         // Cache Miss: Perform Database Lookups
+        const roleIds: string[] = [];
+
+        // 1. Fetch custom roles assigned in RoleMember collection
+        const { RoleMember } = await import('../models/RoleMember.js');
+        const customRoleMembers = await RoleMember.find({
+          organizationId: orgId,
+          userId: userId,
+        });
+
+        for (const rm of customRoleMembers) {
+          if (rm.roleId) {
+            roleIds.push(rm.roleId.toString());
+          }
+        }
+
+        // 2. Fetch user's primary system role
         const userRole = await Role.findOne({
           organizationId: orgId,
           code: user.role,
           isActive: true,
         });
 
-        const roleIds: string[] = [];
-        if (userRole) {
+        if (userRole && !roleIds.includes(userRole._id.toString())) {
           roleIds.push(userRole._id.toString());
-          let currentParentId = userRole.parentRoleId;
-          const maxDepth = 10;
-          let depth = 0;
+        }
 
+        // 3. Recursively compile parent roles for all assigned roles
+        const compiledRoleIds = [...roleIds];
+        const maxDepth = 10;
+
+        for (const rId of roleIds) {
+          let currentParentId: any = null;
+          const roleObj = await Role.findOne({ _id: rId, organizationId: orgId, isActive: true });
+          if (roleObj) currentParentId = roleObj.parentRoleId;
+
+          let depth = 0;
           while (currentParentId && depth < maxDepth) {
             const parentRole = await Role.findOne({
               _id: currentParentId,
@@ -81,7 +104,10 @@ export const rbacGuard = (
               isActive: true,
             });
             if (!parentRole) break;
-            roleIds.push(parentRole._id.toString());
+            const parentIdStr = parentRole._id.toString();
+            if (!compiledRoleIds.includes(parentIdStr)) {
+              compiledRoleIds.push(parentIdStr);
+            }
             currentParentId = parentRole.parentRoleId;
             depth++;
           }
@@ -92,7 +118,7 @@ export const rbacGuard = (
           module: moduleCode,
           $or: [
             { userId: userId },
-            { roleId: { $in: roleIds } },
+            { roleId: { $in: compiledRoleIds } },
           ],
         });
 

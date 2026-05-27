@@ -11,4 +11,6 @@ router.use(auth_middleware_js_1.authenticate);
 router.use((0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']));
 router.get('/', finance_controller_js_1.getFinanceSummary);
 router.post('/', finance_controller_js_1.addFinanceRecord);
+router.get('/config', finance_controller_js_1.getFinanceConfig);
+router.post('/config', finance_controller_js_1.updateFinanceConfig);
 exports.default = router;

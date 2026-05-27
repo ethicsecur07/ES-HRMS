@@ -1,7 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteRole = exports.updateRole = exports.createRole = exports.getRoleById = exports.getRoles = void 0;
+exports.updateRoleMembers = exports.getRoleMembers = exports.deleteRole = exports.updateRole = exports.createRole = exports.getRoleById = exports.getRoles = void 0;
 const Role_js_1 = require("../models/Role.js");
+const RoleMember_js_1 = require("../models/RoleMember.js");
+const mongoose_1 = __importDefault(require("mongoose"));
 /**
  * Get all roles for the authenticated user's organization.
  */
@@ -211,3 +216,82 @@ const deleteRole = async (req, res) => {
     }
 };
 exports.deleteRole = deleteRole;
+/**
+ * Get all members of a role.
+ */
+const getRoleMembers = async (req, res) => {
+    try {
+        const orgId = req.user?.organizationId;
+        const { id } = req.params;
+        if (!orgId) {
+            res.status(401).json({ success: false, message: 'Unauthorized. Organization not found.' });
+            return;
+        }
+        // Verify role exists in this organization
+        const roleExists = await Role_js_1.Role.findOne({ _id: id, organizationId: orgId });
+        if (!roleExists) {
+            res.status(404).json({ success: false, message: 'Role not found.' });
+            return;
+        }
+        const members = await RoleMember_js_1.RoleMember.find({ roleId: id, organizationId: orgId })
+            .populate({
+            path: 'userId',
+            select: 'name email role employeeId isActive',
+            populate: {
+                path: 'employeeId',
+                select: 'employeeCode department designation'
+            }
+        });
+        res.status(200).json({ success: true, data: members });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to retrieve role members.', error: error.message });
+    }
+};
+exports.getRoleMembers = getRoleMembers;
+/**
+ * Assign members to a role (overwrite existing members list).
+ */
+const updateRoleMembers = async (req, res) => {
+    const session = await mongoose_1.default.startSession();
+    session.startTransaction();
+    try {
+        const orgId = req.user?.organizationId;
+        const { id } = req.params;
+        const { userIds } = req.body; // Array of user IDs to set as members
+        if (!orgId) {
+            res.status(401).json({ success: false, message: 'Unauthorized. Organization not found.' });
+            return;
+        }
+        if (!Array.isArray(userIds)) {
+            res.status(400).json({ success: false, message: 'userIds must be an array.' });
+            return;
+        }
+        // Verify role exists in this organization
+        const role = await Role_js_1.Role.findOne({ _id: id, organizationId: orgId }).session(session);
+        if (!role) {
+            res.status(404).json({ success: false, message: 'Role not found.' });
+            return;
+        }
+        // Remove current members of this role
+        await RoleMember_js_1.RoleMember.deleteMany({ roleId: id, organizationId: orgId }).session(session);
+        // Create new members
+        if (userIds.length > 0) {
+            const records = userIds.map((uid) => ({
+                organizationId: orgId,
+                roleId: id,
+                userId: new mongoose_1.default.Types.ObjectId(uid)
+            }));
+            await RoleMember_js_1.RoleMember.insertMany(records, { session });
+        }
+        await session.commitTransaction();
+        session.endSession();
+        res.status(200).json({ success: true, message: 'Role members updated successfully.' });
+    }
+    catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(500).json({ success: false, message: 'Failed to update role members.', error: error.message });
+    }
+};
+exports.updateRoleMembers = updateRoleMembers;

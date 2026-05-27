@@ -49,6 +49,7 @@ class EmployeeService {
             // 3. Create Employee record
             const [employee] = await Employee_js_1.Employee.create([{
                     ...employeeData,
+                    isActive: true,
                     organizationId: orgId,
                 }], { session });
             // 4. Create corresponding login account (User)
@@ -202,21 +203,23 @@ class EmployeeService {
         sortObj[sortField] = sortDir;
         const total = await Employee_js_1.Employee.countDocuments(query);
         const employees = await Employee_js_1.Employee.find(query)
+            .select('-salary -emergencyContact')
             .populate('departmentId', 'name code')
             .populate('designationId', 'name code')
             .sort(sortObj)
             .skip(skipNum)
             .limit(limitNum);
         const employeeIds = employees.map(emp => emp._id);
-        const users = await User_js_1.User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId ssoData');
-        const userMap = new Map(users.map(u => [u.employeeId?.toString(), { userId: u._id.toString(), ssoData: u.ssoData }]));
+        const users = await User_js_1.User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId ssoData role');
+        const userMap = new Map(users.map(u => [u.employeeId?.toString(), { userId: u._id.toString(), ssoData: u.ssoData, role: u.role }]));
         const enrichedEmployees = employees.map(emp => {
             const empObj = emp.toObject();
             const userData = userMap.get(emp._id.toString()) || null;
             return {
                 ...empObj,
                 userId: userData?.userId || null,
-                ssoData: userData?.ssoData || null
+                ssoData: userData?.ssoData || null,
+                role: userData?.role || 'EMPLOYEE'
             };
         });
         return { employees: enrichedEmployees, total, page: pageNum, limit: limitNum };

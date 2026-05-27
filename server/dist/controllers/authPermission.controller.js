@@ -241,7 +241,7 @@ const getMyPermissions = async (req, res) => {
         }
         const orgId = user.organizationId;
         const userId = user.id;
-        // Find the user's role
+        // Find the user's base role
         const userRole = await Role_js_1.Role.findOne({
             organizationId: orgId,
             code: user.role,
@@ -250,8 +250,26 @@ const getMyPermissions = async (req, res) => {
         const roleIds = [];
         if (userRole) {
             roleIds.push(userRole._id.toString());
-            let currentParentId = userRole.parentRoleId;
-            const maxDepth = 10;
+        }
+        // 1. Fetch custom roles assigned in RoleMember collection
+        const { RoleMember } = await import('../models/RoleMember.js');
+        const customRoleMembers = await RoleMember.find({
+            organizationId: orgId,
+            userId: userId,
+        });
+        for (const rm of customRoleMembers) {
+            if (rm.roleId && !roleIds.includes(rm.roleId.toString())) {
+                roleIds.push(rm.roleId.toString());
+            }
+        }
+        // 2. Recursively compile parent roles for all assigned roles
+        const compiledRoleIds = [...roleIds];
+        const maxDepth = 10;
+        for (const rId of roleIds) {
+            let currentParentId = null;
+            const roleObj = await Role_js_1.Role.findOne({ _id: rId, organizationId: orgId, isActive: true });
+            if (roleObj)
+                currentParentId = roleObj.parentRoleId;
             let depth = 0;
             while (currentParentId && depth < maxDepth) {
                 const parentRole = await Role_js_1.Role.findOne({
@@ -261,7 +279,10 @@ const getMyPermissions = async (req, res) => {
                 });
                 if (!parentRole)
                     break;
-                roleIds.push(parentRole._id.toString());
+                const parentIdStr = parentRole._id.toString();
+                if (!compiledRoleIds.includes(parentIdStr)) {
+                    compiledRoleIds.push(parentIdStr);
+                }
                 currentParentId = parentRole.parentRoleId;
                 depth++;
             }
@@ -271,7 +292,7 @@ const getMyPermissions = async (req, res) => {
             organizationId: orgId,
             $or: [
                 { userId: userId },
-                { roleId: { $in: roleIds } },
+                { roleId: { $in: compiledRoleIds } },
             ],
         });
         // Group permissions by module
@@ -281,7 +302,7 @@ const getMyPermissions = async (req, res) => {
         for (const mod of uniqueModules) {
             const modPerms = permissions.filter((p) => p.module === mod);
             const directPermissions = modPerms.filter((p) => p.userId?.toString() === userId.toString());
-            const rolePermissions = modPerms.filter((p) => !p.userId && roleIds.includes(p.roleId?.toString() || ''));
+            const rolePermissions = modPerms.filter((p) => !p.userId && compiledRoleIds.includes(p.roleId?.toString() || ''));
             const activePermsForMod = directPermissions.length > 0 ? directPermissions : rolePermissions;
             // Compile action boolean flags
             const actions = {

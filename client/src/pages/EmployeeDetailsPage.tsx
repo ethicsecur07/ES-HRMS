@@ -458,8 +458,21 @@ export const EmployeeDetailsPage: React.FC = () => {
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
                   <Calendar className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Joining Date</p>
-                    <p className="font-semibold text-foreground">{formatDate(employee.joiningDate)}</p>
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Employee Hire Date</p>
+                    <p className="font-semibold text-foreground">
+                      {(() => {
+                        if (!employee.joiningDate) return 'N/A';
+                        try {
+                          const d = new Date(employee.joiningDate);
+                          const day = String(d.getDate()).padStart(2, '0');
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          const year = d.getFullYear();
+                          return `${day}/${month}/${year}`;
+                        } catch {
+                          return employee.joiningDate;
+                        }
+                      })()}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border col-span-2">

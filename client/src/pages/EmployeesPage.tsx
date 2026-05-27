@@ -16,8 +16,7 @@ import { Input, Textarea } from '../Components/WrapperComponents/Input';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Employee } from '../types';
-import { formatCurrency } from '../utils/formatters';
-import { PlusCircle, Edit, Trash2, PhoneCall, Eye, Camera, Loader2, Sparkles, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Edit, Trash2, Eye, Camera, Loader2, Sparkles, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 const baseEmployeeSchema = z.object({
   id: z.string().optional(),
@@ -30,7 +29,7 @@ const baseEmployeeSchema = z.object({
   phone: z.string().regex(/^\+?[0-9\s-]{10,20}$/, 'Phone number must be a valid number (10 to 20 digits, spaces/hyphens allowed)'),
   departmentId: z.string().min(1, 'Department is required'),
   designationId: z.string().min(1, 'Designation is required'),
-  joiningDate: z.string().min(1, 'Joining date is required'),
+  joiningDate: z.string().min(1, 'Employee hire date is required'),
   salary: z.coerce.number().min(0, 'Salary cannot be negative'),
   address: z.string().min(5, 'Residential Address must be at least 5 characters'),
   emergencyContactName: z.string()
@@ -337,28 +336,6 @@ export const EmployeesPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleAddNew = () => {
-    setEditingId(null);
-    setProfileImage('');
-    reset({
-      id: '',
-      employeeCode: '',
-      joiningDate: new Date().toISOString().split('T')[0],
-      departmentId: departments[0]?._id || '',
-      designationId: '',
-      password: '',
-      salary: 0,
-      bankName: '',
-      accountName: '',
-      accountNumber: '',
-      ifscCode: '',
-      branchName: '',
-      panNumber: '',
-      taxRegime: '',
-    });
-    setFormTab('general');
-    setShowModal(true);
-  };
 
   const handleSyncMicrosoft = async () => {
     if (!window.confirm('Are you sure you want to sync employees from your Microsoft Directory? This will auto-provision or update accounts for users with @ethicsecur.co.in corporate email.')) {
@@ -428,20 +405,15 @@ export const EmployeesPage: React.FC = () => {
       ),
     },
     {
-      header: 'Salary',
+      header: 'Status',
       accessor: (row: Employee) => (
-        <span className="text-xs font-mono font-bold text-primary">{formatCurrency(row.salary)}</span>
-      ),
-    },
-    {
-      header: 'Emergency Contact',
-      accessor: (row: Employee) => (
-        <div className="text-xs">
-          <p className="font-semibold text-foreground flex items-center gap-1">
-            <PhoneCall className="w-3 h-3 text-primary" /> {row.emergencyContact.name} ({row.emergencyContact.relationship})
-          </p>
-          <p className="text-[10px] text-muted-foreground font-mono">{row.emergencyContact.phone}</p>
-        </div>
+        <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+          row.isActive
+            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+            : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+        }`}>
+          {row.isActive ? 'Active' : 'Inactive'}
+        </span>
       ),
     },
     {
@@ -513,10 +485,7 @@ export const EmployeesPage: React.FC = () => {
               )}
               {isSyncingMS ? 'SYNCING...' : 'SYNC MICROSOFT'}
             </Button>
-            <Button onClick={handleAddNew} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
-              <PlusCircle className="w-5 h-5 mr-2" />
-              ONBOARD EMPLOYEE
-            </Button>
+
           </div>
         )}
       </div>
@@ -767,7 +736,7 @@ export const EmployeesPage: React.FC = () => {
                   {errors.designationId && <p className="text-xs text-red-500 font-bold mt-1">{errors.designationId.message}</p>}
                 </div>
 
-                <Input label="Joining Date *" type="date" {...register('joiningDate')} error={errors.joiningDate?.message} />
+                <Input label="Employee Hire Date *" type="date" {...register('joiningDate')} error={errors.joiningDate?.message} />
                 <Input label="Monthly Base Salary (INR) *" type="number" {...register('salary')} error={errors.salary?.message} />
               </div>
             </div>

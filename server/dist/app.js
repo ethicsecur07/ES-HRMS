@@ -28,13 +28,12 @@ const permission_routes_js_1 = __importDefault(require("./routes/permission.rout
 const task_routes_js_1 = __importDefault(require("./routes/task.routes.js"));
 const finance_routes_js_1 = __importDefault(require("./routes/finance.routes.js"));
 const upload_routes_js_1 = __importDefault(require("./routes/upload.routes.js"));
-const lifecycle_routes_js_1 = __importDefault(require("./domains/employee-lifecycle/lifecycle.routes.js"));
 const organization_routes_js_1 = __importDefault(require("./domains/organization/organization.routes.js"));
 const module_routes_js_1 = __importDefault(require("./routes/module.routes.js"));
 const attendance_routes_js_2 = __importDefault(require("./domains/attendance-engine/attendance.routes.js"));
-const selfService_routes_js_1 = __importDefault(require("./routes/selfService.routes.js"));
 const document_routes_js_1 = __importDefault(require("./routes/document.routes.js"));
 const role_routes_js_1 = __importDefault(require("./routes/role.routes.js"));
+const asset_routes_js_1 = __importDefault(require("./routes/asset.routes.js"));
 const authPermission_routes_js_1 = __importDefault(require("./routes/authPermission.routes.js"));
 const department_routes_js_1 = __importDefault(require("./routes/department.routes.js"));
 const designation_routes_js_1 = __importDefault(require("./routes/designation.routes.js"));
@@ -103,12 +102,11 @@ const createApp = () => {
     app.use('/api/finance', finance_routes_js_1.default);
     app.use('/api/expenses', expense_routes_js_1.default);
     app.use('/api/upload', upload_routes_js_1.default);
-    app.use('/api/lifecycle', lifecycle_routes_js_1.default);
     app.use('/api/organization', organization_routes_js_1.default);
     app.use('/api/modules', module_routes_js_1.default);
-    app.use('/api/self-service', selfService_routes_js_1.default);
     app.use('/api/documents', document_routes_js_1.default);
     app.use('/api/roles', role_routes_js_1.default);
+    app.use('/api/assets', asset_routes_js_1.default);
     app.use('/api/auth-permissions', authPermission_routes_js_1.default);
     app.use('/api/departments', department_routes_js_1.default);
     app.use('/api/designations', designation_routes_js_1.default);

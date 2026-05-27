@@ -6,29 +6,32 @@ import { KanbanBoard } from '../Components/project/KanbanBoard';
 import { ProjectAnalyticsDashboard } from '../Components/project/ProjectAnalyticsDashboard';
 import {
   ArrowLeft, Calendar, Clock, Edit, Trash2, Plus, Settings,
-  LayoutDashboard, BarChart2, Users, Activity, Eye, Shield,
-  Loader2, CheckCircle2, Star
+  BarChart2, Users, Activity, Eye, Shield,
+  Loader2, CheckCircle2, Star, Paperclip, FileText, Trophy,
+  Download, UploadCloud, Info, CheckSquare, Square,
+  ListTodo
 } from 'lucide-react';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import { Input, Select, Textarea } from '../Components/WrapperComponents/Input';
 import { Button } from '../Components/WrapperComponents/Button';
 import { usePermission } from '../hooks/usePermission';
 import { useAuthStore } from '../store/useAuthStore';
+import { motion, AnimatePresence } from 'framer-motion';
 
-type TabType = 'board' | 'analytics' | 'members' | 'activity';
+type TabType = 'overview' | 'milestones' | 'tasks' | 'members' | 'timeline' | 'files' | 'analytics' | 'activity';
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  PLANNING: { label: 'Planning', bg: 'bg-amber-500/10 border-amber-500/30', text: 'text-amber-400' },
-  ACTIVE: { label: 'Active', bg: 'bg-emerald-500/10 border-emerald-500/30', text: 'text-emerald-400' },
-  ON_HOLD: { label: 'On Hold', bg: 'bg-orange-500/10 border-orange-500/30', text: 'text-orange-400' },
-  COMPLETED: { label: 'Completed', bg: 'bg-indigo-500/10 border-indigo-500/30', text: 'text-indigo-400' },
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  PLANNING: { label: 'Planning', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
+  ACTIVE: { label: 'Active', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+  ON_HOLD: { label: 'On Hold', bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30' },
+  COMPLETED: { label: 'Completed', bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/30' },
 };
 
-const PRIORITY_CONFIG: Record<string, { text: string }> = {
-  CRITICAL: { text: 'text-red-400' },
-  HIGH: { text: 'text-orange-400' },
-  MEDIUM: { text: 'text-amber-400' },
-  LOW: { text: 'text-slate-400' },
+const PRIORITY_CONFIG: Record<string, { text: string; bg: string; border: string }> = {
+  CRITICAL: { text: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
+  HIGH: { text: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+  MEDIUM: { text: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  LOW: { text: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
 };
 
 const PROJECT_TYPE_BADGE: Record<string, string> = {
@@ -51,16 +54,18 @@ export const ProjectDetailsPage = () => {
 
   const [project, setProject] = useState<any>(null);
   const [sprints, setSprints] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [eligibleEmployees, setEligibleEmployees] = useState<any[]>([]);
   const [projectActivity, setProjectActivity] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<TabType>('board');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedSprintId, setSelectedSprintId] = useState<string>('backlog');
 
   // Modals
   const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
   const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false);
   const [isEditSprintOpen, setIsEditSprintOpen] = useState(false);
+  const [isCreateMilestoneOpen, setIsCreateMilestoneOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Edit Project Form
@@ -88,6 +93,14 @@ export const ProjectDetailsPage = () => {
   const [editSprintStart, setEditSprintStart] = useState('');
   const [editSprintEnd, setEditSprintEnd] = useState('');
   const [editSprintStatus, setEditSprintStatus] = useState<'PLANNING' | 'ACTIVE' | 'COMPLETED'>('PLANNING');
+
+  // Milestone form
+  const [milestoneName, setMilestoneName] = useState('');
+  const [milestoneDueDate, setMilestoneDueDate] = useState('');
+
+  // Local uploads state for simulated files
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const fetchProjectDetails = async () => {
     if (!id) return;
@@ -121,6 +134,16 @@ export const ProjectDetailsPage = () => {
     }
   };
 
+  const fetchTasks = async () => {
+    if (!id) return;
+    try {
+      const data = await projectApi.getTasks(id);
+      setTasks(data.tasks || []);
+    } catch (e) {
+      console.error('Failed to fetch tasks', e);
+    }
+  };
+
   const fetchProjectActivity = async () => {
     if (!id) return;
     try {
@@ -137,7 +160,6 @@ export const ProjectDetailsPage = () => {
       const data = await projectApi.getEligibleEmployees(id);
       setEligibleEmployees(data.eligible || []);
     } catch (e) {
-      // Fallback to all employees
       setEligibleEmployees(employees);
     }
   };
@@ -145,6 +167,7 @@ export const ProjectDetailsPage = () => {
   useEffect(() => {
     fetchProjectDetails();
     fetchSprints();
+    fetchTasks();
 
     const loadEmployees = async () => {
       try {
@@ -160,6 +183,7 @@ export const ProjectDetailsPage = () => {
   useEffect(() => {
     if (activeTab === 'activity') fetchProjectActivity();
     if (activeTab === 'members' && id) fetchEligibleEmployees();
+    if (activeTab === 'files') fetchTasks();
   }, [activeTab]);
 
   const handleUpdateProject = async (e: React.FormEvent) => {
@@ -244,6 +268,76 @@ export const ProjectDetailsPage = () => {
     }
   };
 
+  // Milestones CRUD
+  const handleCreateMilestone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !project) return;
+    setIsSubmitting(true);
+    try {
+      const updatedMilestones = [
+        ...(project.milestones || []),
+        { name: milestoneName, dueDate: milestoneDueDate, status: 'PENDING' }
+      ];
+      const data = await projectApi.updateProject(id, { milestones: updatedMilestones });
+      setProject(data.project);
+      setMilestoneName('');
+      setMilestoneDueDate('');
+      setIsCreateMilestoneOpen(false);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to create milestone');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleMilestone = async (index: number) => {
+    if (!id || !project) return;
+    try {
+      const updatedMilestones = project.milestones.map((m: any, idx: number) => {
+        if (idx === index) {
+          return { ...m, status: m.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED' };
+        }
+        return m;
+      });
+      const data = await projectApi.updateProject(id, { milestones: updatedMilestones });
+      setProject(data.project);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update milestone status');
+    }
+  };
+
+  const handleDeleteMilestone = async (index: number) => {
+    if (!id || !project) return;
+    if (!window.confirm('Delete this milestone?')) return;
+    try {
+      const updatedMilestones = project.milestones.filter((_: any, idx: number) => idx !== index);
+      const data = await projectApi.updateProject(id, { milestones: updatedMilestones });
+      setProject(data.project);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete milestone');
+    }
+  };
+
+  // Simulated uploader for files tab
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setIsUploading(true);
+      const file = e.target.files[0];
+      setTimeout(() => {
+        const newFile = {
+          filename: file.name,
+          url: '#',
+          fileType: file.type || 'application/octet-stream',
+          uploadedByName: user?.name || 'CurrentUser',
+          uploadedAt: new Date().toISOString(),
+          isSimulated: true
+        };
+        setUploadedFiles([newFile, ...uploadedFiles]);
+        setIsUploading(false);
+      }, 1000);
+    }
+  };
+
   if (!project) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -259,11 +353,56 @@ export const ProjectDetailsPage = () => {
   const typeBadge = PROJECT_TYPE_BADGE[project.projectType] || PROJECT_TYPE_BADGE.General;
 
   const TABS: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'board', label: 'Board', icon: <LayoutDashboard className="w-4 h-4" /> },
-    { id: 'analytics', label: 'Analytics', icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'members', label: 'Members', icon: <Users className="w-4 h-4" /> },
-    { id: 'activity', label: 'Activity', icon: <Activity className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: <Info className="w-4 h-4" /> },
+    { id: 'milestones', label: 'Milestones', icon: <Trophy className="w-4 h-4" /> },
+    { id: 'tasks', label: 'Tasks', icon: <ListTodo className="w-4 h-4" /> },
+    { id: 'members', label: 'Team Members', icon: <Users className="w-4 h-4" /> },
+    { id: 'timeline', label: 'Timeline', icon: <Calendar className="w-4 h-4" /> },
+    { id: 'files', label: 'Files', icon: <Paperclip className="w-4 h-4" /> },
+    { id: 'analytics', label: 'Progress Analytics', icon: <BarChart2 className="w-4 h-4" /> },
+    { id: 'activity', label: 'Activity Logs', icon: <Activity className="w-4 h-4" /> },
   ];
+
+  // Compile all attachments from all tasks
+  const taskAttachments = tasks.reduce((acc: any[], t: any) => {
+    if (t.attachments && t.attachments.length > 0) {
+      t.attachments.forEach((att: any) => {
+        acc.push({
+          ...att,
+          taskTitle: t.title,
+          taskId: t._id
+        });
+      });
+    }
+    return acc;
+  }, []);
+
+  const allFiles = [...uploadedFiles, ...taskAttachments];
+
+  // Compile timeline data
+  const timelineEvents = [
+    ...sprints.map((s: any) => ({
+      type: 'sprint',
+      name: s.name,
+      date: new Date(s.startDate),
+      endDate: new Date(s.endDate),
+      status: s.status,
+      goal: s.goal,
+      original: s
+    })),
+    ...(project.milestones || []).map((m: any) => ({
+      type: 'milestone',
+      name: m.name,
+      date: new Date(m.dueDate),
+      status: m.status,
+      original: m
+    }))
+  ].sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
+
+  // Task statistics for overview
+  const totalTasksCount = tasks.length;
+  const completedTasksCount = tasks.filter(t => t.status === 'COMPLETED').length;
+  const completionPercentage = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
 
   const ACTION_LABELS: Record<string, string> = {
     CREATED: 'created task',
@@ -279,35 +418,35 @@ export const ProjectDetailsPage = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background text-left">
+    <div className="flex flex-col min-h-screen bg-background text-left font-sans">
       {/* Top Header */}
-      <div className="bg-card border-b border-white/10 px-6 py-5">
+      <div className="bg-card/50 backdrop-blur-md border-b border-white/10 px-6 py-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/projects')}
-              className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-colors border border-white/10"
+              className="p-2.5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all border border-white/10"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                <span className={`text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${statConfig.bg} ${statConfig.text}`}>
+                <span className={`text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${statConfig.bg} ${statConfig.text} ${statConfig.border}`}>
                   {statConfig.label}
                 </span>
-                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${typeBadge}`}>
+                <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${typeBadge}`}>
                   {project.projectType || 'General'}
                 </span>
-                <span className={`text-xs font-bold ${priConfig.text}`}>
+                <span className={`text-[11px] font-extrabold flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border ${priConfig.bg} ${priConfig.text} ${priConfig.border}`}>
                   ● {project.priority}
                 </span>
                 {isAdmin && (
-                  <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/30 text-amber-400">
+                  <span className="flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/30 text-amber-400">
                     <Eye className="w-3 h-3" /> View Only
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl font-bold text-white">{project.name}</h1>
+              <h1 className="text-2xl font-bold text-white tracking-tight">{project.name}</h1>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-1 font-medium">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
@@ -327,7 +466,7 @@ export const ProjectDetailsPage = () => {
                   onClick={() => setIsEditProjectOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl border border-white/10 transition-colors text-sm font-semibold"
                 >
-                  <Edit className="w-4 h-4" /> Edit
+                  <Edit className="w-4 h-4" /> Edit Project
                 </button>
               )}
               {canEditProject && (
@@ -344,203 +483,611 @@ export const ProjectDetailsPage = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-card border-b border-white/10 px-6">
-        <div className="flex gap-1">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3.5 text-sm font-semibold border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-400 hover:text-white hover:border-white/20'
-              }`}
-            >
-              {tab.icon} {tab.label}
-            </button>
-          ))}
+      <div className="bg-card/30 backdrop-blur-md border-b border-white/10 px-6">
+        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+          {TABS.map(tab => {
+            const isTabActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex items-center gap-2 px-4 py-4 text-sm font-semibold transition-all whitespace-nowrap ${
+                  isTabActive ? 'text-primary' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                {isTabActive && (
+                  <motion.div
+                    layoutId="activeTabUnderline"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-6 overflow-auto bg-slate-950/20">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.2 }}
+            className="h-full"
+          >
+            {/* ── OVERVIEW TAB ── */}
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column (Wide) */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Description Card */}
+                  <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-lg font-bold text-white mb-4">Project Description</h2>
+                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+                      {project.description || 'No description provided.'}
+                    </p>
+                  </div>
 
-        {/* ── BOARD TAB ── */}
-        {activeTab === 'board' && (
-          <>
-            {/* Sprint toolbar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-transparent border border-white/10 p-4 rounded-2xl">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-sm font-semibold text-slate-400">Sprint:</span>
-                <select
-                  value={selectedSprintId}
-                  onChange={e => setSelectedSprintId(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white outline-none focus:border-primary/50 cursor-pointer font-medium"
-                >
-                  <option value="backlog">Backlog / All Tasks</option>
-                  {sprints.map(sprint => (
-                    <option key={sprint._id} value={sprint._id}>
-                      {sprint.name} ({sprint.status})
-                    </option>
-                  ))}
-                </select>
+                  {/* Metadata Grid */}
+                  <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-lg font-bold text-white mb-4">Project Details</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-slate-500">CLIENT NAME</span>
+                        <span className="text-sm font-bold text-slate-200 mt-1">{project.clientName}</span>
+                      </div>
+                      <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-slate-500">PROJECT TYPE</span>
+                        <span className="text-sm font-bold text-slate-200 mt-1">{project.projectType || 'General'}</span>
+                      </div>
+                      <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-slate-500">BUDGET ALLOCATION</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-sm font-bold text-primary">${project.budget?.toLocaleString()}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            project.budgetStatus === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                            project.budgetStatus === 'REJECTED' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }`}>
+                            {project.budgetStatus || 'PENDING'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-slate-500">TIMELINE RANGE</span>
+                        <span className="text-sm font-bold text-slate-200 mt-1">
+                          {new Date(project.startDate).toLocaleDateString()} — {new Date(project.endDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-                {selectedSprintId !== 'backlog' && hasPermission('PROJECTS', 'edit') && !isAdmin && (
-                  <button
-                    onClick={openEditSprintModal}
-                    className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 rounded-xl transition-colors"
-                    title="Edit Sprint"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </button>
-                )}
+                {/* Right Column (Narrow) */}
+                <div className="space-y-6">
+                  {/* Progress Ring Card */}
+                  <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl flex flex-col items-center text-center">
+                    <h2 className="text-md font-bold text-slate-400 mb-6">Task Completion</h2>
+                    <div className="relative flex items-center justify-center w-36 h-36 mb-4">
+                      {/* SVG Progress Circle */}
+                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="transparent" />
+                        <motion.circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          stroke="var(--color-primary, #6366f1)"
+                          strokeWidth="8"
+                          fill="transparent"
+                          strokeDasharray={251.2}
+                          initial={{ strokeDashoffset: 251.2 }}
+                          animate={{ strokeDashoffset: 251.2 - (251.2 * completionPercentage) / 100 }}
+                          transition={{ duration: 1.2, ease: 'easeOut' }}
+                        />
+                      </svg>
+                      <div className="absolute flex flex-col items-center">
+                        <span className="text-3xl font-extrabold text-white">{completionPercentage}%</span>
+                        <span className="text-[10px] text-slate-500 mt-0.5">{completedTasksCount}/{totalTasksCount} Tasks</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400">Total sprints currently tracked: <strong>{sprints.length}</strong></p>
+                  </div>
 
-                {hasPermission('PROJECTS', 'edit') && !isAdmin && ['HR', 'MANAGER', 'TEAM_LEAD'].includes(userRole) && (
-                  <button
-                    onClick={() => setIsCreateSprintOpen(true)}
-                    className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-2 rounded-xl border border-primary/30 transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> New Sprint
-                  </button>
-                )}
+                  {/* Team Members Summary Card */}
+                  <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-md font-bold text-slate-400 mb-4">Leadership & Contacts</h2>
+                    <div className="space-y-4">
+                      {project.allocatedManagerId && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-xs">
+                            {project.allocatedManagerId.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500">PROJECT MANAGER</p>
+                            <p className="text-sm font-bold text-slate-200">{project.allocatedManagerId.name}</p>
+                          </div>
+                        </div>
+                      )}
+                      {project.teamLeadId && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-xs">
+                            {project.teamLeadId.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500">TEAM LEAD</p>
+                            <p className="text-sm font-bold text-slate-200">{project.teamLeadId.name}</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="border-t border-white/5 pt-4">
+                        <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+                          <span>Total Assigned Members:</span>
+                          <span className="text-white font-bold">{project.teamMemberIds?.length || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
+            )}
 
-              {selectedSprintObj && (
-                <div className="text-xs text-slate-400 flex flex-wrap items-center gap-3 font-medium">
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-slate-500" />
-                    {new Date(selectedSprintObj.startDate).toLocaleDateString()} — {new Date(selectedSprintObj.endDate).toLocaleDateString()}
-                  </span>
-                  {selectedSprintObj.goal && (
-                    <span className="italic text-muted-foreground">"{selectedSprintObj.goal}"</span>
+            {/* ── MILESTONES TAB ── */}
+            {activeTab === 'milestones' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Sprints Section */}
+                <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-slate-400" /> Sprints
+                    </h2>
+                    {hasPermission('PROJECTS', 'edit') && !isAdmin && ['HR', 'MANAGER', 'TEAM_LEAD'].includes(userRole) && (
+                      <button
+                        onClick={() => setIsCreateSprintOpen(true)}
+                        className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl border border-primary/30 transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> New Sprint
+                      </button>
+                    )}
+                  </div>
+                  {sprints.length === 0 ? (
+                    <div className="text-center text-slate-500 py-12 text-sm">No sprints created for this project.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {sprints.map((s: any) => (
+                        <div key={s._id} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 transition-all flex justify-between items-center">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-slate-200">{s.name}</span>
+                              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                                s.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                s.status === 'COMPLETED' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                                'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                              }`}>
+                                {s.status}
+                              </span>
+                            </div>
+                            {s.goal && <p className="text-xs text-slate-400 mt-1 italic">"{s.goal}"</p>}
+                            <p className="text-[10px] text-slate-500 mt-2">
+                              {new Date(s.startDate).toLocaleDateString()} — {new Date(s.endDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {hasPermission('PROJECTS', 'edit') && !isAdmin && (
+                            <button
+                              onClick={() => {
+                                setSelectedSprintId(s._id);
+                                openEditSprintModal();
+                              }}
+                              className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors border border-white/10"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            <KanbanBoard
-              projectId={project._id}
-              selectedSprintId={selectedSprintId}
-              sprints={sprints}
-              teamMembers={assignableMembers}
-            />
-          </>
-        )}
-
-        {/* ── ANALYTICS TAB ── */}
-        {activeTab === 'analytics' && <ProjectAnalyticsDashboard projectId={project._id} />}
-
-        {/* ── MEMBERS TAB ── */}
-        {activeTab === 'members' && (
-          <div className="space-y-6">
-            {/* Info banner for non-admins */}
-            {!isAdmin && project.projectType && project.projectType !== 'General' && (
-              <div className="flex items-center gap-2 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-300 text-xs font-semibold">
-                <Shield className="w-4 h-4 flex-shrink-0" />
-                This is a <strong>{project.projectType}</strong> project. Only eligible department employees are shown below.
-              </div>
-            )}
-
-            {/* Team Lead */}
-            {project.teamLeadId && (
-              <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <Star className="w-3.5 h-3.5 text-amber-400" /> Team Lead
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm">
-                    {(project.teamLeadId?.name || 'T').charAt(0).toUpperCase()}
+                {/* Project Milestones Section */}
+                <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-slate-400" /> Milestones Checklist
+                    </h2>
+                    {hasPermission('PROJECTS', 'edit') && !isAdmin && (
+                      <button
+                        onClick={() => setIsCreateMilestoneOpen(true)}
+                        className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl border border-primary/30 transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> New Milestone
+                      </button>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{project.teamLeadId?.name || 'Assigned'}</p>
-                    <p className="text-xs text-slate-500">{project.teamLeadId?.email}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Team Members */}
-            <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Users className="w-3.5 h-3.5" /> Team Members ({project.teamMemberIds?.length || 0})
-              </p>
-              {project.teamMemberIds?.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">No team members assigned yet.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {project.teamMemberIds?.map((emp: any) => (
-                    <div key={emp._id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/10">
-                      <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
-                        {emp.fullName?.charAt(0)?.toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{emp.fullName}</p>
-                        <p className="text-xs text-slate-500 truncate">{emp.department} · {emp.designation}</p>
-                      </div>
+                  {(!project.milestones || project.milestones.length === 0) ? (
+                    <div className="text-center text-slate-500 py-12 text-sm">No milestones configured for this project.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {project.milestones.map((m: any, idx: number) => (
+                        <div key={idx} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 transition-all flex justify-between items-center">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => !isAdmin && handleToggleMilestone(idx)}
+                              disabled={isAdmin}
+                              className={`p-1 rounded-lg transition-colors ${isAdmin ? 'cursor-not-allowed' : 'hover:bg-white/5'}`}
+                            >
+                              {m.status === 'COMPLETED' ? (
+                                <CheckSquare className="w-5 h-5 text-primary" />
+                              ) : (
+                                <Square className="w-5 h-5 text-slate-500" />
+                              )}
+                            </button>
+                            <div>
+                              <span className={`text-sm font-semibold ${m.status === 'COMPLETED' ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                                {m.name}
+                              </span>
+                              <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" /> Due Date: {new Date(m.dueDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          {!isAdmin && hasPermission('PROJECTS', 'edit') && (
+                            <button
+                              onClick={() => handleDeleteMilestone(idx)}
+                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-colors"
+                              title="Delete Milestone"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Eligible Employees (for assignment) — only for HR/Manager */}
-            {canEditProject && eligibleEmployees.length > 0 && (
-              <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Eligible Employees
-                </p>
-                <p className="text-xs text-slate-500 mb-4">These employees can be assigned to this project based on department mapping.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {eligibleEmployees.slice(0, 12).map((emp: any) => (
-                    <div key={emp._id} className="flex items-center gap-2 bg-emerald-500/5 border border-emerald-500/15 rounded-xl px-3 py-2">
-                      <div className="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs flex-shrink-0">
-                        {emp.fullName?.charAt(0)?.toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-white truncate">{emp.fullName}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{emp.department}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {eligibleEmployees.length > 12 && (
-                    <p className="text-xs text-slate-500 col-span-2 text-center py-2">+{eligibleEmployees.length - 12} more eligible employees</p>
                   )}
                 </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* ── ACTIVITY TAB ── */}
-        {activeTab === 'activity' && (
-          <div className="space-y-3">
-            {projectActivity.length === 0 ? (
-              <div className="text-center text-slate-500 py-12 text-sm">No activity recorded for this project yet.</div>
-            ) : (
-              <div className="relative pl-8">
-                <div className="absolute left-3.5 top-0 bottom-0 w-px bg-white/10" />
-                {projectActivity.map((a: any) => (
-                  <div key={a._id} className="relative mb-4">
-                    <div className="absolute -left-5 top-1 w-6 h-6 rounded-full bg-card border border-white/10 flex items-center justify-center">
-                      <div className="w-2 h-2 rounded-full bg-primary" />
+            {/* ── TASKS TAB ── */}
+            {activeTab === 'tasks' && (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-card border border-white/10 p-4 rounded-2xl">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-sm font-semibold text-slate-400">Sprint Selection:</span>
+                    <select
+                      value={selectedSprintId}
+                      onChange={e => setSelectedSprintId(e.target.value)}
+                      className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white outline-none focus:border-primary/50 cursor-pointer font-medium"
+                    >
+                      <option value="backlog">Backlog / All Tasks</option>
+                      {sprints.map(sprint => (
+                        <option key={sprint._id} value={sprint._id}>
+                          {sprint.name} ({sprint.status})
+                        </option>
+                      ))}
+                    </select>
+
+                    {selectedSprintId !== 'backlog' && hasPermission('PROJECTS', 'edit') && !isAdmin && (
+                      <button
+                        onClick={openEditSprintModal}
+                        className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 rounded-xl transition-colors"
+                        title="Edit Sprint"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {hasPermission('PROJECTS', 'edit') && !isAdmin && ['HR', 'MANAGER', 'TEAM_LEAD'].includes(userRole) && (
+                      <button
+                        onClick={() => setIsCreateSprintOpen(true)}
+                        className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-2 rounded-xl border border-primary/30 transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> New Sprint
+                      </button>
+                    )}
+                  </div>
+
+                  {selectedSprintObj && (
+                    <div className="text-xs text-slate-400 flex flex-wrap items-center gap-3 font-medium">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                        {new Date(selectedSprintObj.startDate).toLocaleDateString()} — {new Date(selectedSprintObj.endDate).toLocaleDateString()}
+                      </span>
+                      {selectedSprintObj.goal && (
+                        <span className="italic text-slate-500">"{selectedSprintObj.goal}"</span>
+                      )}
                     </div>
-                    <div className="bg-white/5 rounded-xl px-4 py-3 border border-white/10">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-bold text-white">{a.actorName}</p>
-                        <p className="text-[10px] text-slate-500">{new Date(a.createdAt).toLocaleString()}</p>
+                  )}
+                </div>
+
+                <KanbanBoard
+                  projectId={project._id}
+                  selectedSprintId={selectedSprintId}
+                  sprints={sprints}
+                  teamMembers={assignableMembers}
+                />
+              </>
+            )}
+
+            {/* ── MEMBERS TAB ── */}
+            {activeTab === 'members' && (
+              <div className="space-y-6">
+                {!isAdmin && project.projectType && project.projectType !== 'General' && (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-300 text-xs font-semibold">
+                    <Shield className="w-4 h-4 flex-shrink-0" />
+                    This is a <strong>{project.projectType}</strong> project. Only eligible department employees are shown below.
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Allocated Manager & Lead */}
+                  <div className="space-y-6">
+                    {project.allocatedManagerId && (
+                      <div className="bg-card border border-white/10 rounded-2xl p-5 shadow-lg">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Users className="w-3.5 h-3.5" /> Project Manager
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm">
+                            {project.allocatedManagerId.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white">{project.allocatedManagerId.name}</p>
+                            <p className="text-xs text-slate-400">{project.allocatedManagerId.email}</p>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-400">
-                        {ACTION_LABELS[a.action] || a.action.toLowerCase().replace(/_/g, ' ')}
-                        {a.from && a.to && <span className="text-slate-500"> ({a.from} → {a.to})</span>}
-                      </p>
-                      {a.comment && <p className="text-xs text-slate-500 mt-1 italic">"{a.comment}"</p>}
+                    )}
+
+                    {project.teamLeadId && (
+                      <div className="bg-card border border-white/10 rounded-2xl p-5 shadow-lg">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Star className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> Team Lead
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm">
+                            {project.teamLeadId.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white">{project.teamLeadId.name}</p>
+                            <p className="text-xs text-slate-400">{project.teamLeadId.email}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Team Members List */}
+                  <div className="bg-card border border-white/10 rounded-2xl p-5 shadow-lg flex flex-col h-[340px]">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5" /> Team Members ({project.teamMemberIds?.length || 0})
+                    </p>
+                    {project.teamMemberIds?.length === 0 ? (
+                      <p className="text-sm text-slate-500 text-center py-12 flex-1 flex items-center justify-center">No team members assigned yet.</p>
+                    ) : (
+                      <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+                        {project.teamMemberIds?.map((emp: any) => (
+                          <div key={emp._id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/5">
+                            <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+                              {emp.fullName?.charAt(0)?.toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-white truncate">{emp.fullName}</p>
+                              <p className="text-xs text-slate-400 truncate">{emp.department} · {emp.designation}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Eligible Employees */}
+                {canEditProject && eligibleEmployees.length > 0 && (
+                  <div className="bg-card border border-white/10 rounded-2xl p-5 shadow-lg">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Eligible Candidates
+                    </p>
+                    <p className="text-xs text-slate-500 mb-4 font-medium">These employees fit this project type ({project.projectType || 'General'}) and can be assigned by editing the project.</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {eligibleEmployees.map((emp: any) => (
+                        <div key={emp._id} className="flex items-center gap-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2.5">
+                          <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs flex-shrink-0">
+                            {emp.fullName?.charAt(0)?.toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-white truncate">{emp.fullName}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{emp.department}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             )}
-          </div>
-        )}
+
+            {/* ── TIMELINE TAB ── */}
+            {activeTab === 'timeline' && (
+              <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
+                <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-slate-400" /> Project Timeline
+                </h2>
+                {timelineEvents.length === 0 ? (
+                  <div className="text-center text-slate-500 py-12 text-sm">No sprints or milestones scheduled for this project.</div>
+                ) : (
+                  <div className="relative pl-8 space-y-6">
+                    <div className="absolute left-3.5 top-0 bottom-0 w-px bg-white/10" />
+                    {timelineEvents.map((event: any, index: number) => {
+                      const isSprint = event.type === 'sprint';
+                      return (
+                        <div key={index} className="relative">
+                          {/* Timeline node icon */}
+                          <div className={`absolute -left-7 top-1 w-5 h-5 rounded-full border bg-card flex items-center justify-center ${
+                            isSprint ? 'border-primary' : 'border-amber-500'
+                          }`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${
+                              isSprint ? 'bg-primary' : 'bg-amber-500'
+                            }`} />
+                          </div>
+
+                          <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                  isSprint ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                }`}>
+                                  {isSprint ? 'Sprint' : 'Milestone'}
+                                </span>
+                                <h3 className="text-sm font-bold text-white">{event.name}</h3>
+                              </div>
+                              {event.goal && <p className="text-xs text-slate-400 mt-1 italic">Goal: "{event.goal}"</p>}
+                              <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1 font-medium">
+                                <Clock className="w-3 h-3" />
+                                {isSprint ? (
+                                  `${event.date.toLocaleDateString()} — ${event.endDate.toLocaleDateString()}`
+                                ) : (
+                                  `Due by ${event.date.toLocaleDateString()}`
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                                event.status === 'COMPLETED' || event.status === 'active' || event.status === 'ACTIVE'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                              }`}>
+                                {event.status}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── FILES TAB ── */}
+            {activeTab === 'files' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* File Upload Zone */}
+                <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+                  <h2 className="text-lg font-bold text-white">Upload Project File</h2>
+                  <div className="border-2 border-dashed border-white/10 rounded-xl p-8 text-center hover:border-primary/50 transition-colors flex flex-col items-center justify-center cursor-pointer relative bg-slate-950/20">
+                    <input
+                      type="file"
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      disabled={isUploading}
+                    />
+                    {isUploading ? (
+                      <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
+                    ) : (
+                      <UploadCloud className="w-10 h-10 text-slate-400 mb-3" />
+                    )}
+                    <span className="text-sm font-bold text-slate-300">Drag & Drop or Click</span>
+                    <span className="text-xs text-slate-500 mt-1">Upload reports, specs, or logs (max 10MB)</span>
+                  </div>
+                  <div className="flex gap-2 p-3 bg-white/5 border border-white/5 rounded-xl text-slate-400 text-xs">
+                    <Info className="w-4 h-4 shrink-0 text-slate-500" />
+                    Files uploaded here are stored in simulated local environment. Files uploaded as task attachments are also fetched dynamically.
+                  </div>
+                </div>
+
+                {/* Files List (2/3 width) */}
+                <div className="lg:col-span-2 bg-card border border-white/10 rounded-2xl p-6 shadow-xl flex flex-col h-[400px]">
+                  <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-slate-400" /> Files & Attachments ({allFiles.length})
+                  </h2>
+                  {allFiles.length === 0 ? (
+                    <div className="text-center text-slate-500 py-12 flex-1 flex flex-col items-center justify-center gap-2">
+                      <Paperclip className="w-8 h-8 opacity-20" />
+                      <p className="text-sm">No files uploaded for this project yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+                      {allFiles.map((file: any, index: number) => (
+                        <div key={index} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-3.5 transition-all flex justify-between items-center gap-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2.5 bg-primary/10 rounded-xl text-primary shrink-0 border border-primary/20">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-200 truncate" title={file.filename}>{file.filename}</p>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-0.5">
+                                <span>By: <strong className="text-slate-400">{file.uploadedByName}</strong></span>
+                                <span>•</span>
+                                <span>{new Date(file.uploadedAt).toLocaleDateString()}</span>
+                                {file.taskTitle && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-primary truncate max-w-[150px]">Task: {file.taskTitle}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <a
+                            href={file.url}
+                            download
+                            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:text-white text-slate-400 rounded-xl transition-all"
+                            title="Download File"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── PROGRESS ANALYTICS TAB ── */}
+            {activeTab === 'analytics' && <ProjectAnalyticsDashboard projectId={project._id} />}
+
+            {/* ── ACTIVITY LOGS TAB ── */}
+            {activeTab === 'activity' && (
+              <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
+                <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-slate-400" /> Project Activity Feed
+                </h2>
+                {projectActivity.length === 0 ? (
+                  <div className="text-center text-slate-500 py-12 text-sm">No activity recorded for this project yet.</div>
+                ) : (
+                  <div className="relative pl-8 space-y-4">
+                    <div className="absolute left-3.5 top-0 bottom-0 w-px bg-white/10" />
+                    {projectActivity.map((a: any) => (
+                      <div key={a._id} className="relative">
+                        <div className="absolute -left-[25px] top-1.5 w-4 h-4 rounded-full bg-card border border-white/15 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                        </div>
+                        <div className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 transition-all">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-xs font-bold text-white">{a.actorName}</p>
+                            <p className="text-[10px] text-slate-500">{new Date(a.createdAt).toLocaleString()}</p>
+                          </div>
+                          <p className="text-xs text-slate-400 font-medium">
+                            {ACTION_LABELS[a.action] || a.action.toLowerCase().replace(/_/g, ' ')}
+                            {a.from && a.to && <span className="text-slate-500 font-bold"> ({a.from} → {a.to})</span>}
+                          </p>
+                          {a.comment && <p className="text-xs text-slate-500 mt-2 italic pl-2.5 border-l border-white/10">"{a.comment}"</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* ── Modals ── */}
@@ -665,6 +1212,18 @@ export const ProjectDetailsPage = () => {
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsEditSprintOpen(false)}>Cancel</Button>
             <Button type="submit" isLoading={isSubmitting}>Save Sprint Changes</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Create Milestone Modal */}
+      <Modal isOpen={isCreateMilestoneOpen} onClose={() => setIsCreateMilestoneOpen(false)} title="Create New Milestone">
+        <form onSubmit={handleCreateMilestone} className="space-y-4 text-left">
+          <Input label="Milestone Name *" value={milestoneName} onChange={e => setMilestoneName(e.target.value)} placeholder="Beta Release / Database Migration" required />
+          <Input label="Due Date *" type="date" value={milestoneDueDate} onChange={e => setMilestoneDueDate(e.target.value)} required />
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => setIsCreateMilestoneOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={isSubmitting}>Create Milestone</Button>
           </div>
         </form>
       </Modal>

@@ -87,6 +87,7 @@ export interface Employee {
   permissionHoursBalance: number; // monthly 3
   isActive: boolean;
   userId?: string;
+  role?: Role;
   ssoData?: {
     provider: string;
     azureRoles: string[];

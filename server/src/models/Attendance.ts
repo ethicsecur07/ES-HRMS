@@ -52,6 +52,14 @@ export interface IAttendance extends Document {
     isResolved: boolean;
     resolvedBy?: mongoose.Types.ObjectId;
   };
+  editHistory?: {
+    field: string;
+    oldValue: string;
+    newValue: string;
+    updatedBy: string;
+    time: Date;
+    ip: string;
+  }[];
 }
 
 const breakSchema = new Schema<IBreak>({
@@ -104,7 +112,17 @@ const attendanceSchema = new Schema<IAttendance>(
       description: { type: String },
       isResolved: { type: Boolean, default: false },
       resolvedBy: { type: Schema.Types.ObjectId, ref: 'User' }
-    }
+    },
+    editHistory: [
+      {
+        field: { type: String, required: true },
+        oldValue: { type: String, required: true },
+        newValue: { type: String, required: true },
+        updatedBy: { type: String, required: true },
+        time: { type: Date, default: Date.now },
+        ip: { type: String, required: true }
+      }
+    ]
   },
   { timestamps: true }
 );

@@ -37,4 +37,14 @@ export const roleApi = {
     const response = await axiosInstance.delete<{ success: boolean; message: string }>(`/roles/${id}`);
     return response.data;
   },
+
+  getMembers: async (id: string) => {
+    const response = await axiosInstance.get<{ success: boolean; data: any[] }>(`/roles/${id}/members`);
+    return response.data;
+  },
+
+  updateMembers: async (id: string, userIds: string[]) => {
+    const response = await axiosInstance.post<{ success: boolean; message: string }>(`/roles/${id}/members`, { userIds });
+    return response.data;
+  },
 };
