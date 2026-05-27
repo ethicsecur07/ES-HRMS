@@ -16,17 +16,24 @@ const PayslipPdfGenerator_js_1 = require("./services/PayslipPdfGenerator.js");
 const triggerPayrollRun = async (req, res, next) => {
     try {
         const orgId = req.user?.organizationId;
-        const { runCycle } = req.body;
-        if (!runCycle) {
-            res.status(400).json({ message: 'runCycle (YYYY-MM) is required' });
+        const { startCycle, endCycle, runCycle } = req.body;
+        const start = startCycle || runCycle;
+        const end = endCycle || runCycle;
+        if (!start) {
+            res.status(400).json({ message: 'runCycle or startCycle is required' });
             return;
         }
         const objectId = new mongoose_1.default.Types.ObjectId(orgId);
-        const run = await PayrollPipeline_js_1.PayrollPipeline.triggerBulkProcessing(objectId, runCycle);
-        res.status(202).json({ message: 'Payroll bulk processing triggered successfully', run });
+        // Trigger sequential range-based bulk processing
+        const runs = await PayrollPipeline_js_1.PayrollPipeline.triggerRangeProcessing(objectId, start, end);
+        res.status(202).json({
+            message: 'Payroll bulk processing triggered successfully for target period range.',
+            runs,
+            run: runs[0]
+        });
     }
     catch (err) {
-        next(err);
+        res.status(400).json({ message: err.message });
     }
 };
 exports.triggerPayrollRun = triggerPayrollRun;

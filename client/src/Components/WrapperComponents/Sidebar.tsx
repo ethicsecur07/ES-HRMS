@@ -56,6 +56,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   // Desktop hover-expand state
   const { expanded, setExpanded } = useSidebarExpanded();
 
+  const handleLogoutClick = () => {
+    if (window.confirm("Are you sure you want to log out?")) {
+      logout();
+    }
+  };
+
+  const handleMobileLogoutClick = () => {
+    if (window.confirm("Are you sure you want to log out?")) {
+      logout();
+      onClose();
+    }
+  };
+
   const { data: employeeData } = useQuery({
     queryKey: ['employeeProfile', user?.employeeId],
     queryFn: () => employeeApi.getById(user?.employeeId as string),
@@ -217,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
           {/* Logout */}
           <button
-            onClick={() => logout()}
+            onClick={handleLogoutClick}
             title={!expanded ? 'Logout' : undefined}
             className="relative flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-destructive hover:bg-destructive/10 transition-all duration-200 group"
           >
@@ -350,7 +363,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Mobile logout */}
         <div className="p-4 border-t border-border mt-auto bg-card">
           <button
-            onClick={() => { logout(); onClose(); }}
+            onClick={handleMobileLogoutClick}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive hover:text-white font-bold text-sm transition-all shadow-sm"
           >
             <LogOut className="h-4 w-4" />

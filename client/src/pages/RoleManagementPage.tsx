@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roleApi, type RoleData } from '../api_service/roleApi';
 import { employeeApi } from '../api_service/employeeApi';
@@ -7,7 +7,7 @@ import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input } from '../Components/WrapperComponents/Input';
 import { Modal } from '../Components/WrapperComponents/Modal';
-import { Settings, Plus, Edit2, Trash2, Network, Lock, ShieldAlert, ArrowRight, Users, ShieldCheck } from 'lucide-react';
+import { Settings, Plus, Edit2, Trash2, Network, Lock, ShieldAlert, ArrowRight, Users, ShieldCheck, ChevronDown, Check, X, Search } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 export const RoleManagementPage: React.FC = () => {
@@ -26,6 +26,19 @@ export const RoleManagementPage: React.FC = () => {
 
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch all employees to allow mapping of users to roles
   const { data: employeesData } = useQuery({
@@ -57,8 +70,11 @@ export const RoleManagementPage: React.FC = () => {
   });
 
   React.useEffect(() => {
-    if (currentMembers && (currentMembers as any).success && (currentMembers as any).data) {
-      const ids = (currentMembers as any).data.map((m: any) => m.userId?._id || m.userId);
+    if (currentMembers && Array.isArray(currentMembers)) {
+      const ids = currentMembers.map((m: any) => {
+        if (!m.userId) return null;
+        return typeof m.userId === 'object' ? m.userId._id || m.userId.id : m.userId;
+      });
       setSelectedUserIds(ids.filter(Boolean));
     } else {
       setSelectedUserIds([]);
@@ -91,6 +107,9 @@ export const RoleManagementPage: React.FC = () => {
     setParentRoleId(null);
     setIsActive(true);
     setEditingRole(null);
+    setSelectedUserIds([]);
+    setMemberSearch('');
+    setIsDropdownOpen(false);
   };
 
   const handleOpenCreate = () => {
@@ -103,7 +122,8 @@ export const RoleManagementPage: React.FC = () => {
     setName(role.name);
     setCode(role.code);
     setDescription(role.description || '');
-    setParentRoleId(role.parentRoleId || null);
+    const pId = role.parentRoleId && typeof role.parentRoleId === 'object' ? (role.parentRoleId as any)._id : role.parentRoleId;
+    setParentRoleId(pId || null);
     setIsActive(role.isActive);
     setIsModalOpen(true);
   };
@@ -111,15 +131,19 @@ export const RoleManagementPage: React.FC = () => {
   // Create Mutation
   const createMutation = useMutation({
     mutationFn: roleApi.create,
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.invalidateQueries({ queryKey: ['roles'] });
-        addToast('Success', 'Role created successfully', 'success');
-        setIsModalOpen(false);
-        resetForm();
-      } else {
-        addToast('Error', data.message || 'Failed to create role', 'error');
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      // If there are selected users, assign them to the new role
+      const createdRole = data; // data is the unwrapped role object
+      if (selectedUserIds.length > 0 && createdRole?._id) {
+        updateMembersMutation.mutate({
+          id: createdRole._id,
+          userIds: selectedUserIds
+        });
       }
+      addToast('Success', 'Role created successfully', 'success');
+      setIsModalOpen(false);
+      resetForm();
     },
     onError: (err: any) => {
       addToast('Error', err.response?.data?.message || 'Could not create role', 'error');
@@ -129,15 +153,11 @@ export const RoleManagementPage: React.FC = () => {
   // Update Mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<RoleData> }) => roleApi.update(id, data),
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.invalidateQueries({ queryKey: ['roles'] });
-        addToast('Success', 'Role updated successfully', 'success');
-        setIsModalOpen(false);
-        resetForm();
-      } else {
-        addToast('Error', data.message || 'Failed to update role', 'error');
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      addToast('Success', 'Role updated successfully', 'success');
+      setIsModalOpen(false);
+      resetForm();
     },
     onError: (err: any) => {
       addToast('Error', err.response?.data?.message || 'Could not update role', 'error');
@@ -147,13 +167,9 @@ export const RoleManagementPage: React.FC = () => {
   // Delete Mutation
   const deleteMutation = useMutation({
     mutationFn: roleApi.delete,
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.invalidateQueries({ queryKey: ['roles'] });
-        addToast('Success', 'Role deactivated successfully', 'success');
-      } else {
-        addToast('Error', data.message || 'Failed to delete role', 'error');
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      addToast('Success', 'Role deactivated successfully', 'success');
     },
     onError: (err: any) => {
       addToast('Error', err.response?.data?.message || 'Could not delete role', 'error');
@@ -181,7 +197,10 @@ export const RoleManagementPage: React.FC = () => {
   };
   // Find root node or construct a logical tree hierarchy
   const renderHierarchyNode = (role: RoleData, depth = 0) => {
-    const children = roles.filter(r => r.parentRoleId === role._id);
+    const children = roles.filter(r => {
+      const parentId = r.parentRoleId && typeof r.parentRoleId === 'object' ? (r.parentRoleId as any)._id : r.parentRoleId;
+      return parentId === role._id;
+    });
     return (
       <div key={role._id} className="relative select-none text-left">
         <div 
@@ -203,6 +222,15 @@ export const RoleManagementPage: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-muted-foreground truncate mt-0.5">{role.description || 'No description provided.'}</p>
+            {role.members && role.members.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5 max-w-full">
+                {role.members.map((m: any) => (
+                  <span key={m._id || m.id} className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary text-[10px] font-semibold leading-none">
+                    {m.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <button 
@@ -237,7 +265,10 @@ export const RoleManagementPage: React.FC = () => {
   };
 
   // Roles without parent are root nodes
-  const rootRoles = roles.filter(r => !r.parentRoleId || !roles.some(parent => parent._id === r.parentRoleId));
+  const rootRoles = roles.filter(r => {
+    const parentId = r.parentRoleId && typeof r.parentRoleId === 'object' ? (r.parentRoleId as any)._id : r.parentRoleId;
+    return !parentId || !roles.some(parent => parent._id === parentId);
+  });
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
@@ -376,7 +407,8 @@ export const RoleManagementPage: React.FC = () => {
             <select
               value={parentRoleId || ''}
               onChange={(e) => setParentRoleId(e.target.value || null)}
-              className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all"
+              disabled={!!editingRole && ['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD', 'EMPLOYEE'].includes(editingRole.code)}
+              className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">None (Base Level)</option>
               {roles
@@ -406,57 +438,107 @@ export const RoleManagementPage: React.FC = () => {
               id="isActive" 
               checked={isActive} 
               onChange={(e) => setIsActive(e.target.checked)} 
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-background"
+              disabled={!!editingRole && ['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD', 'EMPLOYEE'].includes(editingRole.code)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-background disabled:opacity-60 disabled:cursor-not-allowed"
             />
             <label htmlFor="isActive" className="text-xs font-bold text-foreground cursor-pointer uppercase tracking-wider">Role Active</label>
           </div>
 
-          {editingRole && (
-            <div className="space-y-2.5 pt-4 border-t border-border mt-4">
-              <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-primary" /> Assign Members
-              </h5>
-              <div className="mb-2">
-                <Input
-                  placeholder="Filter users..."
-                  value={memberSearch}
-                  onChange={e => setMemberSearch(e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-              <div className="max-h-48 overflow-y-auto border border-border rounded-xl p-3 bg-muted/20 space-y-2">
-                {filteredEmployees.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">No users found</p>
-                ) : (
-                  filteredEmployees.map(emp => {
-                    const uId = emp.userId;
-                    if (!uId) return null; // Only show employees with linked user accounts
-                    const isChecked = selectedUserIds.includes(uId);
-                    return (
-                      <label key={emp._id} className="flex items-center gap-3 cursor-pointer p-1.5 hover:bg-muted/40 rounded-lg transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            if (isChecked) {
-                              setSelectedUserIds(selectedUserIds.filter(id => id !== uId));
-                            } else {
-                              setSelectedUserIds([...selectedUserIds, uId]);
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-background"
-                        />
-                        <div className="text-xs leading-none">
-                          <p className="font-bold text-foreground">{emp.fullName}</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{emp.email}</p>
-                        </div>
-                      </label>
-                    );
-                  })
-                )}
-              </div>
+          <div className="space-y-2.5 pt-4 border-t border-border mt-4 text-left" ref={dropdownRef}>
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Assign Members</label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all shadow-sm hover:border-primary/30"
+              >
+                <span className="truncate text-xs">
+                  {selectedUserIds.length === 0
+                    ? 'Select employees to assign...'
+                    : `${selectedUserIds.length} employee(s) selected`}
+                </span>
+                <ChevronDown className="w-4 h-4 opacity-60 flex-shrink-0" />
+              </button>
+
+              {isDropdownOpen && (
+                <div className="absolute z-[100] left-0 right-0 mt-1.5 p-3 rounded-xl border border-border bg-card shadow-xl space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search employees..."
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div className="max-h-48 overflow-y-auto divide-y divide-border/50">
+                    {filteredEmployees.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">No employees found</p>
+                    ) : (
+                      filteredEmployees.map((emp) => {
+                        const uId = emp.userId;
+                        const isChecked = uId ? selectedUserIds.includes(uId) : false;
+
+                        return (
+                          <div
+                            key={emp._id}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!uId) return;
+                              if (isChecked) {
+                                setSelectedUserIds(selectedUserIds.filter(id => id !== uId));
+                              } else {
+                                setSelectedUserIds([...selectedUserIds, uId]);
+                              }
+                            }}
+                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-xs ${
+                              !uId ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'
+                            }`}
+                          >
+                            <div className="text-left min-w-0 pr-2">
+                              <p className="font-bold text-foreground truncate">{emp.fullName}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{emp.email}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {!uId ? (
+                                <span className="text-[8px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/25 px-1.5 py-0.5 rounded">No User</span>
+                              ) : isChecked ? (
+                                <Check className="w-4 h-4 text-primary" />
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {selectedUserIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2 max-h-24 overflow-y-auto p-1 rounded-lg border border-border/40 bg-muted/10">
+                {selectedUserIds.map((uId) => {
+                  const emp = employees.find(e => e.userId === uId);
+                  if (!emp) return null;
+                  return (
+                    <span key={uId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold">
+                      {emp.fullName}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUserIds(selectedUserIds.filter(id => id !== uId))}
+                        className="hover:text-primary-hover flex items-center p-0.5 text-muted-foreground hover:text-primary"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>CANCEL</Button>

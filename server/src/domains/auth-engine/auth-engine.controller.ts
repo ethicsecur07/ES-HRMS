@@ -8,7 +8,9 @@ import { SessionPolicyService } from './services/SessionPolicyService.js';
 import { OrganizationAuthConfig, ProviderType } from '../../models/OrganizationAuthConfig.js';
 import { User } from '../../models/User.js';
 import { Organization } from '../../models/Organization.js';
-import { generateToken } from '../../utils/jwt.js';
+import { generateToken, generateAccessToken, generateRefreshToken } from '../../utils/jwt.js';
+import { UserSession } from '../../models/UserSession.js';
+import mongoose from 'mongoose';
 import { createAuditLog } from '../../services/auditLog.service.js';
 
 interface AuthRequest extends Request {
@@ -115,9 +117,13 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Restrict Microsoft SSO login exclusively to @ethicsecur.co.in domain
-    if (providerType === 'MICROSOFT' && !authResult.profile.email.toLowerCase().endsWith('@ethicsecur.co.in')) {
-      res.status(403).json({ success: false, message: 'Access denied. Only @ethicsecur.co.in corporate accounts are authorized.' });
+    // Restrict Microsoft SSO login exclusively to @ethicsecur.co.in or @ethicsecur.com domains
+    const allowedDomains = ['@ethicsecur.co.in', '@ethicsecur.com'];
+    const lowerEmail = authResult.profile.email.toLowerCase();
+    const isDomainAllowed = allowedDomains.some(domain => lowerEmail.endsWith(domain));
+
+    if (providerType === 'MICROSOFT' && !isDomainAllowed) {
+      res.status(403).json({ success: false, message: 'Access denied. Only @ethicsecur.co.in or @ethicsecur.com corporate accounts are authorized.' });
       return;
     }
 
@@ -276,17 +282,91 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Issue full session token
-    user.lastLogin = new Date();
-    await user.save();
+    // Cleanup expired user sessions
+    await UserSession.deleteMany({
+      userId: user._id,
+      expiresAt: { $lt: new Date() },
+    });
 
-    const token = generateToken({
+    // Fetch current active sessions
+    const maxSessions = 3;
+    const activeSessions = await UserSession.find({
+      userId: user._id,
+      isRevoked: false,
+    }).sort({ lastActivity: 1 });
+
+    if (activeSessions.length >= maxSessions) {
+      // Revoke the oldest sessions to remain under the limit
+      const overage = activeSessions.length - maxSessions + 1;
+      const sessionsToRevoke = activeSessions.slice(0, overage);
+      for (const session of sessionsToRevoke) {
+        session.isRevoked = true;
+        await session.save();
+      }
+    }
+
+    // Parse User-Agent
+    let browser = 'Unknown Browser';
+    let os = 'Unknown OS';
+    if (/chrome/i.test(userAgent)) browser = 'Chrome';
+    else if (/firefox/i.test(userAgent)) browser = 'Firefox';
+    else if (/safari/i.test(userAgent)) browser = 'Safari';
+    else if (/edge/i.test(userAgent)) browser = 'Edge';
+
+    if (/windows/i.test(userAgent)) os = 'Windows';
+    else if (/macintosh|mac os/i.test(userAgent)) os = 'macOS';
+    else if (/linux/i.test(userAgent)) os = 'Linux';
+    else if (/android/i.test(userAgent)) os = 'Android';
+    else if (/iphone|ipad/i.test(userAgent)) os = 'iOS';
+
+    const deviceInfo = `${browser} on ${os}`;
+    const sessionId = new mongoose.Types.ObjectId();
+
+    // Generate Refresh Token
+    const refreshToken = generateRefreshToken({
+      id: user._id.toString(),
+      organizationId: org._id.toString(),
+      sessionId: sessionId.toString(),
+    });
+
+    const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+    // Create database-backed user session
+    await UserSession.create({
+      _id: sessionId,
+      userId: user._id,
+      organizationId: org._id,
+      refreshTokenHash,
+      deviceInfo,
+      ipAddress: ipAddress,
+      browser,
+      os,
+      location: risk.country || 'Unknown',
+      lastActivity: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    });
+
+    // Generate Access Token
+    const accessToken = generateAccessToken({
       id: user._id.toString(),
       role: user.role,
       email: user.email,
       organizationId: org._id.toString(),
       employeeId: user.employeeId?.toString(),
+      sessionId: sessionId.toString(),
     });
+
+    // Set Refresh Token as HttpOnly Cookie
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Issue full session token
+    user.lastLogin = new Date();
+    await user.save();
 
     await LoginRiskService.recordEvent({
       userId: user._id,
@@ -299,6 +379,7 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       deviceFingerprint: device.fingerprint,
       riskLevel: risk.riskLevel,
       riskFactors: risk.factors,
+      sessionId: sessionId.toString(),
     });
 
     await createAuditLog(
@@ -314,7 +395,7 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       success: true,
       data: {
         user,
-        token,
+        token: accessToken,
         provider: providerType,
         isNewDevice,
         riskLevel: risk.riskLevel,

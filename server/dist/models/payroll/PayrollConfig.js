@@ -36,7 +36,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_PAYROLL_CONFIG = exports.PayrollConfig = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const payrollConfigSchema = new mongoose_1.Schema({
-    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, unique: true, index: true },
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
+    employeeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee', default: null, index: true },
     // Earnings
     basicSalaryPercent: { type: Number, default: 40, min: 0, max: 100 },
     hraPercent: { type: Number, default: 40, min: 0, max: 100 },
@@ -55,6 +56,7 @@ const payrollConfigSchema = new mongoose_1.Schema({
     // ESI Toggle
     applyEsiOnlyIfGrossBelow21000: { type: Boolean, default: true },
 }, { timestamps: true });
+payrollConfigSchema.index({ organizationId: 1, employeeId: 1 }, { unique: true });
 exports.PayrollConfig = mongoose_1.default.model('PayrollConfig', payrollConfigSchema);
 // Default config values used when no org config exists
 exports.DEFAULT_PAYROLL_CONFIG = {

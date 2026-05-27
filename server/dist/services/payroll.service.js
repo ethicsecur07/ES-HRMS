@@ -99,8 +99,8 @@ async function getReimbursements(employeeId, organizationId, month) {
  * Uses the org-level payroll configuration for percentage-based CTC splitting.
  */
 async function calculateWithPayrollConfig(emp, config, organizationId, month) {
-    const ctcAnnual = emp.salary || 0;
-    const ctcMonthly = ctcAnnual / 12;
+    const ctcMonthly = emp.salary || 0;
+    const ctcAnnual = ctcMonthly * 12;
     // Earnings calculation
     const basic = Math.round(ctcMonthly * config.basicSalaryPercent / 100);
     const hra = Math.round(basic * config.hraPercent / 100);
@@ -189,9 +189,9 @@ const calculateMonthlyPayroll = async (month, organizationId) => {
             throw new Error('organizationId is required for payroll calculation');
         }
         const employees = await Employee_js_1.Employee.find({ isActive: true, organizationId });
-        // Fetch org payroll config
-        let config = await PayrollConfig_js_1.PayrollConfig.findOne({ organizationId });
-        const configValues = config ? config.toObject() : { ...PayrollConfig_js_1.DEFAULT_PAYROLL_CONFIG };
+        // Fetch org default payroll config
+        let defaultConfig = await PayrollConfig_js_1.PayrollConfig.findOne({ organizationId, employeeId: null });
+        const defaultConfigValues = defaultConfig ? defaultConfig.toObject() : { ...PayrollConfig_js_1.DEFAULT_PAYROLL_CONFIG };
         const generatedPayrolls = [];
         // Pre-fetch all components for SalaryStructure-based fallback
         const allComponents = await SalaryComponent_js_1.SalaryComponent.find({ organizationId, isActive: true });
@@ -208,8 +208,11 @@ const calculateMonthlyPayroll = async (month, organizationId) => {
                 payrollData = await calculateWithSalaryStructure(emp, structure, componentMap, organizationId, month);
             }
             else {
+                // Check if employee has a custom payroll config
+                const empConfig = await PayrollConfig_js_1.PayrollConfig.findOne({ organizationId, employeeId: emp._id });
+                const finalConfigValues = empConfig ? empConfig.toObject() : defaultConfigValues;
                 // Use PayrollConfig-based CTC breakup calculation
-                payrollData = await calculateWithPayrollConfig(emp, configValues, organizationId, month);
+                payrollData = await calculateWithPayrollConfig(emp, finalConfigValues, organizationId, month);
             }
             // Generate Payroll Record
             const payroll = await Payroll_js_1.Payroll.findOneAndUpdate({ employeeId: emp._id, month, organizationId }, {
@@ -312,7 +315,7 @@ async function calculateWithSalaryStructure(emp, structure, componentMap, organi
     const grossPay = baseSalary + allowancesTotal;
     const finalSalary = Math.round(grossPay + overtimePay + reimbursements - totalDeductions);
     return {
-        ctcAnnual: emp.salary || grossPay * 12,
+        ctcAnnual: (emp.salary || grossPay) * 12,
         grossPay,
         baseSalary,
         overtime: overtimePay,
