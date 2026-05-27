@@ -39,6 +39,8 @@ const payrollSchema = new mongoose_1.Schema({
     organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     employeeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee', required: true },
     month: { type: String, required: true, index: true },
+    ctcAnnual: { type: Number, default: 0 },
+    grossPay: { type: Number, default: 0 },
     baseSalary: { type: Number, required: true },
     overtime: { type: Number, default: 0 },
     bonus: { type: Number, default: 0 },

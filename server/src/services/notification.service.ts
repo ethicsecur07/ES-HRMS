@@ -32,7 +32,7 @@ export const notificationService = {
           payload: data.payload,
           status: 'PENDING'
         });
-        
+
         await notification.save();
 
         switch (channel) {
@@ -63,7 +63,7 @@ export const notificationService = {
     const io = getIO();
     if (io) {
       io.to(`user_${notification.recipientId}`).emit('new_notification', notification);
-      
+
       // Update status
       notification.status = 'SENT';
       await notification.save();

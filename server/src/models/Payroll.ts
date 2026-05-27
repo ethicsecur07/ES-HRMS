@@ -4,6 +4,8 @@ export interface IPayroll extends Document {
   organizationId: mongoose.Types.ObjectId;
   employeeId: mongoose.Types.ObjectId;
   month: string; // YYYY-MM
+  ctcAnnual: number;
+  grossPay: number;
   baseSalary: number;
   overtime: number;
   bonus: number;
@@ -22,6 +24,8 @@ const payrollSchema = new Schema<IPayroll>(
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
     month: { type: String, required: true, index: true },
+    ctcAnnual: { type: Number, default: 0 },
+    grossPay: { type: Number, default: 0 },
     baseSalary: { type: Number, required: true },
     overtime: { type: Number, default: 0 },
     bonus: { type: Number, default: 0 },

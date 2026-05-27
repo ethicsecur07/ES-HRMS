@@ -12,6 +12,8 @@ export interface IPayslip extends Document {
     medical: number;
     bonus: number;
     overtime: number;
+    specialAllowance: number;
+    performanceIncentive: number;
   };
   deductions: {
     professionalTax: number;
@@ -19,6 +21,13 @@ export interface IPayslip extends Document {
     leaveDeductions: number;
     latePenalties: number;
     tax: number;
+    tds: number;
+  };
+  employerContributions: {
+    pfEmployer: number;
+    gratuity: number;
+    esi: number;
+    insurance: number;
   };
   reimbursements: number;
   netSalary: number;
@@ -38,6 +47,8 @@ const payslipSchema = new Schema<IPayslip>(
       medical: { type: Number, default: 0 },
       bonus: { type: Number, default: 0 },
       overtime: { type: Number, default: 0 },
+      specialAllowance: { type: Number, default: 0 },
+      performanceIncentive: { type: Number, default: 0 },
     },
     deductions: {
       professionalTax: { type: Number, default: 0 },
@@ -45,6 +56,13 @@ const payslipSchema = new Schema<IPayslip>(
       leaveDeductions: { type: Number, default: 0 },
       latePenalties: { type: Number, default: 0 },
       tax: { type: Number, default: 0 },
+      tds: { type: Number, default: 0 },
+    },
+    employerContributions: {
+      pfEmployer: { type: Number, default: 0 },
+      gratuity: { type: Number, default: 0 },
+      esi: { type: Number, default: 0 },
+      insurance: { type: Number, default: 0 },
     },
     reimbursements: { type: Number, default: 0 },
     netSalary: { type: Number, required: true },

@@ -47,6 +47,8 @@ const payslipSchema = new mongoose_1.Schema({
         medical: { type: Number, default: 0 },
         bonus: { type: Number, default: 0 },
         overtime: { type: Number, default: 0 },
+        specialAllowance: { type: Number, default: 0 },
+        performanceIncentive: { type: Number, default: 0 },
     },
     deductions: {
         professionalTax: { type: Number, default: 0 },
@@ -54,6 +56,13 @@ const payslipSchema = new mongoose_1.Schema({
         leaveDeductions: { type: Number, default: 0 },
         latePenalties: { type: Number, default: 0 },
         tax: { type: Number, default: 0 },
+        tds: { type: Number, default: 0 },
+    },
+    employerContributions: {
+        pfEmployer: { type: Number, default: 0 },
+        gratuity: { type: Number, default: 0 },
+        esi: { type: Number, default: 0 },
+        insurance: { type: Number, default: 0 },
     },
     reimbursements: { type: Number, default: 0 },
     netSalary: { type: Number, required: true },
