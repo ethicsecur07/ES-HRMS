@@ -45,7 +45,6 @@ const recruitment_routes_js_1 = __importDefault(require("./domains/recruitment/r
 const chat_routes_js_1 = __importDefault(require("./domains/chat/chat.routes.js"));
 const notification_routes_js_1 = __importDefault(require("./domains/notification/notification.routes.js"));
 const reports_routes_js_1 = __importDefault(require("./routes/reports.routes.js"));
-const payrollConfig_routes_js_1 = __importDefault(require("./routes/payrollConfig.routes.js"));
 const errorHandler_js_1 = require("./middlewares/errorHandler.js");
 const traceId_js_1 = require("./middlewares/traceId.js");
 const responseFormatter_js_1 = require("./middlewares/responseFormatter.js");
@@ -88,7 +87,6 @@ const createApp = () => {
     app.use('/api/wfh', wfh_routes_js_1.default);
     app.use('/api/payrolls', payroll_routes_js_1.default); // Legacy
     app.use('/api/v2/payroll', payroll_routes_js_2.default); // Enterprise Engine
-    app.use('/api/payroll-config', payrollConfig_routes_js_1.default); // Payroll Setup Config
     app.use('/api/projects', project_routes_js_1.default);
     app.use('/api/recruitment', recruitment_routes_js_1.default);
     app.use('/api/chat', chat_routes_js_1.default);

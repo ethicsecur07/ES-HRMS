@@ -133,7 +133,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       moduleCode: route.moduleCode,
     }));
 
-  const filteredItems = compiledItems.filter((item) => hasPermission(item.moduleCode, 'view'));
+  const filteredItems = compiledItems.filter((item) => {
+    if (item.moduleCode === 'PAYROLL') {
+      return role === 'ADMIN' || role === 'HR';
+    }
+    return hasPermission(item.moduleCode, 'view');
+  });
 
   // ─── Sidebar content shared between mobile & desktop ───────────────────────
   const navItems = (

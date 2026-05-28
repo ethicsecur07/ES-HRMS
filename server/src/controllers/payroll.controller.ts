@@ -57,8 +57,10 @@ export const updatePayrollStatus = async (req: AuthRequest, res: Response): Prom
       runCycle: payroll.month
     });
 
-    if (run && ['LOCKED', 'COMPLETED'].includes(run.status)) {
-      res.status(400).json({ message: `Cannot modify individual payroll status when the run cycle is ${run.status}.` });
+    // Allow manual status updates when LOCKED (since payment disbursement happens when LOCKED), 
+    // but prevent changes once the entire run is COMPLETED (fully finalized and paid).
+    if (run && run.status === 'COMPLETED') {
+      res.status(400).json({ message: `Cannot modify individual payroll status when the run cycle is COMPLETED.` });
       return;
     }
 

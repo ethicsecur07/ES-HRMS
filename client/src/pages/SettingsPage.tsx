@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { analyticsApi } from '../api_service/analyticsApi';
+import { departmentApi } from '../api_service/departmentApi';
+import { designationApi } from '../api_service/designationApi';
 import { authV2Api } from '../api_service/authV2Api';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -16,6 +18,8 @@ import {
   Trash2,
   Users,
   ShieldCheck,
+  Briefcase,
+  FolderTree,
   X,
   Fingerprint,
   Globe,
@@ -30,7 +34,9 @@ export const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const isAdmin = user?.role === 'ADMIN';
-  const [activeSubTab, setActiveSubTab] = useState<'global' | 'sso'>('global');
+  const [activeSubTab, setActiveSubTab] = useState<'global' | 'departments' | 'designations' | 'sso'>(
+    isAdmin ? 'global' : 'departments'
+  );
 
   // --- SSO Configuration Queries & Mutations ---
   const { data: authProviders = [], isLoading: isAuthProvidersLoading } = useQuery({
@@ -340,9 +346,10 @@ export const SettingsPage: React.FC = () => {
   const [monthlyLeaveLimit, setMonthlyLeaveLimit] = useState(2);
   const [monthlyWFHLimit, setMonthlyWFHLimit] = useState(1);
   const [monthlyPermissionHours, setMonthlyPermissionHours] = useState(3);
-  const [payrollCycleStartDay, setPayrollCycleStartDay] = useState(1);
+  const [salaryCycleStartDay, setSalaryCycleStartDay] = useState(1);
   const [officeIPs, setOfficeIPs] = useState<string[]>([]);
   const [newIP, setNewIP] = useState('');
+  const [activeWorkdays, setActiveWorkdays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
 
   useEffect(() => {
     if (settings) {
@@ -351,16 +358,21 @@ export const SettingsPage: React.FC = () => {
       setMonthlyLeaveLimit(settings.monthlyLeaveLimit);
       setMonthlyWFHLimit(settings.monthlyWFHLimit);
       setMonthlyPermissionHours(settings.monthlyPermissionHours);
-      setPayrollCycleStartDay(settings.payrollCycleStartDay || 1);
+      setSalaryCycleStartDay(settings.salaryCycleStartDay || 1);
       setOfficeIPs(settings.officeWiFiIPs || []);
+      if (settings.activeWorkdays) {
+        setActiveWorkdays(settings.activeWorkdays);
+      }
     }
   }, [settings]);
 
   const updateSettingsMutation = useMutation({
     mutationFn: (data: any) => analyticsApi.updateSettings(data),
     onSuccess: () => {
+      // Invalidate both keys: 'settings' (used here) and 'companySettings' (used by PayrollSetupModal & AttendancePage)
       queryClient.invalidateQueries({ queryKey: ['settings'] });
-      addToast('Settings Saved', 'Global settings updated successfully.', 'success');
+      queryClient.invalidateQueries({ queryKey: ['companySettings'] });
+      addToast('Settings Saved', 'Global settings updated successfully and policy updates broadcasted to all employees.', 'success');
     },
     onError: (err: any) => {
       addToast('Error', err.message || 'Could not save settings.', 'error');
@@ -381,6 +393,12 @@ export const SettingsPage: React.FC = () => {
     setOfficeIPs(officeIPs.filter((item) => item !== ip));
   };
 
+  const handleToggleWorkday = (day: string) => {
+    setActiveWorkdays(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
+  };
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettingsMutation.mutate({
@@ -389,13 +407,32 @@ export const SettingsPage: React.FC = () => {
       monthlyLeaveLimit,
       monthlyWFHLimit,
       monthlyPermissionHours,
+      salaryCycleStartDay,
       officeWiFiIPs: officeIPs,
-      payrollCycleStartDay,
+      activeWorkdays,
     });
   };
 
+  // --- Departments Queries & Mutations ---
+  const { data: departments = [], isLoading: isDeptsLoading } = useQuery({
+    queryKey: ['departments'],
+    queryFn: departmentApi.getAll,
+  });
+
+
+
+  // --- Designations Queries & Mutations ---
+  const { data: designations = [], isLoading: isDesigsLoading } = useQuery({
+    queryKey: ['designations'],
+    queryFn: () => designationApi.getAll(),
+  });
+
+
+
   const isLoading =
     (isAdmin && isSettingsLoading) ||
+    isDeptsLoading ||
+    isDesigsLoading ||
     (activeSubTab === 'sso' && isAuthProvidersLoading);
 
   if (isLoading) {
@@ -415,7 +452,7 @@ export const SettingsPage: React.FC = () => {
             System & Organization Settings
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Configure company global policies, whitelisted networks, and single sign-on parameters.
+            Configure company global policies, whitelisted networks, departments, and designations.
           </p>
         </div>
       </div>
@@ -448,6 +485,28 @@ export const SettingsPage: React.FC = () => {
             </button>
           </>
         )}
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('departments')}
+          className={`px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
+            activeSubTab === 'departments'
+              ? 'border-primary text-primary font-extrabold'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <FolderTree className="w-4 h-4" /> Departments
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('designations')}
+          className={`px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
+            activeSubTab === 'designations'
+              ? 'border-primary text-primary font-extrabold'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Briefcase className="w-4 h-4" /> Designations
+        </button>
         <NavLink
           to="/settings/roles"
           className={({ isActive }) =>
@@ -485,6 +544,34 @@ export const SettingsPage: React.FC = () => {
             </div>
           </Card>
 
+          <Card className="space-y-6 border-l-4 border-l-amber-500 shadow-md">
+            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Weekly Working Days Configuration</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Select the active working days for your organization. Weekends/non-working days are automatically excluded from leave deductions and attendance calculations.
+            </p>
+            <div className="flex flex-wrap gap-4 pt-2">
+              {[
+                { label: 'Monday (Mon)', value: 'Mon' },
+                { label: 'Tuesday (Tue)', value: 'Tue' },
+                { label: 'Wednesday (Wed)', value: 'Wed' },
+                { label: 'Thursday (Thu)', value: 'Thu' },
+                { label: 'Friday (Fri)', value: 'Fri' },
+                { label: 'Saturday (Sat)', value: 'Sat' },
+                { label: 'Sunday (Sun)', value: 'Sun' },
+              ].map((day) => (
+                <label key={day.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary bg-background"
+                    checked={activeWorkdays.includes(day.value)}
+                    onChange={() => handleToggleWorkday(day.value)}
+                  />
+                  {day.label}
+                </label>
+              ))}
+            </div>
+          </Card>
+
           <Card className="space-y-6 border-l-4 border-l-foreground shadow-md">
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <Wifi className="w-5 h-5 text-foreground" />
@@ -514,23 +601,12 @@ export const SettingsPage: React.FC = () => {
           </Card>
 
           <Card className="space-y-6 border-l-4 border-l-muted-foreground shadow-md">
-            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Monthly Global Allowance Policies & Payroll Cycle</h3>
+            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Monthly Global Allowance Policies</h3>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
               <Input label="Casual Leave Limit (Days/Month) *" type="number" value={monthlyLeaveLimit} onChange={(e) => setMonthlyLeaveLimit(Number(e.target.value))} required />
               <Input label="WFH Limit (Days/Month) *" type="number" value={monthlyWFHLimit} onChange={(e) => setMonthlyWFHLimit(Number(e.target.value))} required />
               <Input label="Permission Limit (Hours/Month) *" type="number" value={monthlyPermissionHours} onChange={(e) => setMonthlyPermissionHours(Number(e.target.value))} required />
-              <Input 
-                label="Salary Cycle Start Day (1-28) *" 
-                type="number" 
-                value={payrollCycleStartDay} 
-                onChange={(e) => {
-                  let val = Number(e.target.value);
-                  if (val < 1) val = 1;
-                  if (val > 28) val = 28;
-                  setPayrollCycleStartDay(val);
-                }} 
-                required 
-              />
+              <Input label="Salary & Attendance Cycle Start Day (1-31) *" type="number" value={salaryCycleStartDay} onChange={(e) => setSalaryCycleStartDay(Number(e.target.value))} min={1} max={31} required />
             </div>
           </Card>
 
@@ -541,6 +617,104 @@ export const SettingsPage: React.FC = () => {
             </Button>
           </div>
         </form>
+      )}
+
+      {activeSubTab === 'departments' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-bold text-foreground">Departments Directory</h3>
+            <span className="text-xs text-muted-foreground bg-muted border border-border px-3 py-1 rounded-lg">
+              Managed via Microsoft Directory Sync
+            </span>
+          </div>
+
+          <Card className="overflow-hidden shadow-md p-0 border border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-muted/40 border-b border-border">
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Code</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Department Name</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Head of Department</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {departments.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-sm text-muted-foreground">
+                        No departments found. Please sync from Microsoft Directory.
+                      </td>
+                    </tr>
+                  ) : (
+                    departments.map((dept: any) => (
+                      <tr key={dept._id} className="hover:bg-muted/10 transition-colors">
+                        <td className="p-4 text-sm font-mono font-bold text-primary">{dept.code}</td>
+                        <td className="p-4 text-sm font-semibold text-foreground">{dept.name}</td>
+                        <td className="p-4 text-sm text-muted-foreground">{dept.headOfDepartment || 'Not Assigned'}</td>
+                        <td className="p-4 text-xs">
+                          <span className={`px-2.5 py-1 rounded-full font-bold ${dept.isActive ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                            {dept.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {activeSubTab === 'designations' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-bold text-foreground">Designations Directory</h3>
+            <span className="text-xs text-muted-foreground bg-muted border border-border px-3 py-1 rounded-lg">
+              Managed via Microsoft Directory Sync
+            </span>
+          </div>
+
+          <Card className="overflow-hidden shadow-md p-0 border border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-muted/40 border-b border-border">
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Code</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Designation Name</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Department</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {designations.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-sm text-muted-foreground">
+                        No designations found. Please sync from Microsoft Directory.
+                      </td>
+                    </tr>
+                  ) : (
+                    designations.map((desig: any) => (
+                      <tr key={desig._id} className="hover:bg-muted/10 transition-colors">
+                        <td className="p-4 text-sm font-mono font-bold text-primary">{desig.code}</td>
+                        <td className="p-4 text-sm font-semibold text-foreground">{desig.name}</td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {desig.departmentId?.name || (typeof desig.departmentId === 'string' ? desig.departmentId : 'Unassigned')}
+                        </td>
+                        <td className="p-4 text-xs">
+                          <span className={`px-2.5 py-1 rounded-full font-bold ${desig.isActive ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                            {desig.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
       )}
 
       {activeSubTab === 'sso' && isAdmin && (

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { holidayCalendarApi } from '../../api_service/holidayCalendarApi';
+import { analyticsApi } from '../../api_service/analyticsApi';
 import { Card } from '../WrapperComponents/Card';
 import { Button } from '../WrapperComponents/Button';
 import type { LeaveRequest, PermissionRequest } from '../../types';
@@ -83,6 +84,15 @@ export const HolidayEnhancedCalendar: React.FC<HolidayEnhancedCalendarProps> = (
     staleTime: 10 * 60 * 1000,
   });
 
+  // ── Fetch company settings for active workdays ─────────────────────────────
+  const { data: settings } = useQuery({
+    queryKey: ['companySettings'],
+    queryFn: analyticsApi.getSettings,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const activeWorkdays = settings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
   // ── Build holiday map { dateStr → holiday } ─────────────────────────────────
   const holidayMap = useMemo(() => {
     const map: Record<string, { name: string; isRestricted: boolean }> = {};
@@ -152,7 +162,7 @@ export const HolidayEnhancedCalendar: React.FC<HolidayEnhancedCalendarProps> = (
     if (!cell.isCurrentMonth) return 'opacity-20 pointer-events-none';
 
     const h = holidayMap[cell.dateStr];
-    const isWeekend = colIndex === 0 || colIndex === 6; // Sun or Sat
+    const isWeekend = !activeWorkdays.includes(DAY_LABELS[colIndex]);
 
     if (h && !h.isRestricted) return 'bg-emerald-500/10 border-emerald-400/30 dark:bg-emerald-900/20';
     if (h &&  h.isRestricted) return 'bg-orange-500/10 border-orange-400/30 dark:bg-orange-900/20';
@@ -201,7 +211,7 @@ export const HolidayEnhancedCalendar: React.FC<HolidayEnhancedCalendarProps> = (
             <div
               key={d}
               className={`text-[10px] font-bold uppercase tracking-wider py-1 ${
-                i === 0 || i === 6 ? 'text-rose-400 dark:text-rose-500' : 'text-muted-foreground'
+                !activeWorkdays.includes(d) ? 'text-rose-400 dark:text-rose-500' : 'text-muted-foreground'
               }`}
             >
               {d}
@@ -216,7 +226,7 @@ export const HolidayEnhancedCalendar: React.FC<HolidayEnhancedCalendarProps> = (
             const events   = getEventsForDate(cell.dateStr);
             const isSelected = cell.dateStr === selectedDate;
             const isToday    = cell.dateStr === todayStr;
-            const isWeekend  = colIndex === 0 || colIndex === 6;
+            const isWeekend  = !activeWorkdays.includes(DAY_LABELS[colIndex]);
             const holiday    = holidayMap[cell.dateStr];
 
             return (

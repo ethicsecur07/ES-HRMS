@@ -22,7 +22,42 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  CalendarRange,
 } from 'lucide-react';
+import { formatDate } from '../utils/formatters';
+
+/** Compute current cycle start/end YYYY-MM-DD from the salaryCycleStartDay setting. */
+function getCurrentCycleDates(startDay: number): { startStr: string; endStr: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+
+  if (startDay <= 1) {
+    const lastDay = new Date(year, month, 0).getDate();
+    return {
+      startStr: `${year}-${String(month).padStart(2, '0')}-01`,
+      endStr:   `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    };
+  }
+
+  let csY: number, csM: number, ceY: number, ceM: number, ceD: number;
+  if (day >= startDay) {
+    csY = year; csM = month;
+    const nd = new Date(year, month, 1);
+    ceY = nd.getFullYear(); ceM = nd.getMonth() + 1; ceD = startDay - 1;
+  } else {
+    const pd = new Date(year, month - 2, 1);
+    csY = pd.getFullYear(); csM = pd.getMonth() + 1;
+    ceY = year; ceM = month; ceD = startDay - 1;
+  }
+  const mxS = new Date(csY, csM, 0).getDate();
+  const mxE = new Date(ceY, ceM, 0).getDate();
+  return {
+    startStr: `${csY}-${String(csM).padStart(2, '0')}-${String(Math.min(startDay, mxS)).padStart(2, '0')}`,
+    endStr:   `${ceY}-${String(ceM).padStart(2, '0')}-${String(Math.min(ceD, mxE)).padStart(2, '0')}`,
+  };
+}
 
 const MONTHS = [
   { value: '01', label: 'January' },
@@ -74,31 +109,17 @@ export const PayrollPage: React.FC = () => {
     queryFn: () => employeeApi.getAll().then(res => res.employees),
   });
 
-  const { data: settings } = useQuery({
-    queryKey: ['settings'],
+  // Fetch org settings to read salaryCycleStartDay
+  const { data: orgSettings } = useQuery({
+    queryKey: ['companySettings'],
     queryFn: analyticsApi.getSettings,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const startDay = settings?.payrollCycleStartDay || 1;
-
-  const cycleText = useMemo(() => {
-    const yearNum = parseInt(selectedYear);
-    const monthNum = parseInt(selectedMonth);
-    if (startDay <= 1) {
-      const lastDay = new Date(yearNum, monthNum, 0).getDate();
-      return `01/${selectedMonth}/${selectedYear} to ${lastDay < 10 ? '0' + lastDay : lastDay}/${selectedMonth}/${selectedYear}`;
-    } else {
-      const prevDate = new Date(yearNum, monthNum - 2, 1);
-      const prevYear = prevDate.getFullYear();
-      const prevMonth = prevDate.getMonth() + 1;
-      const prevMonthStr = prevMonth < 10 ? `0${prevMonth}` : `${prevMonth}`;
-      const startDayStr = startDay < 10 ? `0${startDay}` : `${startDay}`;
-
-      const endDayVal = startDay - 1;
-      const endDayStr = endDayVal < 10 ? `0${endDayVal}` : `${endDayVal}`;
-      return `${startDayStr}/${prevMonthStr}/${prevYear} to ${endDayStr}/${selectedMonth}/${selectedYear}`;
-    }
-  }, [selectedMonth, selectedYear, startDay]);
+  const cycleDates = useMemo(() => {
+    const startDay = orgSettings?.salaryCycleStartDay ?? 1;
+    return getCurrentCycleDates(startDay);
+  }, [orgSettings]);
 
   // Filters
   const filteredPayrolls = useMemo(() => {
@@ -148,6 +169,13 @@ export const PayrollPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['payrolls'] });
       addToast('Status Updated', 'Payroll disbursement status updated.', 'success');
     },
+    onError: (error: any) => {
+      addToast(
+        'Update Failed',
+        error?.response?.data?.message || error.message || 'Could not update payroll status.',
+        'error'
+      );
+    },
   });
 
   const handleViewPayslip = (payroll: Payroll) => {
@@ -189,6 +217,7 @@ export const PayrollPage: React.FC = () => {
     );
   }
 
+
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
       {/* Header Banner */}
@@ -201,10 +230,26 @@ export const PayrollPage: React.FC = () => {
           <p className="text-xs text-muted-foreground mt-0.5">
             Automated monthly salary calculation, bonus disbursements, deductions, and payslip generation
           </p>
+          {/* Cycle period badge — synced with salary/attendance cycle */}
+          <div className="flex items-center gap-1.5 mt-2">
+            <CalendarRange className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs font-semibold text-primary">
+              Current Cycle:&nbsp;
+            </span>
+            <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">
+              {formatDate(cycleDates.startStr)} – {formatDate(cycleDates.endStr)}
+            </span>
+            {orgSettings?.salaryCycleStartDay && orgSettings.salaryCycleStartDay > 1 && (
+              <span className="text-[10px] text-muted-foreground">
+                (starts {orgSettings.salaryCycleStartDay}{['st','nd','rd'][((orgSettings.salaryCycleStartDay % 10) - 1)] || 'th'} of each month)
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-
+      {/* Employee Compensations View */}
+     
         <Card className="border-l-4 border-l-primary shadow-md p-6 space-y-5">
           {/* Filter / Action Bar */}
           <div className="flex flex-wrap items-center gap-3">
@@ -240,12 +285,6 @@ export const PayrollPage: React.FC = () => {
                 <option key={y.value} value={y.value}>{y.label}</option>
               ))}
             </select>
-
-            {/* Salary Cycle Period Badge */}
-            <div className="flex items-center gap-1.5 px-3.5 h-10 rounded-lg border border-primary/20 bg-primary/5 text-primary text-xs font-bold font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              Cycle: {cycleText}
-            </div>
 
             {/* Generate Payroll Button (ADMIN/HR only) */}
             {(role === 'ADMIN' || role === 'HR') && (

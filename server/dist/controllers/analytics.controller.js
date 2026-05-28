@@ -14,6 +14,8 @@ const Organization_js_1 = require("../models/Organization.js");
 const Project_js_1 = require("../models/Project.js");
 const Task_js_1 = require("../models/Task.js");
 const index_js_1 = require("../constants/index.js");
+const User_js_1 = require("../models/User.js");
+const notification_service_js_1 = require("../services/notification.service.js");
 const LeaveAnalyticsService_js_1 = require("../domains/leave-engine/services/LeaveAnalyticsService.js");
 const countTasks = (text) => {
     if (!text || text.trim() === '' || text.trim().toLowerCase() === 'none' || text.trim().toLowerCase() === 'n/a' || text.trim() === '-')
@@ -259,7 +261,10 @@ const getSettings = async (req, res) => {
             monthlyLeaveLimit: org.settings?.monthlyLeaveLimit || 2,
             monthlyWFHLimit: org.settings?.monthlyWFHLimit || 1,
             monthlyPermissionHours: org.settings?.monthlyPermissionHours || 3,
+            salaryCycleStartDay: org.settings?.salaryCycleStartDay || 1,
             officeWiFiIPs: org.settings?.allowedIPs || ['127.0.0.1', '::1'],
+            adminEmail: org.settings?.adminEmail || '',
+            activeWorkdays: org.settings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
         };
         res.status(200).json({
             ...settingsData,
@@ -279,16 +284,62 @@ const updateSettings = async (req, res) => {
             res.status(404).json({ message: 'Organization not found' });
             return;
         }
-        const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, officeWiFiIPs } = req.body;
+        const oldSalaryCycleStartDay = org.settings?.salaryCycleStartDay || 1;
+        const oldLeaveLimit = org.settings?.monthlyLeaveLimit || 2;
+        const oldPermissionHours = org.settings?.monthlyPermissionHours || 3;
+        const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, salaryCycleStartDay, officeWiFiIPs, adminEmail, activeWorkdays } = req.body;
+        const newSalaryCycleStartDay = Number(salaryCycleStartDay) || 1;
+        const newLeaveLimit = Number(monthlyLeaveLimit) || 2;
+        const newPermissionHours = Number(monthlyPermissionHours) || 3;
+        const getOrdinal = (n) => {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return s[(v - 20) % 10] || s[v] || s[0];
+        };
+        const changes = [];
+        if (newSalaryCycleStartDay !== oldSalaryCycleStartDay) {
+            changes.push(`Salary cycle start day updated to the ${newSalaryCycleStartDay}${getOrdinal(newSalaryCycleStartDay)} day of the month`);
+        }
+        if (newLeaveLimit !== oldLeaveLimit) {
+            changes.push(`Monthly leave limit updated to ${newLeaveLimit} days`);
+        }
+        if (newPermissionHours !== oldPermissionHours) {
+            changes.push(`Monthly permission limit updated to ${newPermissionHours} hours`);
+        }
         if (companyName)
             org.name = companyName;
-        org.settings = {
-            monthlyLeaveLimit: Number(monthlyLeaveLimit) || org.settings?.monthlyLeaveLimit || 2,
-            monthlyWFHLimit: Number(monthlyWFHLimit) || org.settings?.monthlyWFHLimit || 1,
-            monthlyPermissionHours: Number(monthlyPermissionHours) || org.settings?.monthlyPermissionHours || 3,
-            allowedIPs: officeWiFiIPs || org.settings?.allowedIPs || ['127.0.0.1', '::1'],
-        };
+        // Use field-level mutations to preserve other settings (customHolidays, activeWorkdays, theme, etc.)
+        if (!org.settings)
+            org.settings = {};
+        org.settings.monthlyLeaveLimit = newLeaveLimit;
+        org.settings.monthlyWFHLimit = Number(monthlyWFHLimit) || org.settings.monthlyWFHLimit || 1;
+        org.settings.monthlyPermissionHours = newPermissionHours;
+        org.settings.salaryCycleStartDay = newSalaryCycleStartDay;
+        org.settings.allowedIPs = officeWiFiIPs?.length ? officeWiFiIPs : (org.settings.allowedIPs || ['127.0.0.1', '::1']);
+        if (adminEmail !== undefined) {
+            org.settings.adminEmail = adminEmail;
+        }
+        if (activeWorkdays && Array.isArray(activeWorkdays)) {
+            org.settings.activeWorkdays = activeWorkdays;
+        }
+        // Tell Mongoose the nested settings object has changed
+        org.markModified('settings');
         await org.save();
+        if (changes.length > 0) {
+            const activeUsers = await User_js_1.User.find({ organizationId: org._id, isActive: true });
+            const notificationTitle = "Company Policy Update Alert";
+            const notificationMessage = `The administrator has updated the company policies:\n• ${changes.join('\n• ')}`;
+            for (const u of activeUsers) {
+                await notification_service_js_1.notificationService.dispatchNotification({
+                    organizationId: org._id,
+                    recipientId: u._id.toString(),
+                    title: notificationTitle,
+                    message: notificationMessage,
+                    channels: ['IN_APP'],
+                    type: 'POLICY_UPDATE',
+                });
+            }
+        }
         res.status(200).json({ message: 'Settings updated successfully', settings: req.body });
     }
     catch (error) {

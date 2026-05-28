@@ -24,16 +24,36 @@ const triggerPayrollRun = async (req, res, next) => {
             return;
         }
         const objectId = new mongoose_1.default.Types.ObjectId(orgId);
-        // Trigger sequential range-based bulk processing
-        const runs = await PayrollPipeline_js_1.PayrollPipeline.triggerRangeProcessing(objectId, start, end);
+        // Generate the range of cycles to run
+        const cycles = PayrollPipeline_js_1.PayrollPipeline.generateCycleRange(start, end);
+        const runs = [];
+        const errors = [];
+        for (const cycle of cycles) {
+            try {
+                const run = await PayrollPipeline_js_1.PayrollPipeline.triggerBulkProcessing(objectId, cycle);
+                runs.push(run);
+            }
+            catch (err) {
+                errors.push({ cycle, error: err.message });
+            }
+        }
+        if (runs.length === 0 && errors.length > 0) {
+            // If everything failed, return 400 with the first validation error message
+            res.status(400).json({
+                message: errors[0].error,
+                errors
+            });
+            return;
+        }
         res.status(202).json({
-            message: 'Payroll bulk processing triggered successfully for target period range.',
+            message: 'Payroll bulk processing triggered successfully',
             runs,
-            run: runs[0]
+            run: runs[0], // backward compatibility
+            errors: errors.length > 0 ? errors : undefined
         });
     }
     catch (err) {
-        res.status(400).json({ message: err.message });
+        next(err);
     }
 };
 exports.triggerPayrollRun = triggerPayrollRun;

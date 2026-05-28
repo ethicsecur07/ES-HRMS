@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.savePayrollConfig = exports.getPayrollConfig = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const PayrollConfig_js_1 = require("../models/payroll/PayrollConfig.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 /**
@@ -56,7 +60,7 @@ const savePayrollConfig = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const { employeeId, basicSalaryPercent, hraPercent, conveyanceMonthly, performanceIncentiveMonthly, otherAllowancesMonthly, pfEmployeePercent, professionalTaxMonthly, incomeTaxTdsMonthly, pfEmployerPercent, gratuityPercent, esiEmployerPercent, insuranceMonthly, applyEsiOnlyIfGrossBelow21000, } = req.body;
+        const { employeeId, basicSalaryPercent, hraPercent, conveyanceMonthly, performanceIncentiveMonthly, otherAllowancesMonthly, pfEmployeePercent, professionalTaxMonthly, incomeTaxTdsMonthly, pfEmployerPercent, gratuityPercent, esiEmployerPercent, insuranceMonthly, applyEsiOnlyIfGrossBelow21000, bulkApplyToAllEmployees, } = req.body;
         const targetEmployeeId = employeeId ? employeeId : null;
         const configData = {
             basicSalaryPercent: basicSalaryPercent ?? PayrollConfig_js_1.DEFAULT_PAYROLL_CONFIG.basicSalaryPercent,
@@ -73,6 +77,31 @@ const savePayrollConfig = async (req, res) => {
             insuranceMonthly: insuranceMonthly ?? PayrollConfig_js_1.DEFAULT_PAYROLL_CONFIG.insuranceMonthly,
             applyEsiOnlyIfGrossBelow21000: applyEsiOnlyIfGrossBelow21000 ?? PayrollConfig_js_1.DEFAULT_PAYROLL_CONFIG.applyEsiOnlyIfGrossBelow21000,
         };
+        if (bulkApplyToAllEmployees === true) {
+            const { Employee } = await import('../models/Employee.js');
+            const employees = await Employee.find({ organizationId: orgId, isActive: true });
+            const bulkOps = employees.map(emp => ({
+                updateOne: {
+                    filter: { organizationId: new mongoose_1.default.Types.ObjectId(orgId), employeeId: emp._id },
+                    update: { $set: { ...configData, organizationId: new mongoose_1.default.Types.ObjectId(orgId), employeeId: emp._id } },
+                    upsert: true
+                }
+            }));
+            bulkOps.push({
+                updateOne: {
+                    filter: { organizationId: new mongoose_1.default.Types.ObjectId(orgId), employeeId: null },
+                    update: { $set: { ...configData, organizationId: new mongoose_1.default.Types.ObjectId(orgId), employeeId: null } },
+                    upsert: true
+                }
+            });
+            if (bulkOps.length > 0) {
+                await PayrollConfig_js_1.PayrollConfig.bulkWrite(bulkOps);
+            }
+            const config = await PayrollConfig_js_1.PayrollConfig.findOne({ organizationId: orgId, employeeId: null });
+            await (0, auditLog_service_js_1.createAuditLog)('PAYROLL_CONFIG_BULK_UPDATE', req.user?.email || 'Admin', 'PAYROLL', orgId.toString(), `Bulk payroll configuration applied to organization defaults and all ${employees.length} active employees`, req.user?.organizationId);
+            res.status(200).json({ config, message: `Payroll configuration applied to organization defaults and all ${employees.length} active employees successfully.` });
+            return;
+        }
         const config = await PayrollConfig_js_1.PayrollConfig.findOneAndUpdate({ organizationId: orgId, employeeId: targetEmployeeId }, { ...configData, organizationId: orgId, employeeId: targetEmployeeId }, { upsert: true, new: true, runValidators: true });
         await (0, auditLog_service_js_1.createAuditLog)('PAYROLL_CONFIG_UPDATE', req.user?.email || 'Admin', 'PAYROLL', config._id?.toString() || '', targetEmployeeId
             ? `Payroll configuration updated for employee ID: ${targetEmployeeId}`

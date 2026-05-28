@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { attendanceApi } from '../api_service/attendanceApi';
 import { employeeApi } from '../api_service/employeeApi';
+import { analyticsApi } from '../api_service/analyticsApi';
 import { axiosInstance } from '../api_service/axiosInstance';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
@@ -13,8 +14,58 @@ import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Attendance } from '../types';
 import { exportAttendanceExcel } from '../utils/exportUtils';
 import { formatDate } from '../utils/formatters';
-import { CalendarCheck, Download, Wifi, Edit, AlertTriangle, Clock, Users, Laptop, Sun, Info } from 'lucide-react';
+import { CalendarCheck, Download, Wifi, Edit, AlertTriangle, Clock, Users, Laptop, Sun, Info, CalendarRange } from 'lucide-react';
 import { holidayCalendarApi } from '../api_service/holidayCalendarApi';
+
+/** Mirrors PayrollPipeline.getCycleDates â€” computes start/end YYYY-MM-DD for the current cycle. */
+function getCurrentCycleDates(startDay: number): { startStr: string; endStr: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1; // 1-indexed
+  const day = now.getDate();
+
+  if (startDay <= 1) {
+    // Standard calendar month
+    const lastDay = new Date(year, month, 0).getDate();
+    return {
+      startStr: `${year}-${String(month).padStart(2, '0')}-01`,
+      endStr:   `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    };
+  }
+
+  // Mid-month cycle: e.g. startDay = 26 â†’ cycle runs from 26th of prev month to 25th of current month
+  let cycleStartYear: number, cycleStartMonth: number;
+  let cycleEndYear: number, cycleEndMonth: number, cycleEndDay: number;
+
+  if (day >= startDay) {
+    // We are in the second half: cycle started this month, ends next month on (startDay - 1)
+    cycleStartYear  = year;
+    cycleStartMonth = month;
+    const nextMonthDate = new Date(year, month, 1); // first of next month
+    cycleEndYear    = nextMonthDate.getFullYear();
+    cycleEndMonth   = nextMonthDate.getMonth() + 1;
+    cycleEndDay     = startDay - 1;
+  } else {
+    // We are in the first half: cycle started last month, ends this month on (startDay - 1)
+    const prevMonthDate = new Date(year, month - 2, 1); // first of prev month
+    cycleStartYear  = prevMonthDate.getFullYear();
+    cycleStartMonth = prevMonthDate.getMonth() + 1;
+    cycleEndYear    = year;
+    cycleEndMonth   = month;
+    cycleEndDay     = startDay - 1;
+  }
+
+  // Clamp start day to max days in that month
+  const maxDaysStart = new Date(cycleStartYear, cycleStartMonth, 0).getDate();
+  const clampedStart = Math.min(startDay, maxDaysStart);
+  const maxDaysEnd   = new Date(cycleEndYear, cycleEndMonth, 0).getDate();
+  const clampedEnd   = Math.min(cycleEndDay, maxDaysEnd);
+
+  return {
+    startStr: `${cycleStartYear}-${String(cycleStartMonth).padStart(2, '0')}-${String(clampedStart).padStart(2, '0')}`,
+    endStr:   `${cycleEndYear}-${String(cycleEndMonth).padStart(2, '0')}-${String(clampedEnd).padStart(2, '0')}`,
+  };
+}
 
 export const AttendancePage: React.FC = () => {
   const { role } = useAuthStore();
@@ -42,6 +93,19 @@ export const AttendancePage: React.FC = () => {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Fetch org settings to read salaryCycleStartDay (attendance cycle = salary cycle)
+  const { data: orgSettings } = useQuery({
+    queryKey: ['companySettings'],
+    queryFn: analyticsApi.getSettings,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Compute current cycle dates once settings load
+  const cycleDates = useMemo(() => {
+    const startDay = orgSettings?.salaryCycleStartDay ?? 1;
+    return getCurrentCycleDates(startDay);
+  }, [orgSettings]);
+
   // Upcoming holidays this month
   const upcomingHolidays = (() => {
     const today = new Date().toISOString().split('T')[0];
@@ -65,11 +129,18 @@ export const AttendancePage: React.FC = () => {
       const empName = emp?.fullName || 'Logapriyan M';
 
       const matchName = empName.toLowerCase().includes(nameFilter.toLowerCase());
-      const matchDate = !dateFilter || att.date === dateFilter;
+
+      // If a specific date filter is set, use it; otherwise filter by current salary/attendance cycle
+      let matchDate: boolean;
+      if (dateFilter) {
+        matchDate = att.date === dateFilter;
+      } else {
+        matchDate = att.date >= cycleDates.startStr && att.date <= cycleDates.endStr;
+      }
 
       return matchName && matchDate;
     });
-  }, [attendances, employees, nameFilter, dateFilter]);
+  }, [attendances, employees, nameFilter, dateFilter, cycleDates]);
 
   const formatDt = (dtStr?: string) => {
     if (!dtStr) return '';
@@ -127,7 +198,7 @@ export const AttendancePage: React.FC = () => {
     },
   });
 
-  // Summary stats (Admin/HR)
+  // Summary stats (Admin/HR today)
   const stats = useMemo(() => {
     if (!filteredAttendances.length) return { present: 0, late: 0, wfh: 0, absent: 0 };
     const today = new Date().toISOString().split('T')[0];
@@ -233,7 +304,7 @@ export const AttendancePage: React.FC = () => {
                     isLoading={approvOvertimeMutation.isPending}
                     className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                   >
-                    ✓ OT
+                    âœ“ OT
                   </Button>
                 )}
               </div>
@@ -262,6 +333,21 @@ export const AttendancePage: React.FC = () => {
           <p className="text-xs text-muted-foreground mt-0.5">
             Monitor daily check-ins, IP network compliance, and automatic working hour calculations
           </p>
+          {/* Cycle period badge â€” synced with salary cycle */}
+          <div className="flex items-center gap-1.5 mt-2">
+            <CalendarRange className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs font-semibold text-primary">
+              Current Cycle:&nbsp;
+            </span>
+            <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">
+              {formatDate(cycleDates.startStr)} â€“ {formatDate(cycleDates.endStr)}
+            </span>
+            {orgSettings?.salaryCycleStartDay && orgSettings.salaryCycleStartDay > 1 && (
+              <span className="text-[10px] text-muted-foreground">
+                (starts {orgSettings.salaryCycleStartDay}{['st','nd','rd'][((orgSettings.salaryCycleStartDay % 10) - 1)] || 'th'} of each month)
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
@@ -275,7 +361,7 @@ export const AttendancePage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Upcoming Holidays Banner ── */}
+      {/* â”€â”€ Upcoming Holidays Banner â”€â”€ */}
       {upcomingHolidays.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 p-4 rounded-2xl bg-emerald-500/8 border border-emerald-200/50 dark:border-emerald-800/40">
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -368,12 +454,21 @@ export const AttendancePage: React.FC = () => {
               onChange={(e) => setNameFilter(e.target.value)}
             />
           </div>
-          <div className="w-full sm:w-64">
+          <div className="w-full sm:w-64 flex gap-2 items-center">
             <Input
               type="date"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
             />
+            {dateFilter && (
+              <button
+                onClick={() => setDateFilter('')}
+                className="text-xs text-muted-foreground hover:text-foreground underline whitespace-nowrap"
+                title="Reset to current cycle"
+              >
+                Reset
+              </button>
+            )}
           </div>
         </div>
 
