@@ -55,7 +55,7 @@ export const App: React.FC = () => {
   const fetchTenantConfig = useTenantStore((state) => state.fetchTenantConfig);
   const isLoading = useTenantStore((state) => state.isLoading);
 
-  const { isAuthenticated, token, setToken, login, logout } = useAuthStore();
+  const { isAuthenticated, token, setToken, login, logout, role } = useAuthStore();
   const [isAuthLoading, setIsAuthLoading] = useState(isAuthenticated && !token);
 
   useEffect(() => {
@@ -160,7 +160,9 @@ export const App: React.FC = () => {
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/attendance" element={<AttendancePage />} />
                   <Route path="/leave-wfh" element={<LeaveWFHPage />} />
-                  <Route path="/payroll" element={<PayrollPage />} />
+                  {(role === 'ADMIN' || role === 'HR') && (
+                    <Route path="/payroll" element={<PayrollPage />} />
+                  )}
                   <Route path="/task-reports" element={<TaskReportsPage />} />
                   <Route path="/self-service" element={<SelfServicePage />} />
                   <Route path="/documents" element={<DocumentPage />} />

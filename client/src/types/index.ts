@@ -224,8 +224,10 @@ export interface CompanySettings {
   monthlyLeaveLimit: number;
   monthlyWFHLimit: number;
   monthlyPermissionHours: number;
+  salaryCycleStartDay: number;
   companyName: string;
   adminEmail: string;
+  customHolidays?: Array<{ date: string; name: string }>;
 }
 
 export type RecruitmentStage = 'NEW' | 'SCREENING' | 'INTERVIEW' | 'TECHNICAL' | 'HR' | 'OFFER' | 'HIRED';

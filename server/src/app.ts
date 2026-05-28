@@ -42,7 +42,7 @@ import recruitmentRoutes from './domains/recruitment/recruitment.routes.js';
 import chatRoutes from './domains/chat/chat.routes.js';
 import notificationRoutes from './domains/notification/notification.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
-import payrollConfigRoutes from './routes/payrollConfig.routes.js';
+
 
 import { errorHandler } from './middlewares/errorHandler.js';
 import { traceIdMiddleware } from './middlewares/traceId.js';
@@ -96,7 +96,7 @@ app.use('/metrics', metricsMiddleware);
   app.use('/api/wfh', wfhRoutes);
   app.use('/api/payrolls', payrollRoutes); // Legacy
   app.use('/api/v2/payroll', v2PayrollRoutes); // Enterprise Engine
-  app.use('/api/payroll-config', payrollConfigRoutes); // Payroll Setup Config
+
   app.use('/api/projects', projectRoutes);
   app.use('/api/recruitment', recruitmentRoutes);
   app.use('/api/chat', chatRoutes);

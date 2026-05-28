@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import { PayrollConfig, DEFAULT_PAYROLL_CONFIG } from '../models/payroll/PayrollConfig.js';
 import { createAuditLog } from '../services/auditLog.service.js';
 import { AuthRequest } from '../types/index.js';
@@ -76,6 +77,7 @@ export const savePayrollConfig = async (req: AuthRequest, res: Response): Promis
       esiEmployerPercent,
       insuranceMonthly,
       applyEsiOnlyIfGrossBelow21000,
+      bulkApplyToAllEmployees,
     } = req.body;
 
     const targetEmployeeId = employeeId ? employeeId : null;
@@ -95,6 +97,45 @@ export const savePayrollConfig = async (req: AuthRequest, res: Response): Promis
       insuranceMonthly: insuranceMonthly ?? DEFAULT_PAYROLL_CONFIG.insuranceMonthly,
       applyEsiOnlyIfGrossBelow21000: applyEsiOnlyIfGrossBelow21000 ?? DEFAULT_PAYROLL_CONFIG.applyEsiOnlyIfGrossBelow21000,
     };
+
+    if (bulkApplyToAllEmployees === true) {
+      const { Employee } = await import('../models/Employee.js');
+      const employees = await Employee.find({ organizationId: orgId, isActive: true });
+      
+      const bulkOps: any[] = employees.map(emp => ({
+        updateOne: {
+          filter: { organizationId: new mongoose.Types.ObjectId(orgId), employeeId: emp._id },
+          update: { $set: { ...configData, organizationId: new mongoose.Types.ObjectId(orgId), employeeId: emp._id } },
+          upsert: true
+        }
+      }));
+
+      bulkOps.push({
+        updateOne: {
+          filter: { organizationId: new mongoose.Types.ObjectId(orgId), employeeId: null },
+          update: { $set: { ...configData, organizationId: new mongoose.Types.ObjectId(orgId), employeeId: null } },
+          upsert: true
+        }
+      });
+
+      if (bulkOps.length > 0) {
+        await PayrollConfig.bulkWrite(bulkOps as any);
+      }
+
+      const config = await PayrollConfig.findOne({ organizationId: orgId, employeeId: null });
+
+      await createAuditLog(
+        'PAYROLL_CONFIG_BULK_UPDATE',
+        req.user?.email || 'Admin',
+        'PAYROLL',
+        orgId.toString(),
+        `Bulk payroll configuration applied to organization defaults and all ${employees.length} active employees`,
+        req.user?.organizationId
+      );
+
+      res.status(200).json({ config, message: `Payroll configuration applied to organization defaults and all ${employees.length} active employees successfully.` });
+      return;
+    }
 
     const config = await PayrollConfig.findOneAndUpdate(
       { organizationId: orgId, employeeId: targetEmployeeId },

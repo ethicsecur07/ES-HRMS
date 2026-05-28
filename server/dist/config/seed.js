@@ -97,6 +97,7 @@ const seedDatabase = async () => {
                 monthlyLeaveLimit: 2,
                 monthlyWFHLimit: 1,
                 monthlyPermissionHours: 3,
+                salaryCycleStartDay: 1,
                 allowedIPs: ['127.0.0.1', '::1', '192.168.29.50', '192.168.29.55'],
             },
         });

@@ -15,120 +15,121 @@ const Attendance_js_1 = require("../../models/Attendance.js");
 const Organization_js_1 = require("../../models/Organization.js");
 const SelfService_js_1 = require("../../models/SelfService.js");
 const Payslip_js_1 = require("../../models/Payslip.js");
-const Employee_js_1 = require("../../models/Employee.js");
-const PayrollConfig_js_1 = require("../../models/payroll/PayrollConfig.js");
+const PermissionRequest_js_1 = require("../../models/PermissionRequest.js");
 const mongoose_1 = __importDefault(require("mongoose"));
 class PayrollPipeline {
     /**
      * Triggers an asynchronous bulk payroll processing run for a given cycle.
      * Lock-guaranteed atomic implementation.
      */
-    /**
-     * Atomically locks a range of target cycles to PROCESSING state first,
-     * then launches sequential batch calculations in a detached background worker.
-     */
-    static async triggerRangeProcessing(organizationId, startCycle, endCycle) {
-        const cycles = this.generateCycleRange(startCycle, endCycle);
-        const runs = [];
-        // Atomically check and lock all cycles in the range
-        for (const cycle of cycles) {
-            let run = await PayrollRun_js_1.PayrollRun.findOneAndUpdate({ organizationId, runCycle: cycle, status: { $nin: ['PROCESSING', 'LOCKED', 'COMPLETED'] } }, { $set: { status: 'PROCESSING', processingLog: [`Batch trigger range started on ${new Date().toISOString()}`] } }, { new: true });
-            if (!run) {
-                const existing = await PayrollRun_js_1.PayrollRun.findOne({ organizationId, runCycle: cycle });
-                if (existing) {
-                    throw new Error(`Payroll run for ${cycle} is already in ${existing.status} state.`);
-                }
-                run = new PayrollRun_js_1.PayrollRun({ organizationId, runCycle: cycle, status: 'PROCESSING', processingLog: [`Batch trigger range started on ${new Date().toISOString()}`] });
-                await run.save();
-            }
-            runs.push(run);
-        }
-        // Detach and run sequentially to ensure month-over-month cumulative consistency
-        this.processSequentialRange(runs).catch(console.error);
-        return runs;
-    }
-    static async processSequentialRange(runs) {
-        for (const run of runs) {
-            try {
-                await this.processBatch(run);
-            }
-            catch (err) {
-                run.status = 'FAILED';
-                run.processingLog.push(`Sequential batch run failed: ${err.message}`);
-                await run.save();
-            }
-        }
-    }
-    /**
-     * Triggers an asynchronous bulk payroll processing run for a given cycle.
-     * Lock-guaranteed atomic implementation (Backward compatible fallback).
-     */
     static async triggerBulkProcessing(organizationId, runCycle) {
-        const runs = await this.triggerRangeProcessing(organizationId, runCycle, runCycle);
-        return runs[0];
+        // Atomic check-and-lock to prevent race conditions
+        let run = await PayrollRun_js_1.PayrollRun.findOneAndUpdate({ organizationId, runCycle, status: { $nin: ['PROCESSING', 'LOCKED', 'COMPLETED'] } }, { $set: { status: 'PROCESSING' } }, { new: true });
+        if (!run) {
+            const existing = await PayrollRun_js_1.PayrollRun.findOne({ organizationId, runCycle });
+            if (existing) {
+                throw new Error(`Payroll run is already in ${existing.status} state.`);
+            }
+            run = new PayrollRun_js_1.PayrollRun({ organizationId, runCycle, status: 'PROCESSING' });
+            await run.save();
+        }
+        // Start async processing (detached)
+        this.processBatch(run).catch(console.error);
+        return run;
+    }
+    static getCycleDates(runCycle, startDay = 1) {
+        const [year, month] = runCycle.split('-').map(Number);
+        if (startDay === 1) {
+            const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+            const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+            const startStr = `${runCycle}-01`;
+            const lastDay = endDate.getUTCDate();
+            const endStr = `${runCycle}-${lastDay < 10 ? '0' + lastDay : lastDay}`;
+            return { startDate, endDate, startStr, endStr, endDay: lastDay };
+        }
+        else {
+            const prevDate = new Date(Date.UTC(year, month - 2, 1));
+            const prevYear = prevDate.getUTCFullYear();
+            const prevMonth = prevDate.getUTCMonth() + 1;
+            const maxDaysPrev = new Date(prevYear, prevMonth, 0).getDate();
+            const clampedStartDay = Math.min(startDay, maxDaysPrev);
+            const startDate = new Date(Date.UTC(prevYear, prevMonth - 1, clampedStartDay, 0, 0, 0, 0));
+            const currentMonthMaxDays = new Date(year, month, 0).getDate();
+            const endDayVal = startDay - 1;
+            const clampedEndDay = Math.min(endDayVal, currentMonthMaxDays);
+            const endDate = new Date(Date.UTC(year, month - 1, clampedEndDay, 23, 59, 59, 999));
+            const startMonthStr = prevMonth < 10 ? `0${prevMonth}` : `${prevMonth}`;
+            const startDayStr = clampedStartDay < 10 ? `0${clampedStartDay}` : `${clampedStartDay}`;
+            const startStr = `${prevYear}-${startMonthStr}-${startDayStr}`;
+            const endMonthStr = month < 10 ? `0${month}` : `${month}`;
+            const endDayStr = clampedEndDay < 10 ? `0${clampedEndDay}` : `${clampedEndDay}`;
+            const endStr = `${year}-${endMonthStr}-${endDayStr}`;
+            const msDiff = endDate.getTime() - startDate.getTime();
+            const totalCalendarDays = Math.round(msDiff / (1000 * 60 * 60 * 24)) + 1;
+            return { startDate, endDate, startStr, endStr, endDay: totalCalendarDays };
+        }
     }
     static async processBatch(run) {
         let processed = 0;
         let failed = 0;
         let totalPayout = 0;
         try {
-            const [year, month] = run.runCycle.split('-');
-            const startStr = `${run.runCycle}-01`;
-            const yearNum = parseInt(year);
-            const monthNum = parseInt(month);
-            const endDay = new Date(yearNum, monthNum, 0).getDate();
-            const endStr = `${run.runCycle}-${endDay < 10 ? '0' + endDay : endDay}`;
-            const cycleStart = new Date(startStr);
-            const cycleEnd = new Date(endStr);
-            // Fetch Organization for working days settings
             const org = await Organization_js_1.Organization.findById(run.organizationId);
+            const salaryCycleStartDay = org?.settings?.salaryCycleStartDay || 1;
+            const monthNum = parseInt(run.runCycle.split('-')[1]);
+            const { startDate, endDate, startStr, endStr, endDay } = this.getCycleDates(run.runCycle, salaryCycleStartDay);
+            const cycleStart = startDate;
+            const cycleEnd = endDate;
             const activeWorkdays = org?.settings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
             const customHolidays = org?.settings?.customHolidays || [];
             // Build list of active working days in the cycle
             const workdaysList = [];
-            for (let d = 1; d <= endDay; d++) {
-                const dStr = d < 10 ? `0${d}` : `${d}`;
-                const dateStr = `${run.runCycle}-${dStr}`;
-                const dateObj = new Date(dateStr);
-                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' }); // 'Mon', 'Tue', etc.
+            const currentCursor = new Date(cycleStart);
+            while (currentCursor <= cycleEnd) {
+                const yearCursor = currentCursor.getUTCFullYear();
+                const monthCursor = currentCursor.getUTCMonth() + 1;
+                const dayCursor = currentCursor.getUTCDate();
+                const yStr = yearCursor;
+                const mStr = monthCursor < 10 ? `0${monthCursor}` : `${monthCursor}`;
+                const dStr = dayCursor < 10 ? `0${dayCursor}` : `${dayCursor}`;
+                const dateStr = `${yStr}-${mStr}-${dStr}`;
+                const dayName = currentCursor.toLocaleDateString('en-US', { weekday: 'short' });
                 if (activeWorkdays.includes(dayName) && !customHolidays.some(h => h.date === dateStr)) {
                     workdaysList.push(dateStr);
                 }
+                currentCursor.setUTCDate(currentCursor.getUTCDate() + 1);
             }
-            // Fetch all active employees
-            const employees = await Employee_js_1.Employee.find({
+            // Fetch all active structures
+            const structures = await SalaryStructure_js_1.SalaryStructure.find({
                 organizationId: run.organizationId,
-                isActive: true
-            });
-            // Fetch organization-wide default configurations
-            let defaultConfig = await PayrollConfig_js_1.PayrollConfig.findOne({ organizationId: run.organizationId, employeeId: null });
-            const defaultConfigValues = defaultConfig ? defaultConfig.toObject() : { ...PayrollConfig_js_1.DEFAULT_PAYROLL_CONFIG };
-            for (const employee of employees) {
+                status: 'ACTIVE'
+            }).populate('components.componentId');
+            for (const structure of structures) {
                 try {
-                    // Check if employee has an active SalaryStructure
-                    const structure = await SalaryStructure_js_1.SalaryStructure.findOne({
-                        organizationId: run.organizationId,
-                        employeeId: employee._id,
-                        status: 'ACTIVE'
-                    }).populate('components.componentId');
-                    // Fetch leaves, attendance, and reimbursements
+                    // Fetch leaves, attendance, reimbursements
                     const approvedLeaves = await Leave_js_1.Leave.find({
                         organizationId: run.organizationId,
-                        employeeId: employee._id,
+                        employeeId: structure.employeeId,
                         status: 'APPROVED',
                         startDate: { $lte: endStr },
                         endDate: { $gte: startStr }
                     });
                     const attendanceRecords = await Attendance_js_1.Attendance.find({
                         organizationId: run.organizationId,
-                        employeeId: employee._id,
+                        employeeId: structure.employeeId,
                         date: { $gte: startStr, $lte: endStr }
                     });
                     const reimbursementClaims = await SelfService_js_1.ReimbursementClaim.find({
                         organizationId: run.organizationId,
-                        employeeId: employee._id,
+                        employeeId: structure.employeeId,
                         status: 'APPROVED',
                         expenseDate: { $gte: cycleStart, $lte: cycleEnd }
+                    });
+                    const approvedPermissions = await PermissionRequest_js_1.PermissionRequest.find({
+                        organizationId: run.organizationId,
+                        employeeId: structure.employeeId,
+                        approvalStatus: 'APPROVED',
+                        date: { $gte: startStr, $lte: endStr }
                     });
                     // Calculate Unpaid Leave days
                     let unpaidDays = 0;
@@ -144,6 +145,23 @@ class PayrollPipeline {
                             unpaidDays += getOverlapDays(leave.startDate, leave.endDate, cycleStart, cycleEnd);
                         }
                     }
+                    // Calculate Paid Leave days (excluding unpaid leaves and WFH)
+                    let paidLeaveDays = 0;
+                    for (const leave of approvedLeaves) {
+                        if (leave.leaveType !== 'Unpaid Leave' && leave.leaveType !== 'WFH') {
+                            paidLeaveDays += getOverlapDays(leave.startDate, leave.endDate, cycleStart, cycleEnd);
+                        }
+                    }
+                    const leaveLimit = org?.settings?.monthlyLeaveLimit || 2;
+                    const excessLeaveDays = Math.max(0, paidLeaveDays - leaveLimit);
+                    // Calculate Permission hours LOP
+                    let totalPermissionHours = 0;
+                    for (const perm of approvedPermissions) {
+                        totalPermissionHours += perm.totalHours;
+                    }
+                    const permissionLimit = org?.settings?.monthlyPermissionHours || 3;
+                    const excessPermissionHours = Math.max(0, totalPermissionHours - permissionLimit);
+                    const permissionLopDays = excessPermissionHours / 8; // Assuming 8-hour workday
                     // Calculate Absent days (no attendance and no approved leave on a workday)
                     let absentDays = 0;
                     for (const dateStr of workdaysList) {
@@ -166,7 +184,7 @@ class PayrollPipeline {
                         lateDeductionDays = Math.floor(lateCount / latePolicy.latePenaltyCount) * 0.5;
                     }
                     // Total Loss of Pay Days
-                    const totalLOPDays = unpaidDays + absentDays + lateDeductionDays;
+                    const totalLOPDays = unpaidDays + absentDays + lateDeductionDays + excessLeaveDays + permissionLopDays;
                     // Calculate Overtime Hours
                     let approvedOTHours = 0;
                     for (const record of attendanceRecords) {
@@ -179,188 +197,92 @@ class PayrollPipeline {
                     for (const claim of reimbursementClaims) {
                         approvedReimbursementAmount += claim.amount;
                     }
-                    let grossSalary = 0;
+                    // Rule Engine Variable Bindings
+                    const variables = {
+                        Base: structure.baseSalary,
+                        Present_Days: Math.max(0, workdaysList.length - absentDays - unpaidDays),
+                        Late_Days: lateCount,
+                        OT_Hours: approvedOTHours,
+                        Unpaid_Days: totalLOPDays,
+                        Reimbursements: approvedReimbursementAmount
+                    };
+                    let totalEarnings = 0;
                     let totalDeductions = 0;
-                    let basicSalaryVal = 0;
-                    let otEarnings = 0;
-                    let netSalary = 0;
-                    let dailyRate = 0;
-                    let lopDeductionAmount = 0;
-                    // Variables map to save to Payslip
-                    let allowancesObj = {};
-                    let deductionsObj = {};
-                    let employerContributionsObj = {};
-                    if (structure) {
-                        // Rule Engine Variable Bindings
-                        const variables = {
-                            Base: structure.baseSalary,
-                            Present_Days: Math.max(0, workdaysList.length - absentDays - unpaidDays),
-                            Late_Days: lateCount,
-                            OT_Hours: approvedOTHours,
-                            Unpaid_Days: totalLOPDays,
-                            Reimbursements: approvedReimbursementAmount
-                        };
-                        let totalEarnings = 0;
-                        let structureDeductions = 0;
-                        basicSalaryVal = structure.baseSalary; // default basic fallback
-                        for (const item of structure.components) {
-                            const comp = item.componentId;
-                            let amount = 0;
-                            if (comp.isConditional && comp.conditionExpression) {
-                                const conditionMet = FormulaEvaluator_js_1.FormulaEvaluator.evaluateCondition(comp.conditionExpression, variables);
-                                if (!conditionMet)
-                                    continue;
-                            }
-                            if (comp.calculationType === 'FIXED') {
-                                amount = item.fixedValue || 0;
-                            }
-                            else if (comp.calculationType === 'FORMULA' && comp.formula) {
-                                amount = FormulaEvaluator_js_1.FormulaEvaluator.evaluate(comp.formula, variables);
-                            }
-                            // Expose computed components as variables for subsequent formulas
-                            variables[comp.name] = amount;
-                            if (comp.name.toUpperCase() === 'BASIC') {
-                                basicSalaryVal = amount;
-                            }
-                            if (comp.type === 'EARNING')
-                                totalEarnings += amount;
-                            if (comp.type === 'DEDUCTION')
-                                structureDeductions += amount;
+                    let basicSalaryVal = structure.baseSalary; // default basic fallback
+                    for (const item of structure.components) {
+                        const comp = item.componentId;
+                        let amount = 0;
+                        if (comp.isConditional && comp.conditionExpression) {
+                            const conditionMet = FormulaEvaluator_js_1.FormulaEvaluator.evaluateCondition(comp.conditionExpression, variables);
+                            if (!conditionMet)
+                                continue;
                         }
-                        grossSalary = totalEarnings;
-                        // Apply LOP salary deductions
-                        dailyRate = grossSalary / endDay;
-                        lopDeductionAmount = Math.round(dailyRate * totalLOPDays);
-                        totalDeductions = structureDeductions + lopDeductionAmount;
-                        // Apply Overtime Earnings
-                        const otRate = (structure.baseSalary / 240) * 1.5;
-                        otEarnings = Math.round(approvedOTHours * otRate);
-                        grossSalary += otEarnings;
-                        variables['OvertimeEarnings'] = otEarnings;
-                        // Apply Country Adapter (Statutory + Taxes)
-                        const adapter = PayrollAdapterFactory_js_1.PayrollAdapterFactory.getAdapter('IN');
-                        const statutory = await adapter.applyStatutoryCompliance(grossSalary, basicSalaryVal);
-                        for (const val of Object.values(statutory))
-                            totalDeductions += val;
-                        const taxResult = await adapter.calculateTaxes({
-                            organizationId: run.organizationId,
-                            employeeId: employee._id,
-                            grossSalary: grossSalary,
-                            yearToDateTaxPaid: 0,
-                            monthIndex: monthNum,
-                            runCycle: run.runCycle
-                        });
-                        totalDeductions += taxResult.totalTaxes;
-                        // Net Salary cannot be negative
-                        netSalary = Math.max(0, grossSalary - totalDeductions + approvedReimbursementAmount);
-                        allowancesObj = {
+                        if (comp.calculationType === 'FIXED') {
+                            amount = item.fixedValue || 0;
+                        }
+                        else if (comp.calculationType === 'FORMULA' && comp.formula) {
+                            amount = FormulaEvaluator_js_1.FormulaEvaluator.evaluate(comp.formula, variables);
+                        }
+                        // Expose computed components as variables for subsequent formulas
+                        variables[comp.name] = amount;
+                        if (comp.name.toUpperCase() === 'BASIC') {
+                            basicSalaryVal = amount;
+                        }
+                        if (comp.type === 'EARNING')
+                            totalEarnings += amount;
+                        if (comp.type === 'DEDUCTION')
+                            totalDeductions += amount;
+                    }
+                    let grossSalary = totalEarnings;
+                    // Apply LOP salary deductions
+                    const dailyRate = grossSalary / endDay;
+                    const lopDeductionAmount = Math.round(dailyRate * totalLOPDays);
+                    totalDeductions += lopDeductionAmount;
+                    // Apply Overtime Earnings
+                    const otRate = (structure.baseSalary / 240) * 1.5;
+                    const otEarnings = Math.round(approvedOTHours * otRate);
+                    grossSalary += otEarnings;
+                    variables['OvertimeEarnings'] = otEarnings;
+                    // Apply Country Adapter (Statutory + Taxes)
+                    const adapter = PayrollAdapterFactory_js_1.PayrollAdapterFactory.getAdapter('IN');
+                    const statutory = await adapter.applyStatutoryCompliance(grossSalary, basicSalaryVal);
+                    for (const val of Object.values(statutory))
+                        totalDeductions += val;
+                    const taxResult = await adapter.calculateTaxes({
+                        organizationId: run.organizationId,
+                        employeeId: structure.employeeId,
+                        grossSalary: grossSalary,
+                        yearToDateTaxPaid: 0,
+                        monthIndex: monthNum,
+                        runCycle: run.runCycle
+                    });
+                    totalDeductions += taxResult.totalTaxes;
+                    // Net Salary cannot be negative
+                    const netSalary = Math.max(0, grossSalary - totalDeductions + approvedReimbursementAmount);
+                    // Upsert the Payroll record
+                    const payrollRecord = await Payroll_js_1.Payroll.findOneAndUpdate({ organizationId: run.organizationId, employeeId: structure.employeeId, month: run.runCycle }, {
+                        baseSalary: structure.baseSalary,
+                        bonus: otEarnings,
+                        deductions: totalDeductions,
+                        reimbursements: approvedReimbursementAmount,
+                        finalSalary: netSalary,
+                        paidStatus: 'PROCESSING'
+                    }, { upsert: true, new: true });
+                    // Generate detailed Payslip record
+                    await Payslip_js_1.Payslip.findOneAndUpdate({ organizationId: run.organizationId, payrollId: payrollRecord._id, employeeId: structure.employeeId, month: run.runCycle }, {
+                        allowances: {
                             basic: basicSalaryVal,
                             hra: variables['HRA'] || 0,
                             conveyance: variables['Conveyance'] || 0,
                             medical: variables['Medical'] || 0,
                             bonus: otEarnings,
-                            specialAllowance: variables['SpecialAllowance'] || 0,
-                            performanceIncentive: variables['PerformanceIncentive'] || 0,
-                        };
-                        deductionsObj = {
+                        },
+                        deductions: {
                             professionalTax: statutory['Professional Tax'] || 0,
                             providentFund: statutory['EPF'] || 0,
                             leaveDeductions: lopDeductionAmount,
                             latePenalties: Math.round(lateDeductionDays * dailyRate),
-                            tds: taxResult.totalTaxes || 0,
-                        };
-                        employerContributionsObj = {
-                            pfEmployer: 0,
-                            gratuity: 0,
-                            esi: 0,
-                            insurance: 0,
-                        };
-                    }
-                    else {
-                        // Check for employee-specific PayrollConfig
-                        const empConfig = await PayrollConfig_js_1.PayrollConfig.findOne({ organizationId: run.organizationId, employeeId: employee._id });
-                        const config = empConfig ? empConfig.toObject() : defaultConfigValues;
-                        const ctcMonthly = employee.salary || 0;
-                        const ctcAnnual = ctcMonthly * 12;
-                        // Earnings calculation
-                        basicSalaryVal = Math.round(ctcMonthly * config.basicSalaryPercent / 100);
-                        const hra = Math.round(basicSalaryVal * config.hraPercent / 100);
-                        const conveyance = config.conveyanceMonthly;
-                        const performanceIncentive = config.performanceIncentiveMonthly;
-                        const otherAllowances = config.otherAllowancesMonthly;
-                        // Employer contributions (part of CTC)
-                        const pfEmployer = Math.round(basicSalaryVal * config.pfEmployerPercent / 100);
-                        const gratuity = Math.round(basicSalaryVal * config.gratuityPercent / 100);
-                        const grossBeforeSpecial = basicSalaryVal + hra + conveyance + performanceIncentive + otherAllowances;
-                        // ESI Employer (conditional)
-                        let esiEmployer = 0;
-                        if (config.applyEsiOnlyIfGrossBelow21000) {
-                            if (grossBeforeSpecial < 21000) {
-                                esiEmployer = Math.round(grossBeforeSpecial * config.esiEmployerPercent / 100);
-                            }
-                        }
-                        else {
-                            esiEmployer = Math.round(grossBeforeSpecial * config.esiEmployerPercent / 100);
-                        }
-                        const insurance = config.insuranceMonthly;
-                        const totalEmployerContributions = pfEmployer + gratuity + esiEmployer + insurance;
-                        // Special allowance fills the gap
-                        const specialAllowance = Math.max(0, Math.round(ctcMonthly - grossBeforeSpecial - totalEmployerContributions));
-                        grossSalary = grossBeforeSpecial + specialAllowance;
-                        // Deductions
-                        const pfEmployee = Math.round(basicSalaryVal * config.pfEmployeePercent / 100);
-                        const professionalTax = config.professionalTaxMonthly;
-                        const tds = config.incomeTaxTdsMonthly;
-                        const baseDeductions = pfEmployee + professionalTax + tds;
-                        // Apply LOP salary deductions
-                        dailyRate = grossSalary / endDay;
-                        lopDeductionAmount = Math.round(dailyRate * totalLOPDays);
-                        // Apply Overtime Earnings
-                        const otRate = (basicSalaryVal / 240) * 1.5;
-                        otEarnings = Math.round(approvedOTHours * otRate);
-                        // Total pay with overtime, deductions with LOP
-                        const finalGross = grossSalary + otEarnings;
-                        totalDeductions = baseDeductions + lopDeductionAmount;
-                        netSalary = Math.max(0, Math.round(finalGross - totalDeductions + approvedReimbursementAmount));
-                        allowancesObj = {
-                            basic: basicSalaryVal,
-                            hra,
-                            conveyance,
-                            medical: 0,
-                            bonus: otEarnings,
-                            specialAllowance,
-                            performanceIncentive,
-                        };
-                        deductionsObj = {
-                            professionalTax,
-                            providentFund: pfEmployee,
-                            leaveDeductions: lopDeductionAmount,
-                            latePenalties: Math.round(lateDeductionDays * dailyRate),
-                            tds,
-                        };
-                        employerContributionsObj = {
-                            pfEmployer,
-                            gratuity,
-                            esi: esiEmployer,
-                            insurance,
-                        };
-                    }
-                    // Upsert the Payroll record
-                    const payrollRecord = await Payroll_js_1.Payroll.findOneAndUpdate({ organizationId: run.organizationId, employeeId: employee._id, month: run.runCycle }, {
-                        baseSalary: basicSalaryVal,
-                        bonus: otEarnings,
-                        deductions: totalDeductions,
-                        reimbursements: approvedReimbursementAmount,
-                        finalSalary: netSalary,
-                        paidStatus: 'PROCESSING',
-                        ctcAnnual: (employee.salary || basicSalaryVal) * 12,
-                        grossPay: grossSalary + otEarnings,
-                    }, { upsert: true, new: true });
-                    // Generate detailed Payslip record
-                    await Payslip_js_1.Payslip.findOneAndUpdate({ organizationId: run.organizationId, payrollId: payrollRecord._id, employeeId: employee._id, month: run.runCycle }, {
-                        allowances: allowancesObj,
-                        deductions: deductionsObj,
-                        employerContributions: employerContributionsObj,
+                        },
                         reimbursements: approvedReimbursementAmount,
                         netSalary: netSalary,
                     }, { upsert: true });
@@ -369,7 +291,7 @@ class PayrollPipeline {
                 }
                 catch (err) {
                     failed++;
-                    run.processingLog.push(`Error for Employee ${employee._id}: ${err.message}`);
+                    run.processingLog.push(`Error for Employee ${structure.employeeId}: ${err.message}`);
                 }
             }
             run.status = 'LOCKED'; // Awaiting approval
