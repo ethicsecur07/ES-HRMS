@@ -192,8 +192,8 @@ We look forward to welcoming you to our team and are confident that your skills 
             doc.text(`Phone: ${phone}      |      Email: ${email}      |      Website: ${website}`, 50, footerY + 12, { align: 'center' });
             doc.fillColor('#2C3E50').font('Helvetica-Bold')
                 .text('ES EthicSecur SofTec Pvt Ltd', 50, footerY + 26, { align: 'center' });
-            doc.fillColor('#7F8C8D').font('Helvetica').fontSize(7.5)
-                .text(address, 50, footerY + 37, { align: 'center' });
+            doc.fillColor('#7F8C8D').font('Helvetica').fontSize(7)
+                .text(address, 50, footerY + 38, { align: 'center', width: 495, lineBreak: false, ellipsis: true });
             // 3. Colorful bottom border strip
             doc.save();
             doc.rect(50, doc.page.height - 35, 495, 5).fillColor('#D35400').fill();

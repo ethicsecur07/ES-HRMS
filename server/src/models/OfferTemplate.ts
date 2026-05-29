@@ -13,6 +13,9 @@ export interface IOfferTemplate extends Document {
   footerAddress: string;
   signatoryName: string;
   signatoryTitle: string;
+  roundsNeeded?: string[];
+  customRounds?: string[];
+  deletedExternalIds?: string[];
   organizationId: mongoose.Types.ObjectId;
 }
 
@@ -44,6 +47,12 @@ ES EthicSecur SofTec Pvt Ltd`
     footerAddress: { type: String, default: '2nd floor , nv arcade building, near 5 roads, next to reliance mall, salem-636004' },
     signatoryName: { type: String, default: 'ES EthicSecur SofTec Private Limited' },
     signatoryTitle: { type: String, default: 'HR Department' },
+    roundsNeeded: {
+      type: [String],
+      default: ['NEW', 'SCREENING', 'INTERVIEW', 'TECHNICAL', 'HR', 'OFFER', 'HIRED']
+    },
+    customRounds: { type: [String], default: [] },
+    deletedExternalIds: { type: [String], default: [] },
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true }
   },
   { timestamps: true }

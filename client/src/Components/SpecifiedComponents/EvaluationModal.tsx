@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { recruitmentApi } from '../../api_service/recruitmentApi';
 import type { Candidate, RecruitmentStage, StageEvaluation } from '../../types';
 import { useNotificationStore } from '../../store/useNotificationStore';
@@ -40,6 +40,14 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
   const queryClient = useQueryClient();
 
   const [selectedStage, setSelectedStage] = useState<RecruitmentStage>('SCREENING');
+
+  const { data: templateData } = useQuery({
+    queryKey: ['offerTemplate'],
+    queryFn: recruitmentApi.getDefaultTemplate,
+    enabled: isOpen && !!candidate
+  });
+
+  const roundsNeeded = templateData?.template?.roundsNeeded || STAGES;
   
   // Local state to store evaluations array temporarily before saving
   const [evaluations, setEvaluations] = useState<Record<RecruitmentStage, StageEvaluation>>({
@@ -52,12 +60,14 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
     HIRED: { stage: 'HIRED', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
   });
 
-  // Load candidate's evaluations when modal opens or candidate changes
+  // Load candidate's evaluations when modal opens, candidate changes, or roundsNeeded changes
   useEffect(() => {
     if (candidate) {
-      // Set the active selected stage to the candidate's current stage (if it exists in STAGES)
-      if (STAGES.includes(candidate.stage)) {
+      // Set the active selected stage to candidate's stage if active, else default to first active round
+      if (roundsNeeded.includes(candidate.stage)) {
         setSelectedStage(candidate.stage);
+      } else if (roundsNeeded.length > 0) {
+        setSelectedStage(roundsNeeded[0]);
       }
 
       const initialEvaluations: Record<RecruitmentStage, StageEvaluation> = {
@@ -89,7 +99,7 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
 
       setEvaluations(initialEvaluations);
     }
-  }, [candidate, isOpen]);
+  }, [candidate, isOpen, roundsNeeded]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Candidate> }) => recruitmentApi.update(id, data),
@@ -177,7 +187,7 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
   };
 
   // Completed steps details count
-  const completedCount = Object.values(evaluations).filter(e => e.completed).length;
+  const completedCount = Object.values(evaluations).filter(e => e.completed && roundsNeeded.includes(e.stage)).length;
 
   return (
     <Modal
@@ -211,7 +221,7 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
             </span>
             <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm">
               <UserCheck className="w-3.5 h-3.5 animate-pulse" />
-              {completedCount} / {STAGES.length} Steps Completed
+              {completedCount} / {roundsNeeded.length} Steps Completed
             </span>
           </div>
         </div>
@@ -225,11 +235,12 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
               Interview Stages
             </h5>
             <div className="relative border-l border-border pl-4 ml-3.5 space-y-4 py-2">
-              {STAGES.map((stage) => {
+              {roundsNeeded.map((stage) => {
                 const stepEval = evaluations[stage];
                 const isSelected = selectedStage === stage;
-                const isCompleted = !!stepEval?.completed;
-                const hasFeedback = stepEval && (stepEval.comments || (stepEval.ratingCommunication || 0) > 0 || (stepEval.ratingTechnical || 0) > 0);
+                const isRequired = roundsNeeded.includes(stage);
+                const isCompleted = isRequired && !!stepEval?.completed;
+                const hasFeedback = isRequired && stepEval && (stepEval.comments || (stepEval.ratingCommunication || 0) > 0 || (stepEval.ratingTechnical || 0) > 0);
 
                 return (
                   <button
@@ -239,7 +250,9 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
                     className={`w-full relative flex items-start text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
                       isSelected 
                         ? 'bg-primary/10 border-primary/30 ring-1 ring-primary/20 text-foreground' 
-                        : 'bg-background hover:bg-muted/30 border-transparent text-muted-foreground'
+                        : isRequired
+                        ? 'bg-background hover:bg-muted/30 border-transparent text-muted-foreground'
+                        : 'bg-muted/10 opacity-55 border-dashed border-border/40 text-muted-foreground/45 hover:bg-muted/20'
                     }`}
                   >
                     {/* Visual dot positioned on the left timeline line */}
@@ -249,16 +262,21 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
                       ) : isSelected ? (
                         <Circle className="w-5 h-5 text-primary fill-primary/10 stroke-[2.5]" />
                       ) : (
-                        <Circle className="w-5 h-5 text-muted-foreground/30 stroke-[1.5]" />
+                        <Circle className={`w-5 h-5 stroke-[1.5] ${isRequired ? 'text-muted-foreground/30' : 'text-muted-foreground/10'}`} />
                       )}
                     </div>
 
                     <div className="space-y-0.5 flex-1 min-w-0 pr-1">
                       <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold leading-none ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                        <span className={`text-xs font-bold leading-none ${isSelected ? 'text-primary' : isRequired ? 'text-foreground' : 'text-muted-foreground/50'}`}>
                           {STAGE_LABELS[stage]}
                         </span>
-                        {isCompleted && (
+                        {!isRequired && (
+                          <span className="text-[8px] font-extrabold bg-muted text-muted-foreground/55 border border-border px-1.5 py-0.5 rounded leading-none uppercase tracking-wider">
+                            Skipped
+                          </span>
+                        )}
+                        {isRequired && isCompleted && (
                           <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 rounded leading-none">
                             Done
                           </span>
@@ -319,50 +337,74 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
                 </button>
               </div>
 
-              {/* Ratings grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-muted/10 border border-border p-4 rounded-xl">
-                <StarRatingSelector
-                  label="Communication Skills"
-                  rating={currentEval.ratingCommunication || 0}
-                  onChange={(val) => handleFieldChange('ratingCommunication', val)}
-                />
-                
-                <StarRatingSelector
-                  label="Technical Skills"
-                  rating={currentEval.ratingTechnical || 0}
-                  onChange={(val) => handleFieldChange('ratingTechnical', val)}
-                />
-              </div>
+              {/* Conditional Ratings grid */}
+              {selectedStage !== 'SCREENING' && (selectedStage === 'TECHNICAL' || selectedStage === 'HR' || selectedStage === 'INTERVIEW') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-muted/10 border border-border p-4 rounded-xl">
+                  {(selectedStage === 'HR' || selectedStage === 'INTERVIEW') && (
+                    <StarRatingSelector
+                      label="Communication Skills"
+                      rating={currentEval.ratingCommunication || 0}
+                      onChange={(val) => handleFieldChange('ratingCommunication', val)}
+                    />
+                  )}
+                  
+                  {(selectedStage === 'TECHNICAL' || selectedStage === 'INTERVIEW') && (
+                    <StarRatingSelector
+                      label="Technical Skills"
+                      rating={currentEval.ratingTechnical || 0}
+                      onChange={(val) => handleFieldChange('ratingTechnical', val)}
+                    />
+                  )}
+                </div>
+              )}
 
-              {/* Comments Textarea */}
-              <div className="space-y-1.5 text-left">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-primary" />
-                  Performance Comments
-                </label>
-                <textarea
-                  rows={4}
-                  placeholder={`Write candidate interview performance notes for the ${STAGE_LABELS[selectedStage]} stage...`}
-                  value={currentEval.comments || ''}
-                  onChange={(e) => handleFieldChange('comments', e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary leading-relaxed shadow-sm transition-all"
-                />
-              </div>
+              {/* Conditional Comments/BG Notes Textarea */}
+              {selectedStage === 'SCREENING' ? (
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                    <UserCheck className="w-3.5 h-3.5 text-primary animate-pulse" />
+                    Background Verification & Screening Notes
+                  </label>
+                  <textarea
+                    rows={6}
+                    placeholder="Enter background verification details, references check feedback, and screening compliance notes..."
+                    value={currentEval.comments || ''}
+                    onChange={(e) => handleFieldChange('comments', e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary leading-relaxed shadow-sm transition-all"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                    Performance Comments
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder={`Write candidate interview performance notes for the ${STAGE_LABELS[selectedStage]} stage...`}
+                    value={currentEval.comments || ''}
+                    onChange={(e) => handleFieldChange('comments', e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary leading-relaxed shadow-sm transition-all"
+                  />
+                </div>
+              )}
 
-              {/* Tools & Experiences Textarea */}
-              <div className="space-y-1.5 text-left">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5 text-primary" />
-                  Tools & Technologies Experiences
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g., React, Node.js, AWS, Git, Docker"
-                  value={currentEval.toolsExperiences || ''}
-                  onChange={(e) => handleFieldChange('toolsExperiences', e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary shadow-sm transition-all font-medium text-foreground"
-                />
-              </div>
+              {/* Conditional Tools & Experiences input */}
+              {selectedStage !== 'SCREENING' && selectedStage !== 'HR' && selectedStage !== 'OFFER' && selectedStage !== 'HIRED' && selectedStage !== 'NEW' && (
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Wrench className="w-3.5 h-3.5 text-primary" />
+                    Tools & Technologies Experiences
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., React, Node.js, AWS, Git, Docker"
+                    value={currentEval.toolsExperiences || ''}
+                    onChange={(e) => handleFieldChange('toolsExperiences', e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary shadow-sm transition-all font-medium text-foreground"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Sub-form action button or save tips */}
