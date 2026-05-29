@@ -45,6 +45,7 @@ const userSchema = new mongoose_1.Schema({
     role: { type: String, enum: Object.values(index_js_1.ROLES), default: index_js_1.ROLES.EMPLOYEE },
     employeeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee' },
     isActive: { type: Boolean, default: true },
+    isLoginApproved: { type: Boolean, default: true },
     lastLogin: { type: Date },
     mfaEnabled: { type: Boolean, default: false },
     mfaSecret: { type: String, select: false },

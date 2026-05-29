@@ -21,6 +21,7 @@ export interface IOrganization extends Document {
     salaryCycleStartDay?: number;
     allowedIPs?: string[];
     adminEmail?: string;
+    loginApprovalRoles?: string[];
   };
   createdAt: Date;
   updatedAt: Date;
@@ -57,6 +58,7 @@ const organizationSchema = new Schema<IOrganization>(
       salaryCycleStartDay: { type: Number, default: 1, min: 1, max: 31 },
       allowedIPs: { type: [String], default: ['127.0.0.1', '::1'] },
       adminEmail: { type: String },
+      loginApprovalRoles: { type: [String], default: ['ADMIN'] },
     },
   },
   { timestamps: true }

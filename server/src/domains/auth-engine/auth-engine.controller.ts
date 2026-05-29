@@ -239,6 +239,14 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    if (user.isLoginApproved === false) {
+      res.status(403).json({
+        success: false,
+        message: 'Your login request has not been approved by an administrator yet. Please contact your organization.',
+      });
+      return;
+    }
+
     // Register device
     const { device, isNewDevice } = await DeviceManagementService.registerDevice({
       userId: user._id.toString(),

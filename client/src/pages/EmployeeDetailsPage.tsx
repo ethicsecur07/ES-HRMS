@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeApi } from '../api_service/employeeApi';
+import { analyticsApi } from '../api_service/analyticsApi';
 import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
 import { permissionApi } from '../api_service/permissionApi';
@@ -10,6 +11,7 @@ import { attendanceApi } from '../api_service/attendanceApi';
 import { documentApi } from '../api_service/documentApi';
 import { axiosInstance } from '../api_service/axiosInstance';
 import { useNotificationStore } from '../store/useNotificationStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Select } from '../Components/WrapperComponents/Input';
@@ -20,7 +22,7 @@ import {
   User, Palmtree, FileText, CalendarCheck, ArrowLeft, PhoneCall, 
   Mail, Briefcase, MapPin, Building, DollarSign, Calendar, Wifi, Clock, Laptop,
   ChevronLeft, ChevronRight, CreditCard, FileDigit, FolderOpen, Upload, Download,
-  History
+  History, Lock
 } from 'lucide-react';
 
 type TabType = 'PERSONAL' | 'PROFESSIONAL' | 'EMERGENCY' | 'BANK' | 'TAX' | 'DOCUMENTS' | 'LEAVE_WFH' | 'TASKS' | 'ATTENDANCE';
@@ -29,6 +31,31 @@ export const EmployeeDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addToast } = useNotificationStore();
+  const { user: currentUser } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  const { data: orgSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: analyticsApi.getSettings,
+    enabled: !!currentUser,
+  });
+
+  const toggleLoginApprovalMutation = useMutation({
+    mutationFn: async (approved: boolean) => {
+      return employeeApi.update(id || '', { isLoginApproved: approved });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee', id] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      addToast('Status Updated', 'Login approval status updated successfully.', 'success');
+    },
+    onError: (err: any) => {
+      addToast('Update Failed', err.response?.data?.message || err.message || 'Could not update login approval status.', 'error');
+    },
+  });
+
+  const allowedRoles = orgSettings?.loginApprovalRoles || ['ADMIN'];
+  const canApproveLogin = currentUser?.role === 'ADMIN' || allowedRoles.includes(currentUser?.role || '');
 
   const [activeTab, setActiveTab] = useState<TabType>('PERSONAL');
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -419,6 +446,55 @@ export const EmployeeDetailsPage: React.FC = () => {
                     <p className="font-semibold text-foreground">{employee.address}</p>
                   </div>
                 </div>
+              </div>
+            </Card>
+
+            <Card className="space-y-6 border-l-4 border-l-primary shadow-md">
+              <h3 className="text-lg font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
+                <Lock className="w-5 h-5 text-primary" /> Login Access & Security Controls
+              </h3>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
+                <div className="space-y-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                    Account Login Clearance Status
+                  </span>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    {employee.isLoginApproved
+                      ? 'Approved: This employee has active clearance to log in to the portal.'
+                      : 'Pending: Login access is currently locked for this account.'}
+                  </p>
+                </div>
+                {canApproveLogin ? (
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+                      employee.isLoginApproved
+                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                        : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                    }`}>
+                      {employee.isLoginApproved ? 'Login Approved' : 'Login Pending'}
+                    </span>
+                    <button
+                      onClick={() => toggleLoginApprovalMutation.mutate(!employee.isLoginApproved)}
+                      disabled={toggleLoginApprovalMutation.isPending}
+                      className={`h-9 px-4 rounded-lg font-bold text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer ${
+                        employee.isLoginApproved
+                          ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/10'
+                          : 'bg-primary hover:bg-primary/95 text-white shadow-primary/10'
+                      }`}
+                    >
+                      {toggleLoginApprovalMutation.isPending 
+                        ? 'Updating...' 
+                        : employee.isLoginApproved 
+                          ? 'Revoke Access' 
+                          : 'Grant Access'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted border border-border text-xs text-muted-foreground font-bold">
+                    <Lock className="w-3.5 h-3.5 text-muted-foreground animate-pulse" />
+                    <span>Role Restricted: Only Admin, HR, or Manager can configure login clearance.</span>
+                  </div>
+                )}
               </div>
             </Card>
           </div>

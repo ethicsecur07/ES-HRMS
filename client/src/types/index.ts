@@ -98,6 +98,7 @@ export interface Employee {
   };
   bankDetails?: BankDetails;
   taxDetails?: TaxDetails;
+  isLoginApproved?: boolean;
 }
 
 export interface Attendance {
@@ -230,6 +231,7 @@ export interface CompanySettings {
   companyName: string;
   adminEmail: string;
   customHolidays?: Array<{ date: string; name: string }>;
+  loginApprovalRoles?: string[];
 }
 
 export type RecruitmentStage = 'NEW' | 'SCREENING' | 'INTERVIEW' | 'TECHNICAL' | 'HR' | 'OFFER' | 'HIRED';

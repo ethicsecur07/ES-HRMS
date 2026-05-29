@@ -228,6 +228,10 @@ const login = async (req, res) => {
             res.status(403).json({ message: 'Account is deactivated. Please contact HR.' });
             return;
         }
+        if (user.isLoginApproved === false) {
+            res.status(403).json({ message: 'Your login request has not been approved by an administrator yet. Please contact your organization.' });
+            return;
+        }
         // Check account temporary lockout
         if (user.isBlocked) {
             if (user.blockedUntil && user.blockedUntil > new Date()) {

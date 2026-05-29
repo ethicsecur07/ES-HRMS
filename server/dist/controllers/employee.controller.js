@@ -118,7 +118,7 @@ const updateEmployee = async (req, res) => {
             res.status(400).json({ message: 'Organization context is missing.' });
             return;
         }
-        const employee = await employee_service_js_1.EmployeeService.updateEmployee(id, req.body, orgId, emailForAudit);
+        const employee = await employee_service_js_1.EmployeeService.updateEmployee(id, req.body, orgId, emailForAudit, req.user?.role);
         res.status(200).json({ employee });
     }
     catch (error) {

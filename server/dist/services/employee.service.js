@@ -12,6 +12,7 @@ const auditLog_service_js_1 = require("./auditLog.service.js");
 const Department_js_1 = require("../models/Department.js");
 const Designation_js_1 = require("../models/Designation.js");
 const OrganizationAuthConfig_js_1 = require("../models/OrganizationAuthConfig.js");
+const Organization_js_1 = require("../models/Organization.js");
 class EmployeeService {
     /**
      * Onboards a new employee, creates their system User account, and hashes their password atomically.
@@ -61,6 +62,7 @@ class EmployeeService {
                     role: 'EMPLOYEE',
                     employeeId: employee._id,
                     isActive: true,
+                    isLoginApproved: false,
                 }], { session });
             await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_CREATE', emailForAudit, 'EMPLOYEE', employee.employeeCode, `Onboarded employee ${employee.fullName} and provisioned credentials.`, orgId);
             await session.commitTransaction();
@@ -77,7 +79,7 @@ class EmployeeService {
     /**
      * Updates employee record and synchronizes User credentials.
      */
-    static async updateEmployee(id, updateData, orgId, emailForAudit) {
+    static async updateEmployee(id, updateData, orgId, emailForAudit, userRole) {
         const session = await mongoose_1.default.startSession();
         session.startTransaction();
         try {
@@ -117,12 +119,42 @@ class EmployeeService {
                 userUpdate.email = updateData.email.toLowerCase().trim();
             if (updateData.isActive !== undefined)
                 userUpdate.isActive = updateData.isActive;
+            if (updateData.isLoginApproved !== undefined) {
+                const organization = await Organization_js_1.Organization.findById(orgId).session(session);
+                const allowedRoles = organization?.settings?.loginApprovalRoles || ['ADMIN'];
+                if (userRole !== 'ADMIN' && !allowedRoles.includes(userRole || '')) {
+                    throw new Error('Forbidden: You do not have permission to approve/disapprove logins.');
+                }
+                userUpdate.isLoginApproved = updateData.isLoginApproved === true || updateData.isLoginApproved === 'true';
+            }
             if (Object.keys(userUpdate).length > 0) {
-                await User_js_1.User.findOneAndUpdate({ employeeId: employee._id, organizationId: orgId }, userUpdate, { session });
+                // Automatically link the employeeId if it's missing on the User document
+                userUpdate.employeeId = employee._id;
+                await User_js_1.User.findOneAndUpdate({
+                    $or: [
+                        { employeeId: employee._id },
+                        { email: employee.email.toLowerCase().trim() }
+                    ],
+                    organizationId: orgId
+                }, userUpdate, { session });
             }
             await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_UPDATE', emailForAudit, 'EMPLOYEE', employee.employeeCode, `Updated profile details for ${employee.fullName}`, orgId);
+            const user = await User_js_1.User.findOne({
+                $or: [
+                    { employeeId: employee._id },
+                    { email: employee.email.toLowerCase().trim() }
+                ],
+                organizationId: orgId
+            }).session(session).select('_id ssoData isLoginApproved role');
             await session.commitTransaction();
-            return employee;
+            const empObj = employee.toObject();
+            return {
+                ...empObj,
+                userId: user?._id.toString() || null,
+                ssoData: user?.ssoData || null,
+                role: user?.role || 'EMPLOYEE',
+                isLoginApproved: user?.isLoginApproved !== false,
+            };
         }
         catch (error) {
             await session.abortTransaction();
@@ -210,16 +242,32 @@ class EmployeeService {
             .skip(skipNum)
             .limit(limitNum);
         const employeeIds = employees.map(emp => emp._id);
-        const users = await User_js_1.User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId ssoData role');
-        const userMap = new Map(users.map(u => [u.employeeId?.toString(), { userId: u._id.toString(), ssoData: u.ssoData, role: u.role }]));
+        const employeeEmails = employees.map(emp => emp.email.toLowerCase().trim());
+        const users = await User_js_1.User.find({
+            organizationId: orgId,
+            $or: [
+                { employeeId: { $in: employeeIds } },
+                { email: { $in: employeeEmails } }
+            ]
+        }).select('_id employeeId email ssoData role isLoginApproved');
+        const userMap = new Map();
+        for (const u of users) {
+            if (u.employeeId) {
+                userMap.set(u.employeeId.toString(), { userId: u._id.toString(), ssoData: u.ssoData, role: u.role, isLoginApproved: u.isLoginApproved });
+            }
+            if (u.email) {
+                userMap.set(u.email.toLowerCase().trim(), { userId: u._id.toString(), ssoData: u.ssoData, role: u.role, isLoginApproved: u.isLoginApproved });
+            }
+        }
         const enrichedEmployees = employees.map(emp => {
             const empObj = emp.toObject();
-            const userData = userMap.get(emp._id.toString()) || null;
+            const userData = userMap.get(emp._id.toString()) || userMap.get(emp.email.toLowerCase().trim()) || null;
             return {
                 ...empObj,
                 userId: userData?.userId || null,
                 ssoData: userData?.ssoData || null,
-                role: userData?.role || 'EMPLOYEE'
+                role: userData?.role || 'EMPLOYEE',
+                isLoginApproved: userData?.isLoginApproved !== false,
             };
         });
         return { employees: enrichedEmployees, total, page: pageNum, limit: limitNum };
@@ -234,12 +282,19 @@ class EmployeeService {
         if (!employee) {
             throw new Error('Employee not found');
         }
-        const user = await User_js_1.User.findOne({ employeeId: employee._id, organizationId: orgId }).select('_id ssoData');
+        const user = await User_js_1.User.findOne({
+            $or: [
+                { employeeId: employee._id },
+                { email: { $regex: new RegExp(`^${employee.email}$`, 'i') } }
+            ],
+            organizationId: orgId
+        }).select('_id ssoData isLoginApproved');
         const empObj = employee.toObject();
         return {
             ...empObj,
             userId: user?._id.toString() || null,
-            ssoData: user?.ssoData || null
+            ssoData: user?.ssoData || null,
+            isLoginApproved: user?.isLoginApproved !== false,
         };
     }
     /**
@@ -471,6 +526,7 @@ class EmployeeService {
                             role: 'EMPLOYEE',
                             employeeId: employee._id,
                             isActive: true,
+                            isLoginApproved: false,
                             ssoData
                         });
                     }
@@ -509,6 +565,7 @@ class EmployeeService {
                         role: 'EMPLOYEE',
                         employeeId: employee._id,
                         isActive: true,
+                        isLoginApproved: false,
                         ssoData: {
                             provider: 'MICROSOFT',
                             azureRoles: msUser.roles || [],

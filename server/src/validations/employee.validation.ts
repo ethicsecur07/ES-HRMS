@@ -57,6 +57,7 @@ export const updateEmployeeSchema = z.object({
       phone: z.string().min(10).optional(),
     }).optional(),
     isActive: z.boolean().optional(),
+    isLoginApproved: z.boolean().optional(),
     branchId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid branch ID').optional(),
     costCenterId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid cost center ID').optional(),
     primaryManagerId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid manager ID').optional(),
