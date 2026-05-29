@@ -58,6 +58,7 @@ exports.updateEmployeeSchema = zod_1.z.object({
             phone: zod_1.z.string().min(10).optional(),
         }).optional(),
         isActive: zod_1.z.boolean().optional(),
+        isLoginApproved: zod_1.z.boolean().optional(),
         branchId: zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid branch ID').optional(),
         costCenterId: zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid cost center ID').optional(),
         primaryManagerId: zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid manager ID').optional(),

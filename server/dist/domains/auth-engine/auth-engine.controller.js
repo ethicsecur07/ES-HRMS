@@ -211,6 +211,13 @@ const handleSSOCallback = async (req, res) => {
             res.status(403).json({ success: false, message: 'Account is deactivated' });
             return;
         }
+        if (user.isLoginApproved === false) {
+            res.status(403).json({
+                success: false,
+                message: 'Your login request has not been approved by an administrator yet. Please contact your organization.',
+            });
+            return;
+        }
         // Register device
         const { device, isNewDevice } = await DeviceManagementService_js_1.DeviceManagementService.registerDevice({
             userId: user._id.toString(),

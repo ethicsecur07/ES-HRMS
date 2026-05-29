@@ -129,7 +129,7 @@ export const updateEmployee = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const employee = await EmployeeService.updateEmployee(id, req.body, orgId, emailForAudit);
+    const employee = await EmployeeService.updateEmployee(id, req.body, orgId, emailForAudit, req.user?.role);
 
     res.status(200).json({ employee });
   } catch (error: any) {

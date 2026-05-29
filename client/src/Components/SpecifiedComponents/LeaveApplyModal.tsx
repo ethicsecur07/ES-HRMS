@@ -117,7 +117,7 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
       onClose();
     },
     onError: (err: any) => {
-      const errMsg = err.response?.data?.message || 'Could not submit application. Please try again.';
+      const errMsg = err.response?.data?.message || err.message || 'Could not submit application. Please try again.';
       addToast('Submission Failed', errMsg, 'error');
     },
   });
@@ -129,6 +129,15 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Apply Leave / WFH / Permission" maxWidth="max-w-xl">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-2  px-2 text-left">
+        {applyMutation.isError && (
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold space-y-1 mb-2 animate-in fade-in duration-200">
+            <p className="uppercase tracking-wider font-extrabold text-[10px]">Submission Failed</p>
+            <p className="font-semibold leading-relaxed">
+              {applyMutation.error?.response?.data?.message || applyMutation.error?.message || 'Could not submit application.'}
+            </p>
+          </div>
+        )}
+
         <Select
           label="Request Type *"
           {...register('leaveType')}

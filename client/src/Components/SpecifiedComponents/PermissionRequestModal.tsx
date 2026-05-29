@@ -66,7 +66,7 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({ 
       onClose();
     },
     onError: (err: any) => {
-      const errMsg = err.response?.data?.message || 'Could not submit permission request.';
+      const errMsg = err.response?.data?.message || err.message || 'Could not submit permission request.';
       addToast('Submission Failed', errMsg, 'error');
     },
   });
@@ -81,6 +81,15 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({ 
         <div className="p-3 bg-muted rounded-xl text-xs text-muted-foreground leading-relaxed">
           <span className="font-bold text-foreground">Company Policy:</span> Employees are eligible for up to 3 hours of permission per month for personal errands.
         </div>
+
+        {applyMutation.isError && (
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold space-y-1 animate-in fade-in duration-200">
+            <p className="uppercase tracking-wider font-extrabold text-[10px]">Submission Failed</p>
+            <p className="font-semibold leading-relaxed">
+              {applyMutation.error?.response?.data?.message || applyMutation.error?.message || 'Could not submit permission request.'}
+            </p>
+          </div>
+        )}
 
         <Input label="Permission Date *" type="date" {...register('date')} error={errors.date?.message} />
 

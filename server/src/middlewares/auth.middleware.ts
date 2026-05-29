@@ -85,6 +85,11 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         return;
       }
 
+      if (user.isLoginApproved === false) {
+        res.status(401).json({ message: 'Your login request has not been approved by an administrator yet. Please contact your organization.' });
+        return;
+      }
+
       // Update session activity
       session.lastActivity = new Date();
       await session.save();

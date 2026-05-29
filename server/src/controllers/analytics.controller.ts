@@ -301,6 +301,7 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
       officeWiFiIPs: org.settings?.allowedIPs || ['127.0.0.1', '::1'],
       adminEmail: org.settings?.adminEmail || '',
       activeWorkdays: org.settings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      loginApprovalRoles: org.settings?.loginApprovalRoles || ['ADMIN'],
     };
     res.status(200).json({
       ...settingsData,
@@ -324,7 +325,7 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
     const oldLeaveLimit = org.settings?.monthlyLeaveLimit || 2;
     const oldPermissionHours = org.settings?.monthlyPermissionHours || 3;
 
-    const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, salaryCycleStartDay, officeWiFiIPs, adminEmail, activeWorkdays } = req.body;
+    const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, salaryCycleStartDay, officeWiFiIPs, adminEmail, activeWorkdays, loginApprovalRoles } = req.body;
     
     const newSalaryCycleStartDay = Number(salaryCycleStartDay) || 1;
     const newLeaveLimit = Number(monthlyLeaveLimit) || 2;
@@ -363,6 +364,10 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
     
     if (activeWorkdays && Array.isArray(activeWorkdays)) {
       org.settings.activeWorkdays = activeWorkdays;
+    }
+
+    if (loginApprovalRoles && Array.isArray(loginApprovalRoles)) {
+      org.settings.loginApprovalRoles = loginApprovalRoles;
     }
 
     // Tell Mongoose the nested settings object has changed

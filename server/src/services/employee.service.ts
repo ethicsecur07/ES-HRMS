@@ -6,6 +6,7 @@ import { createAuditLog } from './auditLog.service.js';
 import { Department } from '../models/Department.js';
 import { Designation } from '../models/Designation.js';
 import { OrganizationAuthConfig } from '../models/OrganizationAuthConfig.js';
+import { Organization } from '../models/Organization.js';
 
 export interface EmployeeQueryOptions {
   search?: string;
@@ -76,6 +77,7 @@ export class EmployeeService {
         role: 'EMPLOYEE',
         employeeId: employee._id,
         isActive: true,
+        isLoginApproved: false,
       }], { session });
 
       await createAuditLog(
@@ -100,7 +102,7 @@ export class EmployeeService {
   /**
    * Updates employee record and synchronizes User credentials.
    */
-  static async updateEmployee(id: string, updateData: any, orgId: mongoose.Types.ObjectId | string, emailForAudit: string) {
+  static async updateEmployee(id: string, updateData: any, orgId: mongoose.Types.ObjectId | string, emailForAudit: string, userRole?: string) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -147,9 +149,27 @@ export class EmployeeService {
       if (updateData.email) userUpdate.email = updateData.email.toLowerCase().trim();
       if (updateData.isActive !== undefined) userUpdate.isActive = updateData.isActive;
 
+      if (updateData.isLoginApproved !== undefined) {
+        const organization = await Organization.findById(orgId).session(session);
+        const allowedRoles = organization?.settings?.loginApprovalRoles || ['ADMIN'];
+        if (userRole !== 'ADMIN' && !allowedRoles.includes(userRole || '')) {
+          throw new Error('Forbidden: You do not have permission to approve/disapprove logins.');
+        }
+        userUpdate.isLoginApproved = updateData.isLoginApproved === true || updateData.isLoginApproved === 'true';
+      }
+
       if (Object.keys(userUpdate).length > 0) {
+        // Automatically link the employeeId if it's missing on the User document
+        userUpdate.employeeId = employee._id;
+
         await User.findOneAndUpdate(
-          { employeeId: employee._id, organizationId: orgId },
+          {
+            $or: [
+              { employeeId: employee._id },
+              { email: employee.email.toLowerCase().trim() }
+            ],
+            organizationId: orgId
+          },
           userUpdate,
           { session }
         );
@@ -164,8 +184,24 @@ export class EmployeeService {
         orgId
       );
 
+      const user = await User.findOne({
+        $or: [
+          { employeeId: employee._id },
+          { email: employee.email.toLowerCase().trim() }
+        ],
+        organizationId: orgId
+      }).session(session).select('_id ssoData isLoginApproved role');
+
       await session.commitTransaction();
-      return employee;
+
+      const empObj = employee.toObject();
+      return {
+        ...empObj,
+        userId: user?._id.toString() || null,
+        ssoData: user?.ssoData || null,
+        role: user?.role || 'EMPLOYEE',
+        isLoginApproved: user?.isLoginApproved !== false,
+      };
     } catch (error) {
       await session.abortTransaction();
       throw error;
@@ -258,17 +294,34 @@ export class EmployeeService {
       .limit(limitNum);
 
     const employeeIds = employees.map(emp => emp._id);
-    const users = await User.find({ employeeId: { $in: employeeIds }, organizationId: orgId }).select('_id employeeId ssoData role');
-    const userMap = new Map(users.map(u => [u.employeeId?.toString(), { userId: u._id.toString(), ssoData: u.ssoData, role: u.role }]));
+    const employeeEmails = employees.map(emp => emp.email.toLowerCase().trim());
+    const users = await User.find({
+      organizationId: orgId,
+      $or: [
+        { employeeId: { $in: employeeIds } },
+        { email: { $in: employeeEmails } }
+      ]
+    }).select('_id employeeId email ssoData role isLoginApproved');
+
+    const userMap = new Map();
+    for (const u of users) {
+      if (u.employeeId) {
+        userMap.set(u.employeeId.toString(), { userId: u._id.toString(), ssoData: u.ssoData, role: u.role, isLoginApproved: u.isLoginApproved });
+      }
+      if (u.email) {
+        userMap.set(u.email.toLowerCase().trim(), { userId: u._id.toString(), ssoData: u.ssoData, role: u.role, isLoginApproved: u.isLoginApproved });
+      }
+    }
 
     const enrichedEmployees = employees.map(emp => {
       const empObj = emp.toObject();
-      const userData = userMap.get(emp._id.toString()) || null;
+      const userData = userMap.get(emp._id.toString()) || userMap.get(emp.email.toLowerCase().trim()) || null;
       return {
         ...empObj,
         userId: userData?.userId || null,
         ssoData: userData?.ssoData || null,
-        role: userData?.role || 'EMPLOYEE'
+        role: userData?.role || 'EMPLOYEE',
+        isLoginApproved: userData?.isLoginApproved !== false,
       };
     });
 
@@ -285,12 +338,19 @@ export class EmployeeService {
     if (!employee) {
       throw new Error('Employee not found');
     }
-    const user = await User.findOne({ employeeId: employee._id, organizationId: orgId }).select('_id ssoData');
+    const user = await User.findOne({
+      $or: [
+        { employeeId: employee._id },
+        { email: { $regex: new RegExp(`^${employee.email}$`, 'i') } }
+      ],
+      organizationId: orgId
+    }).select('_id ssoData isLoginApproved');
     const empObj = employee.toObject();
     return {
       ...empObj,
       userId: user?._id.toString() || null,
-      ssoData: user?.ssoData || null
+      ssoData: user?.ssoData || null,
+      isLoginApproved: user?.isLoginApproved !== false,
     };
   }
 
@@ -557,6 +617,7 @@ export class EmployeeService {
               role: 'EMPLOYEE',
               employeeId: employee._id,
               isActive: true,
+              isLoginApproved: false,
               ssoData
             });
           }
@@ -595,6 +656,7 @@ export class EmployeeService {
             role: 'EMPLOYEE',
             employeeId: employee._id,
             isActive: true,
+            isLoginApproved: false,
             ssoData: {
               provider: 'MICROSOFT',
               azureRoles: msUser.roles || [],

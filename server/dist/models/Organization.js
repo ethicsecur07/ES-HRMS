@@ -65,6 +65,7 @@ const organizationSchema = new mongoose_1.Schema({
         salaryCycleStartDay: { type: Number, default: 1, min: 1, max: 31 },
         allowedIPs: { type: [String], default: ['127.0.0.1', '::1'] },
         adminEmail: { type: String },
+        loginApprovalRoles: { type: [String], default: ['ADMIN'] },
     },
 }, { timestamps: true });
 exports.Organization = mongoose_1.default.model('Organization', organizationSchema);

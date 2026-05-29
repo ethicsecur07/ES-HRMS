@@ -10,6 +10,7 @@ export interface IUser extends Document {
   role: keyof typeof ROLES;
   employeeId?: mongoose.Types.ObjectId;
   isActive: boolean;
+  isLoginApproved: boolean;
   lastLogin?: Date;
   mfaEnabled: boolean;
   mfaSecret?: string;
@@ -39,6 +40,7 @@ const userSchema = new Schema<IUser>(
     role: { type: String, enum: Object.values(ROLES), default: ROLES.EMPLOYEE },
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee' },
     isActive: { type: Boolean, default: true },
+    isLoginApproved: { type: Boolean, default: true },
     lastLogin: { type: Date },
     mfaEnabled: { type: Boolean, default: false },
     mfaSecret: { type: String, select: false },

@@ -350,6 +350,7 @@ export const SettingsPage: React.FC = () => {
   const [officeIPs, setOfficeIPs] = useState<string[]>([]);
   const [newIP, setNewIP] = useState('');
   const [activeWorkdays, setActiveWorkdays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  const [loginApprovalRoles, setLoginApprovalRoles] = useState<string[]>(['ADMIN']);
 
   useEffect(() => {
     if (settings) {
@@ -363,6 +364,7 @@ export const SettingsPage: React.FC = () => {
       if (settings.activeWorkdays) {
         setActiveWorkdays(settings.activeWorkdays);
       }
+      setLoginApprovalRoles(settings.loginApprovalRoles || ['ADMIN']);
     }
   }, [settings]);
 
@@ -410,6 +412,7 @@ export const SettingsPage: React.FC = () => {
       salaryCycleStartDay,
       officeWiFiIPs: officeIPs,
       activeWorkdays,
+      loginApprovalRoles,
     });
   };
 
@@ -607,6 +610,36 @@ export const SettingsPage: React.FC = () => {
               <Input label="WFH Limit (Days/Month) *" type="number" value={monthlyWFHLimit} onChange={(e) => setMonthlyWFHLimit(Number(e.target.value))} required />
               <Input label="Permission Limit (Hours/Month) *" type="number" value={monthlyPermissionHours} onChange={(e) => setMonthlyPermissionHours(Number(e.target.value))} required />
               <Input label="Salary & Attendance Cycle Start Day (1-31) *" type="number" value={salaryCycleStartDay} onChange={(e) => setSalaryCycleStartDay(Number(e.target.value))} min={1} max={31} required />
+            </div>
+          </Card>
+
+          <Card className="space-y-6 border-l-4 border-l-primary shadow-md">
+            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Login Approval Permissions</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Select which roles are permitted to approve employee accounts for login access. (Admin accounts always retain approval rights).
+            </p>
+            <div className="flex flex-wrap gap-6 pt-2">
+              {[
+                { label: 'HR Role', value: 'HR' },
+                { label: 'Manager Role', value: 'MANAGER' },
+                { label: 'Team Lead Role', value: 'TEAM_LEAD' }
+              ].map((roleOption) => (
+                <label key={roleOption.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
+                    checked={loginApprovalRoles.includes(roleOption.value)}
+                    onChange={() => {
+                      setLoginApprovalRoles(prev => 
+                        prev.includes(roleOption.value) 
+                          ? prev.filter(r => r !== roleOption.value) 
+                          : [...prev, roleOption.value]
+                      );
+                    }}
+                  />
+                  {roleOption.label}
+                </label>
+              ))}
             </div>
           </Card>
 
