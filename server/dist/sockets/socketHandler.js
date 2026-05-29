@@ -6,6 +6,17 @@ const logger_js_1 = require("../utils/logger.js");
 const jwt_js_1 = require("../utils/jwt.js");
 const UserSession_js_1 = require("../models/UserSession.js");
 let ioInstance = null;
+// Online presence map: userId -> { organizationId, socketIds } (supports multi-tab)
+const onlineUsers = new Map();
+const getOnlineUserIdsByOrg = (orgId) => {
+    const ids = [];
+    for (const [userId, data] of onlineUsers.entries()) {
+        if (data.organizationId === orgId) {
+            ids.push(userId);
+        }
+    }
+    return ids;
+};
 const initSockets = (httpServer) => {
     const io = new socket_io_1.Server(httpServer, {
         cors: {
@@ -38,8 +49,6 @@ const initSockets = (httpServer) => {
                     EMPLOYEE: { role: 'EMPLOYEE', email: 'logapriyan@ethicsec.com' },
                 };
                 const targetUser = mockUsers[demoRole] || mockUsers.EMPLOYEE;
-                // In sockets, we can't easily use await without importing User model, but we can do it if needed.
-                // Actually, we can just import User at the top and await it.
                 const { User } = await import('../models/User.js');
                 const dbUser = await User.findOne({ email: new RegExp('^' + targetUser.email + '$', 'i') });
                 if (dbUser) {
@@ -76,33 +85,77 @@ const initSockets = (httpServer) => {
     io.on('connection', (socket) => {
         const user = socket.user;
         logger_js_1.logger.info(`Socket connected: ${socket.id} (User: ${user?.email})`);
-        // Auto-join standard rooms
+        // ── Auto-join standard rooms ──────────────────────────────────────────
         if (user) {
             socket.join(`org_${user.organizationId}`);
             socket.join(`user_${user.id}`);
             socket.join(`role_${user.role}`);
             socket.join(`org_${user.organizationId}_role_${user.role}`);
-            logger_js_1.logger.info(`Socket ${socket.id} joined rooms: org_${user.organizationId}, user_${user.id}, role_${user.role}, org_${user.organizationId}_role_${user.role}`);
+            logger_js_1.logger.info(`Socket ${socket.id} joined rooms: org_${user.organizationId}, user_${user.id}, role_${user.role}`);
+            // ── Online Presence Tracking ─────────────────────────────────────────
+            // IMPORTANT: Add user to map FIRST, then emit so the list is complete
+            if (!onlineUsers.has(user.id)) {
+                onlineUsers.set(user.id, { organizationId: user.organizationId, socketIds: new Set() });
+            }
+            onlineUsers.get(user.id).socketIds.add(socket.id);
+            // Broadcast to ALL org members (including self) that this user is online
+            io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
+            // Send the FULL current list of online users in this organization to only the newly connected socket
+            socket.emit('online_users', getOnlineUserIdsByOrg(user.organizationId));
         }
-        socket.on('join_room', (role) => {
-            socket.join(role);
-            logger_js_1.logger.info(`Socket ${socket.id} joined room: ${role}`);
+        // ── Group/Broadcast room join ──────────────────────────────────────────
+        socket.on('join_room', (roomId) => {
+            socket.join(roomId);
+            logger_js_1.logger.info(`Socket ${socket.id} joined room: ${roomId}`);
         });
         socket.on('join_project_board', (projectId) => {
             const room = `project_${projectId}`;
             socket.join(room);
             logger_js_1.logger.info(`Socket ${socket.id} joined project board room: ${room}`);
         });
+        // ── Legacy Notification Event ──────────────────────────────────────────
         socket.on('send_notification', (data) => {
-            // Validate sender context matches room organization to prevent cross-tenant message injection
             if (user && data.organizationId && user.organizationId !== data.organizationId) {
                 logger_js_1.logger.warn(`Cross-tenant notification attempt blocked for user ${user.email}`);
                 return;
             }
             io.to(data.targetRole).emit('receive_notification', data);
         });
+        // ── Typing Indicators ──────────────────────────────────────────────────
+        socket.on('typing_start', ({ receiverId }) => {
+            if (!user)
+                return;
+            if (receiverId.startsWith('group_') || receiverId === 'broadcast') {
+                io.to(receiverId).emit('user_typing', { userId: user.id, receiverId });
+            }
+            else {
+                io.to(`user_${receiverId}`).emit('user_typing', { userId: user.id, receiverId });
+            }
+        });
+        socket.on('typing_stop', ({ receiverId }) => {
+            if (!user)
+                return;
+            if (receiverId.startsWith('group_') || receiverId === 'broadcast') {
+                io.to(receiverId).emit('user_stop_typing', { userId: user.id, receiverId });
+            }
+            else {
+                io.to(`user_${receiverId}`).emit('user_stop_typing', { userId: user.id, receiverId });
+            }
+        });
+        // ── Disconnect ──────────────────────────────────────────────────────────
         socket.on('disconnect', () => {
             logger_js_1.logger.info(`Socket disconnected: ${socket.id}`);
+            if (user) {
+                const userData = onlineUsers.get(user.id);
+                if (userData) {
+                    userData.socketIds.delete(socket.id);
+                    // Only mark user as offline when ALL their sockets disconnect (multi-tab support)
+                    if (userData.socketIds.size === 0) {
+                        onlineUsers.delete(user.id);
+                        io.to(`org_${user.organizationId}`).emit('user_offline', { userId: user.id });
+                    }
+                }
+            }
         });
     });
     return io;

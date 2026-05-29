@@ -131,7 +131,7 @@ export const App: React.FC = () => {
 
   if (isLoading || isAuthLoading) {
     const statusText = isLoading 
-      ? 'Loading Workspace Settings...' 
+      ? '' 
       : 'Authenticating Session...';
     return (
       <div className="flex items-center justify-center h-screen bg-slate-950 text-indigo-400 font-semibold">
@@ -140,7 +140,7 @@ export const App: React.FC = () => {
           <p className="text-xs tracking-wider uppercase text-slate-400">{statusText}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (

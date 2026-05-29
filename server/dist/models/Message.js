@@ -38,7 +38,12 @@ const mongoose_1 = __importStar(require("mongoose"));
 const messageSchema = new mongoose_1.Schema({
     senderId: { type: String, required: true, index: true },
     receiverId: { type: String, required: true, index: true },
-    content: { type: String, required: true },
+    content: { type: String, default: '' },
+    messageType: { type: String, enum: ['text', 'file', 'image'], default: 'text' },
+    fileUrl: { type: String },
+    fileName: { type: String },
+    fileSize: { type: Number },
+    fileType: { type: String },
     read: { type: Boolean, default: false },
 }, { timestamps: true });
 exports.Message = mongoose_1.default.model('Message', messageSchema);
