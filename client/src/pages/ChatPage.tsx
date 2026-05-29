@@ -396,7 +396,10 @@ export const ChatPage: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-extrabold text-base text-foreground tracking-tight">Messages</h2>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px_2px_hsl(var(--primary)/0.3)]"></span>
+              <span
+                className="w-2 h-2 rounded-full bg-primary animate-pulse"
+                style={{ boxShadow: '0 0 6px 2px hsl(var(--primary) / 0.3)' }}
+              ></span>
               <span className="text-[10px] text-muted-foreground font-semibold">{otherOnlineCount > 0 ? `${onlineUserIds.length} online` : 'online'}</span>
             </div>
           </div>
@@ -464,27 +467,30 @@ export const ChatPage: React.FC = () => {
                             : <span className="bg-gradient-to-br from-primary/40 to-primary/20 text-primary w-full h-full flex items-center justify-center">{emp.fullName.charAt(0).toUpperCase()}</span>
                           }
                         </div>
-                        <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${online ? 'bg-primary shadow-[0_0_4px_1px_hsl(var(--primary)/0.4)]' : 'bg-muted-foreground/65'}`}></span>
+                        <span
+                          className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${online ? 'bg-primary' : 'bg-muted-foreground/65'}`}
+                          style={online ? { boxShadow: '0 0 4px 1px hsl(var(--primary) / 0.4)' } : undefined}
+                        ></span>
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className={`text-xs truncate ${unread > 0 ? 'font-bold text-foreground' : 'font-semibold text-foreground/90'}`}>{emp.fullName}</span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {unread > 0 && !isSelected && (
-                              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-extrabold flex items-center justify-center shadow-lg shadow-primary/40 animate-pulse">
-                                {unread > 99 ? '99+' : unread}
-                              </span>
-                            )}
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${getRoleBadgeClass((emp as any).role || '')}`}>
-                              {(emp as any).role || 'Staff'}
-                            </span>
-                          </div>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase shrink-0 ${getRoleBadgeClass((emp as any).role || '')}`}>
+                            {(emp as any).role || 'Staff'}
+                          </span>
                         </div>
-                        <div className="text-[10px] truncate mt-0.5">
-                          {online
-                            ? <span className="text-primary font-semibold">● Online</span>
-                            : <span className="text-muted-foreground">{emp.designation}</span>
-                          }
+                        <div className="flex items-center justify-between text-[10px] mt-0.5 min-w-0">
+                          <div className="truncate pr-2">
+                            {online
+                              ? <span className="text-primary font-semibold">● Online</span>
+                              : <span className="text-muted-foreground">{emp.designation}</span>
+                            }
+                          </div>
+                          {unread > 0 && !isSelected && (
+                            <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-primary text-primary-foreground text-[9px] font-extrabold flex items-center justify-center shadow-lg shadow-primary/40 animate-pulse shrink-0">
+                              {unread > 99 ? '99+' : unread}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </button>
