@@ -39,6 +39,7 @@ import leavePolicyRoutes from './routes/leavePolicy.routes.js';
 import expenseRoutes from './routes/expense.routes.js';
 import projectRoutes from './domains/project-management/project.routes.js';
 import recruitmentRoutes from './domains/recruitment/recruitment.routes.js';
+import applicantRoutes from './routes/applicant.routes.js';
 import chatRoutes from './domains/chat/chat.routes.js';
 import notificationRoutes from './domains/notification/notification.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
@@ -99,6 +100,7 @@ app.use('/metrics', metricsMiddleware);
 
   app.use('/api/projects', projectRoutes);
   app.use('/api/recruitment', recruitmentRoutes);
+  app.use('/api/applicants', applicantRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/reports', reportsRoutes);

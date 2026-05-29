@@ -15,6 +15,7 @@ import { Role } from '../models/Role.js';
 import { Permission } from '../models/Permission.js';
 import { Designation } from '../models/Designation.js';
 import { LeavePolicy } from '../models/LeavePolicy.js';
+import { OfferTemplate } from '../models/OfferTemplate.js';
 import { logger } from '../utils/logger.js';
 import { ROLES } from '../constants/index.js';
 import { PasswordService } from '../domains/auth-engine/services/PasswordService.js';
@@ -61,6 +62,7 @@ export const seedDatabase = async (): Promise<void> => {
         logger.info('Seeded missing Team Lead user.');
       }
 
+      await seedOfferTemplate(orgId);
       await syncRolePermissions(orgId);
       return;
     }
@@ -155,6 +157,7 @@ export const seedDatabase = async (): Promise<void> => {
     const createdUsers = await User.insertMany(usersData);
     logger.info(`✅ Seeded ${createdUsers.length} System Users (Admin & HR). Employees will be synced from Microsoft Directory.`);
 
+    await seedOfferTemplate(orgId);
     await syncRolePermissions(orgId);
 
     logger.info('🚀 Database Seeding Completed Successfully! Enterprise HRMS is ready with clean state.');
@@ -162,6 +165,36 @@ export const seedDatabase = async (): Promise<void> => {
     logger.error('❌ Database Seeding Failed:', { error });
   }
 };
+
+const seedOfferTemplate = async (orgId: mongoose.Types.ObjectId): Promise<void> => {
+  try {
+    const templateExists = await OfferTemplate.findOne({ organizationId: orgId });
+    if (!templateExists) {
+      await OfferTemplate.create({
+        name: 'Default Offer Template',
+        subject: 'Job Offer: {{appliedRole}} - ES EthicSecur SofTec Pvt Ltd',
+        bodyText: `Dear {{candidateName}},
+
+We are pleased to offer you the position of {{appliedRole}} at ES EthicSecur SofTec for a period of {{duration}}, starting from {{startDate}}. This is a {{stipendDetails}} designed to provide practical exposure to real-time web application development and industry-level projects.
+
+During the internship, you will work with technologies including {{technologies}}, along with frontend and backend development tasks, debugging, testing, and project support under the guidance of our technical team. You are expected to maintain professionalism, confidentiality, and follow company policies throughout the internship period..
+
+We look forward to welcoming you to our team and are confident that your skills and dedication will make a valuable contribution to ES EthicSecur SofTec Pvt Ltd. Please confirm your acceptance of this offer by signing and returning a copy of this letter.`,
+        footerPhone: '755028487',
+        footerEmail: 'info@ethicsecur.com',
+        footerWebsite: 'www.ethicsecur.com',
+        footerAddress: '2nd floor , nv arcade building, near 5 roads, next to reliance mall, salem-636004',
+        signatoryName: 'ES EthicSecur SofTec Private Limited',
+        signatoryTitle: 'HR Department',
+        organizationId: orgId
+      });
+      logger.info('✅ Seeded default Offer Letter Template in database.');
+    }
+  } catch (error) {
+    logger.error('Failed to seed offer template:', error);
+  }
+};
+
 
 export const syncRolePermissions = async (orgId: mongoose.Types.ObjectId): Promise<void> => {
   const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');

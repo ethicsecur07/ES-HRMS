@@ -21,6 +21,7 @@ const Role_js_1 = require("../models/Role.js");
 const Permission_js_1 = require("../models/Permission.js");
 const Designation_js_1 = require("../models/Designation.js");
 const LeavePolicy_js_1 = require("../models/LeavePolicy.js");
+const OfferTemplate_js_1 = require("../models/OfferTemplate.js");
 const logger_js_1 = require("../utils/logger.js");
 const index_js_1 = require("../constants/index.js");
 const PasswordService_js_1 = require("../domains/auth-engine/services/PasswordService.js");
@@ -62,6 +63,7 @@ const seedDatabase = async () => {
                 await User_js_1.User.create({ _id: new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79505'), organizationId: orgId, name: 'Karthik', email: 'karthik@ethicsecur.com', password: await PasswordService_js_1.PasswordService.hashPassword('EthicSec@2026'), role: index_js_1.ROLES.TEAM_LEAD, isActive: true });
                 logger_js_1.logger.info('Seeded missing Team Lead user.');
             }
+            await seedOfferTemplate(orgId);
             await (0, exports.syncRolePermissions)(orgId);
             return;
         }
@@ -143,6 +145,7 @@ const seedDatabase = async () => {
         ];
         const createdUsers = await User_js_1.User.insertMany(usersData);
         logger_js_1.logger.info(`✅ Seeded ${createdUsers.length} System Users (Admin & HR). Employees will be synced from Microsoft Directory.`);
+        await seedOfferTemplate(orgId);
         await (0, exports.syncRolePermissions)(orgId);
         logger_js_1.logger.info('🚀 Database Seeding Completed Successfully! Enterprise HRMS is ready with clean state.');
     }
@@ -151,6 +154,35 @@ const seedDatabase = async () => {
     }
 };
 exports.seedDatabase = seedDatabase;
+const seedOfferTemplate = async (orgId) => {
+    try {
+        const templateExists = await OfferTemplate_js_1.OfferTemplate.findOne({ organizationId: orgId });
+        if (!templateExists) {
+            await OfferTemplate_js_1.OfferTemplate.create({
+                name: 'Default Offer Template',
+                subject: 'Job Offer: {{appliedRole}} - ES EthicSecur SofTec Pvt Ltd',
+                bodyText: `Dear {{candidateName}},
+
+We are pleased to offer you the position of {{appliedRole}} at ES EthicSecur SofTec for a period of {{duration}}, starting from {{startDate}}. This is a {{stipendDetails}} designed to provide practical exposure to real-time web application development and industry-level projects.
+
+During the internship, you will work with technologies including {{technologies}}, along with frontend and backend development tasks, debugging, testing, and project support under the guidance of our technical team. You are expected to maintain professionalism, confidentiality, and follow company policies throughout the internship period..
+
+We look forward to welcoming you to our team and are confident that your skills and dedication will make a valuable contribution to ES EthicSecur SofTec Pvt Ltd. Please confirm your acceptance of this offer by signing and returning a copy of this letter.`,
+                footerPhone: '755028487',
+                footerEmail: 'info@ethicsecur.com',
+                footerWebsite: 'www.ethicsecur.com',
+                footerAddress: '2nd floor , nv arcade building, near 5 roads, next to reliance mall, salem-636004',
+                signatoryName: 'ES EthicSecur SofTec Private Limited',
+                signatoryTitle: 'HR Department',
+                organizationId: orgId
+            });
+            logger_js_1.logger.info('✅ Seeded default Offer Letter Template in database.');
+        }
+    }
+    catch (error) {
+        logger_js_1.logger.error('Failed to seed offer template:', error);
+    }
+};
 const syncRolePermissions = async (orgId) => {
     const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');
     await PermissionSyncService.syncForTenant(orgId);

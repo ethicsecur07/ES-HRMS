@@ -11,6 +11,8 @@ import { Button } from '../Components/WrapperComponents/Button';
 import { usePermission } from '../hooks/usePermission';
 import { Input } from '../Components/WrapperComponents/Input';
 import { Modal } from '../Components/WrapperComponents/Modal';
+import { OfferLetterModal } from '../Components/SpecifiedComponents/OfferLetterModal';
+import { EvaluationModal } from '../Components/SpecifiedComponents/EvaluationModal';
 import { 
   Users, 
   Plus, 
@@ -19,7 +21,11 @@ import {
   Mail, 
   Phone, 
   Briefcase,
-  FileText
+  FileText,
+  Trash2,
+  Edit3,
+  Star,
+  ClipboardCheck
 } from 'lucide-react';
 import { formatDate } from '../utils/formatters';
 
@@ -53,8 +59,26 @@ export const RecruitmentPage: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerCandidate, setOfferCandidate] = useState<Candidate | null>(null);
   
+  const [showEvalModal, setShowEvalModal] = useState(false);
+  const [evalCandidate, setEvalCandidate] = useState<Candidate | null>(null);
+  
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editCandidate, setEditCandidate] = useState<Candidate | null>(null);
+
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    appliedRole: '',
+    resumeUrl: ''
+  });
+
+  const [editFormData, setEditFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
@@ -75,6 +99,34 @@ export const RecruitmentPage: React.FC = () => {
       addToast('Candidate Added', 'New candidate added to the pipeline.', 'success');
       setShowAddModal(false);
       setFormData({ firstName: '', lastName: '', email: '', phone: '', appliedRole: '', resumeUrl: '' });
+    },
+    onError: (error: any) => {
+      const errMsg = error?.response?.data?.message || error.message || 'Could not add candidate.';
+      addToast('Add Candidate Failed', errMsg, 'error');
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Candidate> }) => recruitmentApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      addToast('Candidate Updated', 'Candidate details were successfully updated.', 'success');
+      setShowEditModal(false);
+      setEditCandidate(null);
+    },
+    onError: (error: any) => {
+      addToast('Update Failed', error?.response?.data?.message || 'Could not update candidate.', 'error');
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: recruitmentApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      addToast('Candidate Deleted', 'Candidate was removed from the pipeline.', 'success');
+    },
+    onError: (error: any) => {
+      addToast('Delete Failed', error?.response?.data?.message || 'Could not delete candidate.', 'error');
     }
   });
 
@@ -120,6 +172,15 @@ export const RecruitmentPage: React.FC = () => {
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
     const newStage = destination.droppableId as RecruitmentStage;
+
+    if (newStage === 'OFFER') {
+      const cand = candidates.find(c => c._id === draggableId);
+      if (cand) {
+        setOfferCandidate(cand);
+        setShowOfferModal(true);
+      }
+      return;
+    }
     
     // Optimistic update
     queryClient.setQueryData<Candidate[]>(['candidates'], (old) => {
@@ -128,6 +189,17 @@ export const RecruitmentPage: React.FC = () => {
     });
 
     updateStageMutation.mutate({ id: draggableId, stage: newStage });
+  };
+
+  const getDownloadUrl = (candidateId: string) => {
+    const envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+    let baseUrl = '';
+    if (envApiUrl && !envApiUrl.includes('localhost')) {
+      baseUrl = envApiUrl;
+    } else {
+      baseUrl = `${window.location.protocol}//${window.location.hostname}:5000/api`;
+    }
+    return `${baseUrl.replace(/\/$/, '')}/recruitment/${candidateId}/offer-letter?token=${token}`;
   };
 
   const filteredCandidates = candidates.filter(c => 
@@ -144,6 +216,12 @@ export const RecruitmentPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createMutation.mutate(formData);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCandidate) return;
+    updateMutation.mutate({ id: editCandidate._id, data: editFormData });
   };
 
   if (isLoading) {
@@ -219,7 +297,7 @@ export const RecruitmentPage: React.FC = () => {
                                 snapshot.isDragging ? 'shadow-lg border-primary ring-1 ring-primary/20 opacity-90' : 'border-border hover:border-primary/30'
                               }`}
                             >
-                              <div className="flex justify-between items-start mb-2">
+                              <div className="flex justify-between items-start mb-2 text-left">
                                 <div>
                                   <h4 className="font-bold text-sm text-foreground">{candidate.firstName} {candidate.lastName}</h4>
                                   <div className="flex items-center gap-1.5 text-xs text-primary font-medium mt-0.5">
@@ -227,9 +305,74 @@ export const RecruitmentPage: React.FC = () => {
                                     {candidate.appliedRole}
                                   </div>
                                 </div>
-                                <button className="text-muted-foreground hover:text-foreground">
-                                  <MoreVertical className="w-4 h-4" />
-                                </button>
+                                <div className="relative">
+                                  <button 
+                                    onClick={() => setActiveMenuId(activeMenuId === candidate._id ? null : candidate._id)}
+                                    className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/80 transition-colors"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </button>
+                                  {activeMenuId === candidate._id && (
+                                    <>
+                                      <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
+                                      <div className="absolute right-0 mt-1.5 w-48 bg-card border border-border rounded-xl shadow-lg py-1.5 z-20 animate-in fade-in slide-in-from-top-1 duration-100 text-left">
+                                        {hasPermission('RECRUITMENT', 'edit') && (
+                                          <button
+                                            onClick={() => {
+                                              setActiveMenuId(null);
+                                              setEditCandidate(candidate);
+                                              setEditFormData({
+                                                firstName: candidate.firstName,
+                                                lastName: candidate.lastName,
+                                                email: candidate.email,
+                                                phone: candidate.phone,
+                                                appliedRole: candidate.appliedRole,
+                                                resumeUrl: candidate.resumeUrl || ''
+                                              });
+                                              setShowEditModal(true);
+                                            }}
+                                            className="w-full px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted flex items-center gap-2 hover:text-primary transition-colors text-left"
+                                          >
+                                            <Edit3 className="w-3.5 h-3.5" /> Edit Details
+                                          </button>
+                                        )}
+                                        <button
+                                           onClick={() => {
+                                             setActiveMenuId(null);
+                                             setEvalCandidate(candidate);
+                                             setShowEvalModal(true);
+                                           }}
+                                           className="w-full px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted flex items-center gap-2 hover:text-emerald-500 transition-colors text-left"
+                                         >
+                                           <ClipboardCheck className="w-3.5 h-3.5" /> Review & Evaluation
+                                         </button>
+                                         <button
+                                           onClick={() => {
+                                             setActiveMenuId(null);
+                                             setOfferCandidate(candidate);
+                                             setShowOfferModal(true);
+                                           }}
+                                           className="w-full px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted flex items-center gap-2 hover:text-amber-500 transition-colors text-left"
+                                         >
+                                           <Mail className="w-3.5 h-3.5" /> Send Offer Letter
+                                         </button>
+                                        {hasPermission('RECRUITMENT', 'delete') && (
+                                          <button
+                                            onClick={() => {
+                                              setActiveMenuId(null);
+                                              if (confirm(`Are you sure you want to delete ${candidate.firstName} ${candidate.lastName}?`)) {
+                                                deleteMutation.mutate(candidate._id);
+                                              }
+                                            }}
+                                            className="w-full px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 flex items-center gap-2 border-t border-border mt-1 transition-colors text-left"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" /> Delete Candidate
+                                          </button>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                               
                               <div className="space-y-1 mt-3">
@@ -243,15 +386,93 @@ export const RecruitmentPage: React.FC = () => {
                                 </div>
                               </div>
 
+                              {/* Evaluations & Step Pipeline Progress */}
+                              {(() => {
+                                const totalCompletedStages = candidate.evaluations?.filter(e => e.completed).length || 0;
+
+                                // Calculate average ratings
+                                let totalRatingsSum = 0;
+                                let ratingsCount = 0;
+                                candidate.evaluations?.forEach(e => {
+                                  if (e.completed) {
+                                    if (e.ratingTechnical) { totalRatingsSum += e.ratingTechnical; ratingsCount++; }
+                                    if (e.ratingCommunication) { totalRatingsSum += e.ratingCommunication; ratingsCount++; }
+                                  }
+                                });
+                                const averageRating = ratingsCount > 0 ? (totalRatingsSum / ratingsCount).toFixed(1) : null;
+
+                                return (
+                                  <div className="mt-3 pt-3 border-t border-border/50 flex flex-col gap-2 text-left">
+                                    <div className="flex items-center justify-between text-[11px]">
+                                      <span className="text-muted-foreground flex items-center gap-1 font-bold">
+                                        <ClipboardCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                        {totalCompletedStages} / 7 Steps Completed
+                                      </span>
+                                      {averageRating && (
+                                        <span className="flex items-center gap-0.5 font-extrabold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded text-[10px] shadow-sm">
+                                          <Star className="w-3 h-3 fill-amber-500 stroke-amber-500" />
+                                          {averageRating} Rating
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Stage progress timeline dots */}
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                      {STAGES.map((stg) => {
+                                        const isStgCompleted = !!candidate.evaluations?.find(e => e.stage === stg && e.completed) || 
+                                          (STAGES.indexOf(candidate.stage) > STAGES.indexOf(stg));
+                                        const isCurrent = candidate.stage === stg;
+                                        
+                                        return (
+                                          <div
+                                            key={stg}
+                                            title={`${STAGE_LABELS[stg]}: ${isStgCompleted ? 'Completed' : isCurrent ? 'Active' : 'Pending'}`}
+                                            className={`h-1.5 rounded-full flex-1 transition-all ${
+                                              isStgCompleted
+                                                ? 'bg-emerald-500 shadow-sm shadow-emerald-500/10'
+                                                : isCurrent
+                                                ? 'bg-primary animate-pulse shadow-sm shadow-primary/20'
+                                                : 'bg-muted-foreground/20'
+                                            }`}
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
                               <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
                                 <div className="text-[10px] text-muted-foreground font-mono">
                                   {formatDate(candidate.createdAt)}
                                 </div>
-                                {candidate.resumeUrl && (
-                                  <a href={candidate.resumeUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] font-bold text-primary hover:underline">
-                                    <FileText className="w-3 h-3" /> Resume
-                                  </a>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  {candidate.offerDetails?.offerLetterUrl && (
+                                    <a 
+                                      href={getDownloadUrl(candidate._id)}
+                                      target="_blank" 
+                                      rel="noreferrer" 
+                                      className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 hover:underline border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 rounded cursor-pointer animate-pulse"
+                                      title="View / Download PDF Offer Letter"
+                                    >
+                                      <FileText className="w-3 h-3" /> Download Offer
+                                    </a>
+                                  )}
+                                  {candidate.stage === 'OFFER' && (
+                                    <button 
+                                      onClick={() => { setOfferCandidate(candidate); setShowOfferModal(true); }}
+                                      className="flex items-center gap-1 text-[10px] font-bold text-amber-500 hover:underline border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 rounded cursor-pointer"
+                                      title="Edit & Send Offer Letter"
+                                    >
+                                      <Mail className="w-3 h-3" /> Offer Letter
+                                    </button>
+                                  )}
+                                  {candidate.resumeUrl && (
+                                    <a href={candidate.resumeUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] font-bold text-primary hover:underline">
+                                      <FileText className="w-3 h-3" /> Resume
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           )}
@@ -329,6 +550,83 @@ export const RecruitmentPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => { setShowEditModal(false); setEditCandidate(null); }}
+        title="Edit Candidate Details"
+      >
+        <form onSubmit={handleEditSubmit} className="space-y-4 px-2">
+          <div className="grid grid-cols-2 gap-4 text-left">
+            <Input
+              label="First Name *"
+              value={editFormData.firstName}
+              onChange={(e) => setEditFormData(p => ({ ...p, firstName: e.target.value }))}
+              required
+            />
+            <Input
+              label="Last Name *"
+              value={editFormData.lastName}
+              onChange={(e) => setEditFormData(p => ({ ...p, lastName: e.target.value }))}
+              required
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 text-left">
+            <Input
+              label="Email Address *"
+              type="email"
+              value={editFormData.email}
+              onChange={(e) => setEditFormData(p => ({ ...p, email: e.target.value }))}
+              required
+            />
+            <Input
+              label="Phone Number *"
+              value={editFormData.phone}
+              onChange={(e) => setEditFormData(p => ({ ...p, phone: e.target.value }))}
+              required
+            />
+          </div>
+
+          <Input
+            label="Applied Role / Position *"
+            placeholder="e.g., Senior Frontend Engineer"
+            value={editFormData.appliedRole}
+            onChange={(e) => setEditFormData(p => ({ ...p, appliedRole: e.target.value }))}
+            required
+            className="text-left"
+          />
+
+          <Input
+            label="Resume Link (Optional)"
+            placeholder="https://..."
+            value={editFormData.resumeUrl}
+            onChange={(e) => setEditFormData(p => ({ ...p, resumeUrl: e.target.value }))}
+            className="text-left"
+          />
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button variant="outline" type="button" onClick={() => { setShowEditModal(false); setEditCandidate(null); }}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={updateMutation.isPending}>
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <OfferLetterModal
+        isOpen={showOfferModal}
+        onClose={() => { setShowOfferModal(false); setOfferCandidate(null); }}
+        candidate={offerCandidate}
+      />
+
+      <EvaluationModal
+        isOpen={showEvalModal}
+        onClose={() => { setShowEvalModal(false); setEvalCandidate(null); }}
+        candidate={evalCandidate}
+      />
     </div>
   );
 };

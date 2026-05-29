@@ -54,8 +54,20 @@ const CandidateSchema = new mongoose_1.Schema({
     offerDetails: {
         salaryOffered: { type: Number },
         offerLetterUrl: { type: String },
+        offerLetterBase64: { type: String },
         status: { type: String, enum: ['PENDING', 'ACCEPTED', 'REJECTED'], default: 'PENDING' }
     },
-    notes: { type: String }
+    notes: { type: String },
+    evaluations: [
+        {
+            stage: { type: String, required: true },
+            comments: { type: String },
+            ratingCommunication: { type: Number, min: 0, max: 5 },
+            ratingTechnical: { type: Number, min: 0, max: 5 },
+            toolsExperiences: { type: String },
+            completed: { type: Boolean, default: false },
+            completedAt: { type: Date }
+        }
+    ]
 }, { timestamps: true });
 exports.Candidate = mongoose_1.default.model('Candidate', CandidateSchema);

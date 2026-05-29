@@ -15,6 +15,7 @@ const auditLog_service_js_1 = require("../../../services/auditLog.service.js");
 const socketHandler_js_1 = require("../../../sockets/socketHandler.js");
 const LatePenaltyService_js_1 = require("../../leave-engine/services/LatePenaltyService.js");
 const PermissionRequest_js_1 = require("../../../models/PermissionRequest.js");
+const Leave_js_1 = require("../../../models/Leave.js");
 // Haversine formula helper
 const getDistanceInMeters = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3; // Earth radius in meters
@@ -91,6 +92,18 @@ class AttendanceService {
             const employee = await Employee_js_1.Employee.findOne({ _id: empId, organizationId: orgId }).session(session);
             if (!employee) {
                 throw new Error('Target employee not found in this organization.');
+            }
+            // 1.5 Enforce Approved Leave Block (Do not allow check-in on approved leave days)
+            const approvedLeaveToday = await Leave_js_1.Leave.findOne({
+                organizationId: orgId,
+                employeeId: empId,
+                leaveType: { $ne: 'WFH' }, // WFH is not a leave, they must check in
+                status: 'APPROVED',
+                startDate: { $lte: today },
+                endDate: { $gte: today },
+            }).session(session);
+            if (approvedLeaveToday) {
+                throw new Error(`Check-in blocked: You have an approved leave (${approvedLeaveToday.leaveType}) today. You cannot record attendance on approved leave days.`);
             }
             // 2. Prevent duplicate check-in
             const existing = await Attendance_js_1.Attendance.findOne({ employeeId: empId, date: today, organizationId: orgId }).session(session);

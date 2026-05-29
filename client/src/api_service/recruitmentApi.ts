@@ -24,5 +24,20 @@ export const recruitmentApi = {
 
   delete: async (id: string): Promise<void> => {
     await axiosInstance.delete(`/recruitment/${id}`);
+  },
+
+  sendOffer: async (id: string, data: any): Promise<any> => {
+    const res = await axiosInstance.post(`/recruitment/${id}/send-offer`, data);
+    return res.data;
+  },
+
+  getDefaultTemplate: async (): Promise<any> => {
+    const res = await axiosInstance.get('/recruitment/templates/default');
+    return res.data;
+  },
+
+  updateDefaultTemplate: async (data: any): Promise<any> => {
+    const res = await axiosInstance.put('/recruitment/templates/default', data);
+    return res.data;
   }
 };

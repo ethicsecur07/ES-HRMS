@@ -6,13 +6,19 @@ import { Organization } from '../models/Organization.js';
 import { User } from '../models/User.js';
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  let token = '';
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token as string;
+  }
+
+  if (!token) {
     res.status(401).json({ message: 'Unauthorized access. Token missing.' });
     return;
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     // Developer Sandbox Bypass

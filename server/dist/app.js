@@ -42,6 +42,7 @@ const leavePolicy_routes_js_1 = __importDefault(require("./routes/leavePolicy.ro
 const expense_routes_js_1 = __importDefault(require("./routes/expense.routes.js"));
 const project_routes_js_1 = __importDefault(require("./domains/project-management/project.routes.js"));
 const recruitment_routes_js_1 = __importDefault(require("./domains/recruitment/recruitment.routes.js"));
+const applicant_routes_js_1 = __importDefault(require("./routes/applicant.routes.js"));
 const chat_routes_js_1 = __importDefault(require("./domains/chat/chat.routes.js"));
 const notification_routes_js_1 = __importDefault(require("./domains/notification/notification.routes.js"));
 const reports_routes_js_1 = __importDefault(require("./routes/reports.routes.js"));
@@ -89,6 +90,7 @@ const createApp = () => {
     app.use('/api/v2/payroll', payroll_routes_js_2.default); // Enterprise Engine
     app.use('/api/projects', project_routes_js_1.default);
     app.use('/api/recruitment', recruitment_routes_js_1.default);
+    app.use('/api/applicants', applicant_routes_js_1.default);
     app.use('/api/chat', chat_routes_js_1.default);
     app.use('/api/notifications', notification_routes_js_1.default);
     app.use('/api/reports', reports_routes_js_1.default);
