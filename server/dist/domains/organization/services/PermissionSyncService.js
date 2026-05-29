@@ -90,6 +90,7 @@ class PermissionSyncService {
                 'EMPLOYEES',
                 'ATTENDANCE',
                 'LEAVES',
+                'LEAVE_POLICY',
                 'TASKS',
                 'PAYROLL',
                 'FINANCE',

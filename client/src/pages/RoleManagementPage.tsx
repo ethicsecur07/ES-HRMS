@@ -7,14 +7,18 @@ import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input } from '../Components/WrapperComponents/Input';
 import { Modal } from '../Components/WrapperComponents/Modal';
-import { Settings, Plus, Edit2, Trash2, Network, Lock, ShieldAlert, ArrowRight, Users, ShieldCheck, ChevronDown, Check, X, Search } from 'lucide-react';
+import { Settings, Plus, Edit2, Trash2, Network, Lock, ShieldAlert, ArrowRight, Users, ShieldCheck, ChevronDown, Check, X, Search, Calendar } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { usePermission } from '../hooks/usePermission';
+
 
 export const RoleManagementPage: React.FC = () => {
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermission();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+
   const [editingRole, setEditingRole] = useState<RoleData | null>(null);
 
   // Form states
@@ -323,7 +327,22 @@ export const RoleManagementPage: React.FC = () => {
         >
           <ShieldCheck className="w-4 h-4" /> Permissions Matrix
         </NavLink>
+        {hasPermission('LEAVE_POLICY', 'view') && (
+          <NavLink
+            to="/settings/leave-policy"
+            className={({ isActive }) =>
+              `px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
+                isActive
+                  ? 'border-primary text-primary font-extrabold'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`
+            }
+          >
+            <Calendar className="w-4 h-4" /> Leave Policy
+          </NavLink>
+        )}
       </div>
+
 
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex-1 space-y-6">

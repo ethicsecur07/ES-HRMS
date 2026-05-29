@@ -11,6 +11,7 @@ const DEFAULT_MODULE_CODES = [
   'EMPLOYEES',
   'ATTENDANCE',
   'LEAVES',
+  'LEAVE_POLICY',
   'TASKS',
   'PAYROLL',
   'FINANCE',
@@ -34,6 +35,7 @@ const DEFAULT_MODULES = [
   { name: 'Employees Registry', code: 'EMPLOYEES', version: '1.0.0', isActive: true },
   { name: 'Attendance & Tracking', code: 'ATTENDANCE', version: '1.0.0', isActive: true },
   { name: 'Leave & WFH Management', code: 'LEAVES', version: '1.0.0', isActive: true },
+  { name: 'Leave Policy Configuration', code: 'LEAVE_POLICY', version: '1.0.0', isActive: true },
   { name: 'Task & Daily Reports', code: 'TASKS', version: '1.0.0', isActive: true },
   { name: 'Payroll & Compensation', code: 'PAYROLL', version: '1.0.0', isActive: true },
   { name: 'Finance & ERP Accounts', code: 'FINANCE', version: '1.0.0', isActive: true },
@@ -51,6 +53,7 @@ const DEFAULT_MODULES = [
   { name: 'Internal Chat', code: 'CHAT', version: '1.0.0', isActive: true },
   { name: 'System Notifications', code: 'NOTIFICATIONS', version: '1.0.0', isActive: true },
 ];
+
 
 const DEFAULT_ROUTES = [
   { moduleCode: 'DASHBOARD', routePath: '/dashboard', displayName: 'Dashboard', order: 1 },

@@ -192,10 +192,11 @@ export const AttendanceCheckIn: React.FC = () => {
       }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['todayAttendance'] });
+      // Always confirm check-in success
+      addToast('Check-In Successful', 'Your attendance has been recorded for today.', 'success');
+      // Additionally show the late-warning if present
       if (data?.warning) {
-        addToast('Check-In Warning', data.warning, 'warning');
-      } else {
-        addToast('Check-In Successful', 'Your attendance has been recorded for today.', 'success');
+        setTimeout(() => addToast('⏰ Late Check-In Warning', data.warning, 'warning'), 400);
       }
       setShowOverrideModal(false);
       setLocCheckResult(null);

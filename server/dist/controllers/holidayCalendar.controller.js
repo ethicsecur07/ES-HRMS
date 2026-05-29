@@ -6,7 +6,7 @@
  * Admin/HR can manage; all authenticated users can view.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteHoliday = exports.updateHoliday = exports.createHoliday = exports.getHolidays = void 0;
+exports.deleteHoliday = exports.updateHoliday = exports.createHoliday = exports.getGoogleHolidays = exports.getHolidays = void 0;
 const HolidayCalendar_js_1 = require("../models/HolidayCalendar.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const logger_js_1 = require("../utils/logger.js");
@@ -31,7 +31,28 @@ const getHolidays = async (req, res) => {
             };
         }
         const customHolidays = await HolidayCalendar_js_1.HolidayCalendar.find(query).sort({ date: 1 });
-        // Fetch Indian public holidays from Google Calendar API
+        res.status(200).json({ holidays: customHolidays });
+    }
+    catch (error) {
+        logger_js_1.logger.error('[holidayCalendar] getHolidays error', { error: error.message });
+        res.status(500).json({ message: 'Failed to fetch holidays.' });
+    }
+};
+exports.getHolidays = getHolidays;
+/**
+ * GET /api/holiday-calendar/google
+ * Fetch Indian public holidays from Google Calendar with database status mapping.
+ * Admin/HR only.
+ */
+const getGoogleHolidays = async (req, res) => {
+    try {
+        const authReq = req;
+        const orgId = authReq.user?.organizationId;
+        if (!orgId) {
+            res.status(401).json({ message: 'Unauthorized.' });
+            return;
+        }
+        const { year } = req.query;
         const targetYear = year ? String(year) : new Date().getFullYear().toString();
         const timeMin = `${targetYear}-01-01T00:00:00Z`;
         const timeMax = `${targetYear}-12-31T23:59:59Z`;
@@ -48,13 +69,9 @@ const getHolidays = async (req, res) => {
                         const dateStr = item.start.date || item.start.dateTime.split('T')[0];
                         const isObservance = item.description && item.description.toLowerCase().includes('observance');
                         return {
-                            _id: `google-${item.id}`,
-                            organizationId: orgId,
                             name: item.summary,
                             date: dateStr,
                             isRestricted: !!isObservance,
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString()
                         };
                     });
                     if (year) {
@@ -69,26 +86,32 @@ const getHolidays = async (req, res) => {
         catch (gcalError) {
             logger_js_1.logger.warn('[holidayCalendar] Google Calendar API error', { error: gcalError.message });
         }
-        // Merge and sort
-        const allHolidays = [...customHolidays.map(h => h.toObject()), ...googleHolidays];
-        allHolidays.sort((a, b) => a.date.localeCompare(b.date));
-        // Deduplicate by date (prefer custom holidays over google ones)
-        const uniqueHolidays = [];
-        const seenDates = new Set();
-        for (const h of allHolidays) {
-            if (!seenDates.has(h.date)) {
-                seenDates.add(h.date);
-                uniqueHolidays.push(h);
-            }
+        // Fetch existing holidays in database for this org and year to match status
+        const dbQuery = { organizationId: orgId };
+        if (year) {
+            dbQuery.date = {
+                $gte: `${year}-01-01`,
+                $lte: `${year}-12-31`,
+            };
         }
-        res.status(200).json({ holidays: uniqueHolidays });
+        const dbHolidays = await HolidayCalendar_js_1.HolidayCalendar.find(dbQuery);
+        // Map google holidays to include import status and database ID if present
+        const holidaysWithStatus = googleHolidays.map((gHoliday) => {
+            const matchedDb = dbHolidays.find((dbH) => dbH.date === gHoliday.date);
+            return {
+                ...gHoliday,
+                isImported: !!matchedDb,
+                databaseId: matchedDb ? matchedDb._id : null,
+            };
+        });
+        res.status(200).json({ holidays: holidaysWithStatus });
     }
     catch (error) {
-        logger_js_1.logger.error('[holidayCalendar] getHolidays error', { error: error.message });
-        res.status(500).json({ message: 'Failed to fetch holidays.' });
+        logger_js_1.logger.error('[holidayCalendar] getGoogleHolidays error', { error: error.message });
+        res.status(500).json({ message: 'Failed to retrieve Google holidays.' });
     }
 };
-exports.getHolidays = getHolidays;
+exports.getGoogleHolidays = getGoogleHolidays;
 /**
  * POST /api/holiday-calendar
  * Admin/HR only — create a new holiday.

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { NavLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leavePolicyApi, type LeavePolicy } from '../api_service/leavePolicyApi';
 import { holidayCalendarApi, type Holiday } from '../api_service/holidayCalendarApi';
@@ -7,6 +8,8 @@ import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Select } from '../Components/WrapperComponents/Input';
 import { Modal } from '../Components/WrapperComponents/Modal';
+import { usePermission } from '../hooks/usePermission';
+
 import {
   Shield,
   Calendar,
@@ -23,7 +26,13 @@ import {
   XCircle,
   Clock,
   Palmtree,
+  Globe,
+  Check,
+  Loader2,
+  Users,
+  ShieldCheck,
 } from 'lucide-react';
+
 
 // ─── Helper: Toggle Pill ────────────────────────────────────────────────────
 const TogglePill: React.FC<{ value: boolean; onChange: (v: boolean) => void; label?: string }> = ({
@@ -212,7 +221,9 @@ const PolicyForm: React.FC<PolicyFormProps> = ({ policy, onChange }) => {
 export const LeavePolicyPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { addToast } = useNotificationStore();
+  const { hasPermission, isLoading: permsLoading } = usePermission();
   const [activeTab, setActiveTab] = useState<'POLICIES' | 'HOLIDAYS'>('POLICIES');
+
 
   // ── Policy state ──────────────────────────────────────────────────────────
   const [policyModal, setPolicyModal] = useState<{ open: boolean; policy: Partial<LeavePolicy> | null; isNew: boolean }>({
@@ -306,6 +317,37 @@ export const LeavePolicyPage: React.FC = () => {
     onError: (err: any) => addToast('Error', err.response?.data?.message || 'Failed to delete holiday.', 'error'),
   });
 
+  // Google Calendar import states, query, and toggle mutation
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  const { data: googleHolidays = [], isLoading: googleLoading } = useQuery({
+    queryKey: ['google-holidays', calendarYear],
+    queryFn: () => holidayCalendarApi.getGoogleHolidays(calendarYear),
+    enabled: isImportModalOpen,
+  });
+
+  const toggleImportMutation = useMutation({
+    mutationFn: async ({ holiday, shouldImport }: { holiday: any; shouldImport: boolean }) => {
+      if (shouldImport) {
+        return holidayCalendarApi.create({
+          name: holiday.name,
+          date: holiday.date,
+          isRestricted: holiday.isRestricted,
+        });
+      } else {
+        if (!holiday.databaseId) throw new Error('No database ID found to remove.');
+        return holidayCalendarApi.delete(holiday.databaseId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      queryClient.invalidateQueries({ queryKey: ['google-holidays'] });
+      addToast('Success', 'Organization holiday list updated.', 'success');
+    },
+    onError: (err: any) => addToast('Error', err.response?.data?.message || 'Action failed.', 'error'),
+  });
+
+
   const handleSaveHoliday = () => {
     if (!holidayModal.holiday?.name || !holidayModal.holiday?.date) {
       addToast('Validation Error', 'Name and date are required.', 'error');
@@ -360,24 +402,123 @@ export const LeavePolicyPage: React.FC = () => {
   const handlePrevMonth = () => { if (calendarMonth === 0) { setCalendarYear(y => y - 1); setCalendarMonth(11); } else setCalendarMonth(m => m - 1); };
   const handleNextMonth = () => { if (calendarMonth === 11) { setCalendarYear(y => y + 1); setCalendarMonth(0); } else setCalendarMonth(m => m + 1); };
 
+  if (permsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] text-primary font-semibold">
+        <Loader2 className="w-8 h-8 animate-spin mr-2" />
+        Loading Permissions...
+      </div>
+    );
+  }
+
+  if (!hasPermission('LEAVE_POLICY', 'view')) {
+    return (
+      <Card className="p-8 text-center border-dashed max-w-md mx-auto my-12 space-y-4">
+        <Shield className="w-12 h-12 text-destructive mx-auto opacity-75 animate-bounce" />
+        <h3 className="text-lg font-bold text-foreground">Access Denied</h3>
+        <p className="text-xs text-muted-foreground">
+          You do not have the required permissions to view or configure leave policies. Please contact your organization administrator.
+        </p>
+      </Card>
+    );
+  }
+
   // Missing leave types (not yet configured)
+
   const configuredTypes = new Set(policies.map((p) => p.leaveType));
   const missingTypes = ALL_LEAVE_TYPES.filter((t) => !configuredTypes.has(t));
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border shadow-sm">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary" />
-            Leave Policy Engine
+            <Settings className="w-6 h-6 text-primary" />
+            System & Security Settings
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Configure leave rules, balances, sandwich policies, and manage the organization holiday calendar
+            Configure company global policies, office WiFi whitelisting for IP attendance, and admin preferences
           </p>
         </div>
-        {activeTab === 'POLICIES' && missingTypes.length > 0 && (
+      </div>
+
+      {/* Settings Navigation Tabs */}
+      <div className="flex border-b border-border">
+        <NavLink
+          to="/settings"
+          end
+          className={({ isActive }) =>
+            `px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
+              isActive
+                ? 'border-primary text-primary font-extrabold'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`
+          }
+        >
+          <Settings className="w-4 h-4" /> Global Settings
+        </NavLink>
+        <NavLink
+          to="/settings/roles"
+          className={({ isActive }) =>
+            `px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
+              isActive
+                ? 'border-primary text-primary font-extrabold'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`
+          }
+        >
+          <Users className="w-4 h-4" /> Role Management
+        </NavLink>
+        <NavLink
+          to="/settings/permissions"
+          className={({ isActive }) =>
+            `px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
+              isActive
+                ? 'border-primary text-primary font-extrabold'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`
+          }
+        >
+          <ShieldCheck className="w-4 h-4" /> Permissions Matrix
+        </NavLink>
+        {hasPermission('LEAVE_POLICY', 'view') && (
+          <NavLink
+            to="/settings/leave-policy"
+            className={({ isActive }) =>
+              `px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
+                isActive
+                  ? 'border-primary text-primary font-extrabold'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`
+            }
+          >
+            <Calendar className="w-4 h-4" /> Leave Policy
+          </NavLink>
+        )}
+      </div>
+
+      {/* Tab Switch */}
+      <div className="flex items-center justify-between border-b border-border pb-3">
+        <div className="flex items-center gap-2">
+          {[
+            { key: 'POLICIES', label: 'Policy Engine', icon: <Settings className="w-4 h-4" /> },
+            { key: 'HOLIDAYS', label: 'Holiday Calendar', icon: <Calendar className="w-4 h-4" /> },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as any)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                activeTab === tab.key
+                  ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
+        
+        {activeTab === 'POLICIES' && missingTypes.length > 0 && hasPermission('LEAVE_POLICY', 'create') && (
           <Button
             onClick={() => setPolicyModal({ open: true, policy: { leaveType: missingTypes[0] as any, monthlyAllowance: 1, halfDayEnabled: true }, isNew: true })}
             className="bg-primary text-white font-bold shadow-md shadow-primary/20"
@@ -385,7 +526,7 @@ export const LeavePolicyPage: React.FC = () => {
             <Plus className="w-4 h-4 mr-1.5" /> Add Policy
           </Button>
         )}
-        {activeTab === 'HOLIDAYS' && (
+        {activeTab === 'HOLIDAYS' && hasPermission('LEAVE_POLICY', 'create') && (
           <Button
             onClick={() => setHolidayModal({ open: true, holiday: { isRestricted: false }, isNew: true })}
             className="bg-primary text-white font-bold shadow-md shadow-primary/20"
@@ -393,26 +534,6 @@ export const LeavePolicyPage: React.FC = () => {
             <Plus className="w-4 h-4 mr-1.5" /> Add Holiday
           </Button>
         )}
-      </div>
-
-      {/* Tab Switch */}
-      <div className="flex items-center gap-2 border-b border-border pb-3">
-        {[
-          { key: 'POLICIES', label: 'Policy Engine', icon: <Settings className="w-4 h-4" /> },
-          { key: 'HOLIDAYS', label: 'Holiday Calendar', icon: <Calendar className="w-4 h-4" /> },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              activeTab === tab.key
-                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            }`}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
       </div>
 
       {/* ── POLICIES TAB ── */}
@@ -452,21 +573,26 @@ export const LeavePolicyPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setPolicyModal({ open: true, policy: { ...policy }, isNew: false })}
-                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                          title="Edit policy"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => toggleMutation.mutate(policy._id)}
-                          className={`p-1.5 rounded-lg transition-colors ${policy.isActive ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
-                          title={policy.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                          {policy.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                        </button>
+                        {hasPermission('LEAVE_POLICY', 'edit') && (
+                          <button
+                            onClick={() => setPolicyModal({ open: true, policy: { ...policy }, isNew: false })}
+                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            title="Edit policy"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {hasPermission('LEAVE_POLICY', 'edit') && (
+                          <button
+                            onClick={() => toggleMutation.mutate(policy._id)}
+                            className={`p-1.5 rounded-lg transition-colors ${policy.isActive ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
+                            title={policy.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            {policy.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                          </button>
+                        )}
                       </div>
+
                     </div>
 
                     {/* Policy rules grid */}
@@ -562,11 +688,14 @@ export const LeavePolicyPage: React.FC = () => {
                       onClick={() => {
                         if (!cell.isCurrentMonth) return;
                         if (holiday) {
+                          if (!hasPermission('LEAVE_POLICY', 'edit')) return;
                           setHolidayModal({ open: true, holiday: { ...holiday }, isNew: false });
                         } else {
+                          if (!hasPermission('LEAVE_POLICY', 'create')) return;
                           setHolidayModal({ open: true, holiday: { date: cell.dateStr, isRestricted: false }, isNew: true });
                         }
                       }}
+
                       title={holiday?.name}
                     >
                       <span className="self-start pl-0.5">{cell.dayNum}</span>
@@ -584,12 +713,26 @@ export const LeavePolicyPage: React.FC = () => {
 
           {/* Holiday List */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground">
-                Holidays in {calendarYear}
-              </h3>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground">
+                  Holidays in {calendarYear}
+                </h3>
+              </div>
+              {hasPermission('LEAVE_POLICY', 'create') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="h-8 text-xs font-bold flex items-center gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                >
+                  <Globe className="w-3.5 h-3.5 animate-pulse" />
+                  Import Holidays
+                </Button>
+              )}
             </div>
+
             {holidaysLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => <div key={i} className="h-14 rounded-xl bg-muted/30 animate-pulse border border-border" />)}
@@ -620,24 +763,29 @@ export const LeavePolicyPage: React.FC = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setHolidayModal({ open: true, holiday: { ...h }, isNew: false })}
-                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => deleteHolidayMutation.mutate(h._id)}
-                          className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-muted-foreground hover:text-rose-600 transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        {hasPermission('LEAVE_POLICY', 'edit') && (
+                          <button
+                            onClick={() => setHolidayModal({ open: true, holiday: { ...h }, isNew: false })}
+                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                        {hasPermission('LEAVE_POLICY', 'delete') && (
+                          <button
+                            onClick={() => deleteHolidayMutation.mutate(h._id)}
+                            className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-muted-foreground hover:text-rose-600 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
               </div>
             )}
           </div>
+
         </div>
       )}
 
@@ -720,6 +868,94 @@ export const LeavePolicyPage: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* ── Google Calendar Holidays Import Modal ────────────────────────────── */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title={`Import Indian Holidays (${calendarYear})`}
+        maxWidth="max-w-xl"
+      >
+        <div className="space-y-4 text-left">
+          <p className="text-xs text-muted-foreground">
+            Select the holidays from Google Calendar that are mandatory/official for your organization. Selected holidays will appear on all employee dashboards.
+          </p>
+
+          {googleLoading ? (
+            <div className="h-64 flex flex-col items-center justify-center gap-2">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <p className="text-xs font-semibold text-muted-foreground">Fetching public holidays from Google Calendar...</p>
+            </div>
+          ) : googleHolidays.length === 0 ? (
+            <div className="p-12 text-center border border-dashed rounded-2xl bg-muted/20">
+              <Calendar className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-30" />
+              <p className="text-xs text-muted-foreground font-bold">No public holidays found for {calendarYear}.</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+              {googleHolidays.map((gH, idx) => {
+                const isMutating = toggleImportMutation.isPending && 
+                  toggleImportMutation.variables?.holiday.date === gH.date;
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-center justify-between p-3.5 border rounded-xl transition-all duration-200 ${
+                      gH.isImported
+                        ? 'bg-primary/5 border-primary/30 shadow-sm'
+                        : 'bg-card border-border hover:border-muted-foreground/30 hover:bg-muted/10'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <p className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                        {gH.name}
+                        {gH.isRestricted && (
+                          <span className="text-[8px] font-extrabold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-1 py-0.5 rounded">
+                            RESTRICTED
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-[10px] font-mono text-muted-foreground font-bold">{gH.date}</p>
+                    </div>
+
+                    <button
+                      disabled={isMutating}
+                      onClick={() =>
+                        toggleImportMutation.mutate({
+                          holiday: gH,
+                          shouldImport: !gH.isImported,
+                        })
+                      }
+                      className={`h-8 px-3.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        gH.isImported
+                          ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/95'
+                          : 'bg-muted hover:bg-muted-foreground/10 text-foreground border border-border'
+                      }`}
+                    >
+                      {isMutating ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : gH.isImported ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Mandatory
+                        </>
+                      ) : (
+                        'Make Mandatory'
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t border-border">
+            <Button onClick={() => setIsImportModalOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
+

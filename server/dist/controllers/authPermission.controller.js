@@ -10,6 +10,7 @@ const DEFAULT_MODULES = [
     'EMPLOYEES',
     'ATTENDANCE',
     'LEAVES',
+    'LEAVE_POLICY',
     'TASKS',
     'PAYROLL',
     'FINANCE',

@@ -10,10 +10,24 @@ export interface Holiday {
   updatedAt: string;
 }
 
+export interface GoogleHoliday {
+  name: string;
+  date: string;
+  isRestricted: boolean;
+  isImported: boolean;
+  databaseId: string | null;
+}
+
 export const holidayCalendarApi = {
   getAll: async (year?: number): Promise<Holiday[]> => {
     const params = year ? { year } : {};
     const response = await axiosInstance.get<{ holidays: Holiday[] }>('/holiday-calendar', { params });
+    return response.data.holidays;
+  },
+
+  getGoogleHolidays: async (year?: number): Promise<GoogleHoliday[]> => {
+    const params = year ? { year } : {};
+    const response = await axiosInstance.get<{ holidays: GoogleHoliday[] }>('/holiday-calendar/google', { params });
     return response.data.holidays;
   },
 
@@ -31,3 +45,4 @@ export const holidayCalendarApi = {
     await axiosInstance.delete(`/holiday-calendar/${id}`);
   },
 };
+

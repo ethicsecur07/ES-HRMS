@@ -103,6 +103,7 @@ export class PermissionSyncService {
         'EMPLOYEES',
         'ATTENDANCE',
         'LEAVES',
+        'LEAVE_POLICY',
         'TASKS',
         'PAYROLL',
         'FINANCE',
@@ -120,6 +121,7 @@ export class PermissionSyncService {
         'CHAT',
         'NOTIFICATIONS',
       ];
+
 
       const employeeSelfServiceModules = [
         'DASHBOARD',
