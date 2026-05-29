@@ -25,4 +25,9 @@ export const chatApi = {
   markRead: async (messageId: string): Promise<void> => {
     await axiosInstance.patch(`/chat/${messageId}/read`);
   },
+
+  getRecentConversations: async (): Promise<any[]> => {
+    const res = await axiosInstance.get('/chat/conversations/recent');
+    return res.data.recentConversations || [];
+  },
 };

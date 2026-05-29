@@ -201,3 +201,54 @@ export const markMessageRead = async (req: Request, res: Response): Promise<void
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const getRecentConversations = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+
+    const recentConversations = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { senderId: userId },
+            { receiverId: userId },
+            { receiverId: 'broadcast' },
+            { receiverId: { $regex: /^group_/ } }
+          ]
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ["$receiverId", "broadcast"] },
+                  { $eq: [ { $substr: ["$receiverId", 0, 6] }, "group_" ] }
+                ]
+              },
+              "$receiverId",
+              {
+                $cond: [
+                  { $eq: ["$senderId", userId] },
+                  "$receiverId",
+                  "$senderId"
+                ]
+              }
+            ]
+          },
+          lastMessageAt: { $first: "$createdAt" },
+          lastMessageContent: { $first: "$content" },
+          lastMessageType: { $first: "$messageType" }
+        }
+      }
+    ]);
+
+    res.status(200).json({ recentConversations });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
