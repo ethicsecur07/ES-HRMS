@@ -7,6 +7,8 @@ const validate_middleware_js_1 = require("../middlewares/validate.middleware.js"
 const attendance_validation_js_1 = require("../domains/attendance-engine/validations/attendance.validation.js");
 const router = (0, express_1.Router)();
 router.get('/today', auth_middleware_js_1.authenticate, attendance_controller_js_1.getTodayAttendance);
+router.get('/pending-reports', auth_middleware_js_1.authenticate, attendance_controller_js_1.getPendingReports);
+router.post('/submit-pending-report', auth_middleware_js_1.authenticate, attendance_controller_js_1.submitPendingReport);
 router.get('/', auth_middleware_js_1.authenticate, attendance_controller_js_1.getAllAttendance);
 router.post('/checkin', auth_middleware_js_1.authenticate, (0, validate_middleware_js_1.validateRequest)(attendance_validation_js_1.checkInSchema), attendance_controller_js_1.checkIn);
 router.post('/checkout/:id', auth_middleware_js_1.authenticate, (0, validate_middleware_js_1.validateRequest)(attendance_validation_js_1.checkOutSchema), attendance_controller_js_1.checkOut);

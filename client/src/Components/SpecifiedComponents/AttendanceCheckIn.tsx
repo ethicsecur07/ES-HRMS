@@ -7,9 +7,11 @@ import { useNotificationStore } from '../../store/useNotificationStore';
 import { Card } from '../WrapperComponents/Card';
 import { Button } from '../WrapperComponents/Button';
 import { Modal } from '../WrapperComponents/Modal';
-import { Input } from '../WrapperComponents/Input';
+import { Input, Textarea } from '../WrapperComponents/Input';
 import { TaskReportForm } from './TaskReportForm';
-import { Clock, CheckCircle2, MapPin, Compass, AlertOctagon, Info } from 'lucide-react';
+import { permissionApi } from '../../api_service/permissionApi';
+import { leaveApi } from '../../api_service/leaveApi';
+import { Clock, CheckCircle2, MapPin, Compass, AlertOctagon, Info, Palmtree } from 'lucide-react';
 
 const formatElapsedTime = (ms: number): string => {
   if (ms < 0) ms = 0;
@@ -29,6 +31,14 @@ export const AttendanceCheckIn: React.FC = () => {
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [activePermBlock, setActivePermBlock] = useState<{ startTime: string; endTime: string } | null>(null);
+  const [pendingReportToSubmit, setPendingReportToSubmit] = useState<any>(null);
+  const [retroCompletedTasks, setRetroCompletedTasks] = useState('');
+  const [retroInProgress, setRetroInProgress] = useState('');
+  const [retroPending, setRetroPending] = useState('');
+  const [retroTomorrow, setRetroTomorrow] = useState('');
+  const [retroBlockers, setRetroBlockers] = useState('');
+  const [retroError, setRetroError] = useState('');
 
   // Advanced Geofencing State
   const [isLocChecking, setIsLocChecking] = useState(false);
@@ -42,21 +52,113 @@ export const AttendanceCheckIn: React.FC = () => {
     errorMessage?: string;
   } | null>(null);
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Fetch settings to check if geofences exist
+  // Query Hooks
   const { data: attendanceSettings } = useQuery({
     queryKey: ['attendanceSettings'],
     queryFn: advancedAttendanceApi.getSettings,
+  });
+
+  const { data: myPerms } = useQuery({
+    queryKey: ['permissions'],
+    queryFn: permissionApi.getAll,
+    enabled: !!user,
+  });
+
+  const { data: myLeaves } = useQuery({
+    queryKey: ['leaves'],
+    queryFn: leaveApi.getAll,
+    enabled: !!user,
+  });
+
+  const { data: pendingReports, refetch: refetchPending } = useQuery({
+    queryKey: ['pendingReports'],
+    queryFn: attendanceApi.getPendingReports,
+    enabled: !!user,
   });
 
   const { data: todayAttendance, isLoading: attLoading } = useQuery({
     queryKey: ['todayAttendance'],
     queryFn: attendanceApi.getToday,
   });
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (pendingReports && pendingReports.length > 0) {
+      setPendingReportToSubmit(pendingReports[0]);
+    } else {
+      setPendingReportToSubmit(null);
+    }
+  }, [pendingReports]);
+
+  useEffect(() => {
+    if (!myPerms || myPerms.length === 0) {
+      setActivePermBlock(null);
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    const currentMinutes = currentHour * 60 + currentMinute;
+
+    const activePerm = myPerms.find((perm) => {
+      if (perm.date !== todayStr || perm.approvalStatus === 'REJECTED' || perm.approvalStatus === 'CANCELLED') {
+        return false;
+      }
+
+      const [startH, startM] = perm.startTime.split(':').map(Number);
+      const [endH, endM] = perm.endTime.split(':').map(Number);
+      const startMin = startH * 60 + startM;
+      const endMin = endH * 60 + endM;
+
+      return currentMinutes >= startMin && currentMinutes <= endMin;
+    });
+
+    if (activePerm) {
+      setActivePermBlock({ startTime: activePerm.startTime, endTime: activePerm.endTime });
+    } else {
+      setActivePermBlock(null);
+    }
+  }, [myPerms, currentTime]);
+
+  const submitRetroMutation = useMutation({
+    mutationFn: async () => {
+      if (!retroCompletedTasks.trim()) {
+        throw new Error('Completed tasks are required.');
+      }
+      return attendanceApi.submitPendingReport({
+        attendanceId: pendingReportToSubmit._id,
+        completedTasks: retroCompletedTasks,
+        inProgressTasks: retroInProgress,
+        pendingTasks: retroPending,
+        tomorrowPlan: retroTomorrow,
+        blockers: retroBlockers || 'None',
+      });
+    },
+    onSuccess: () => {
+      addToast('Tasks Submitted Successfully', 'Your retroactive task report has been archived.', 'success');
+      setRetroCompletedTasks('');
+      setRetroInProgress('');
+      setRetroPending('');
+      setRetroTomorrow('');
+      setRetroBlockers('');
+      setRetroError('');
+      refetchPending();
+      queryClient.invalidateQueries({ queryKey: ['todayAttendance'] });
+    },
+    onError: (err: any) => {
+      setRetroError(err.message || 'Submission failed. Please try again.');
+    },
+  });
+
+  const handleRetroSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitRetroMutation.mutate();
+  };
 
   const myAttendance = todayAttendance?.find(
     (a) =>
@@ -71,6 +173,16 @@ export const AttendanceCheckIn: React.FC = () => {
   const elapsedMs = isCheckedIn ? currentTime.getTime() - new Date(myAttendance.loginTime).getTime() : 0;
   const elapsedStr = formatElapsedTime(elapsedMs);
 
+  const currentHour = currentTime.getHours();
+  const currentMinute = currentTime.getMinutes();
+  
+  const todayStr = currentTime.toISOString().split('T')[0];
+  const hasApprovedPermissionToday = myPerms?.some(
+    (perm) => perm.date === todayStr && perm.approvalStatus === 'APPROVED'
+  ) || false;
+
+  const isBeforeCheckoutTime = (currentHour < 17 || (currentHour === 17 && currentMinute < 40)) && !hasApprovedPermissionToday;
+
   const checkInMutation = useMutation({
     mutationFn: (override?: string) =>
       attendanceApi.checkIn({
@@ -78,9 +190,13 @@ export const AttendanceCheckIn: React.FC = () => {
         deviceInfo: navigator.userAgent,
         overrideReason: override,
       }),
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['todayAttendance'] });
-      addToast('Check-In Successful', 'Your attendance has been recorded for today.', 'success');
+      if (data?.warning) {
+        addToast('Check-In Warning', data.warning, 'warning');
+      } else {
+        addToast('Check-In Successful', 'Your attendance has been recorded for today.', 'success');
+      }
       setShowOverrideModal(false);
       setLocCheckResult(null);
       setOverrideInput('');
@@ -188,6 +304,47 @@ export const AttendanceCheckIn: React.FC = () => {
     );
   }
 
+  const localToday = new Date();
+  const year = localToday.getFullYear();
+  const month = String(localToday.getMonth() + 1).padStart(2, '0');
+  const day = String(localToday.getDate()).padStart(2, '0');
+  const localTodayStr = `${year}-${month}-${day}`;
+
+  const myEmpId = user?.employeeId || user?._id;
+
+  const hasApprovedLeaveToday = myLeaves?.some((l) => {
+    const lEmpId = typeof l.employeeId === 'object' && l.employeeId !== null ? l.employeeId._id : l.employeeId;
+    return (
+      lEmpId === myEmpId &&
+      l.status === 'APPROVED' &&
+      l.leaveType !== 'WFH' &&
+      localTodayStr >= l.startDate &&
+      localTodayStr <= l.endDate
+    );
+  }) ?? false;
+
+  if (hasApprovedLeaveToday) {
+    return (
+      <Card className="relative overflow-hidden border-l-4 border-primary shadow-xl bg-card">
+        <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+          <Palmtree className="w-36 h-36 text-primary" />
+        </div>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10 p-2">
+          <div className="space-y-2 text-left">
+            <h3 className="text-xl font-bold text-foreground">You are on Approved Leave Today</h3>
+            <p className="text-xs text-muted-foreground">
+              Enjoy your time off! The check-in and checkout system is disabled for today as your leave request has been approved.
+            </p>
+          </div>
+          <div className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 flex-shrink-0">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+            On Leave Duty-Free
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className="relative overflow-hidden border-l-4 border-primary shadow-xl">
       <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
@@ -223,9 +380,19 @@ export const AttendanceCheckIn: React.FC = () => {
               size="lg"
               onClick={handleCheckInClick}
               isLoading={checkInMutation.isPending || isLocChecking}
-              className="w-full sm:w-auto bg-gradient-to-r from-primary to-accent text-white font-bold tracking-wider shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all scale-105 my-2"
+              disabled={!!activePermBlock}
+              className={`w-full sm:w-auto font-bold tracking-wider shadow-lg transition-all scale-105 my-2 ${
+                activePermBlock
+                  ? 'bg-muted text-muted-foreground border border-border pointer-events-none opacity-60'
+                  : 'bg-gradient-to-r from-primary to-accent text-white shadow-primary/30 hover:shadow-xl hover:shadow-primary/40'
+              }`}
             >
-              {isLocChecking ? (
+              {activePermBlock ? (
+                <>
+                  <Clock className="w-5 h-5 mr-2 text-destructive animate-pulse" />
+                  LOCKED (PERMISSION {activePermBlock.startTime}-{activePermBlock.endTime})
+                </>
+              ) : isLocChecking ? (
                 <>
                   <Compass className="w-5 h-5 mr-2 animate-spin" />
                   LOCATING GPS...
@@ -248,14 +415,29 @@ export const AttendanceCheckIn: React.FC = () => {
                   </span>
                 )}
               </div>
-              <Button
-                size="lg"
-                variant="destructive"
-                onClick={() => setShowTaskModal(true)}
-                className="w-full sm:w-auto font-bold tracking-wider shadow-lg shadow-destructive/30"
-              >
-                CHECK OUT & SUBMIT TASK
-              </Button>
+              {isBeforeCheckoutTime ? (
+                <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-1">
+                  <Button
+                    size="lg"
+                    disabled
+                    className="w-full sm:w-auto font-bold tracking-wider bg-muted text-muted-foreground border border-border cursor-not-allowed opacity-60"
+                  >
+                    CHECK OUT LOCKED
+                  </Button>
+                  <p className="text-[10px] font-bold text-destructive animate-pulse text-right">
+                    Checkout available after 5:40 PM
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  size="lg"
+                  variant="destructive"
+                  onClick={() => setShowTaskModal(true)}
+                  className="w-full sm:w-auto font-bold tracking-wider shadow-lg shadow-destructive/30"
+                >
+                  CHECK OUT & SUBMIT TASK
+                </Button>
+              )}
             </div>
           ) : (
             <div className="px-5 py-3 rounded-xl bg-muted border border-border text-muted-foreground text-sm font-bold flex items-center gap-2">
@@ -342,6 +524,86 @@ export const AttendanceCheckIn: React.FC = () => {
           }}
         />
       </Modal>
+
+      {/* Retroactive Task Report Modal for Forgotten Checkout */}
+      {pendingReportToSubmit && (
+        <Modal
+          isOpen={true}
+          onClose={() => {}}
+          preventClose={true}
+          title="Forgotten Checkout: Daily Task Report Required"
+          maxWidth="max-w-2xl"
+        >
+          <form onSubmit={handleRetroSubmit} className="space-y-4 text-left p-2">
+            <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs space-y-1 leading-relaxed animate-in fade-in duration-300">
+              <span className="font-bold uppercase flex items-center gap-1.5">
+                <AlertOctagon className="w-4 h-4" /> RETROACTIVE REPORT REQUIRED
+              </span>
+              <p>
+                You forgot to check out on <strong className="font-mono">{pendingReportToSubmit.date}</strong>. The system has automatically resolved your checkout status and calculated exactly <strong>9 working hours</strong> for that date.
+              </p>
+              <p className="font-semibold mt-1">
+                You must submit your tasks and daily report for {pendingReportToSubmit.date} to unlock and use the HRMS application.
+              </p>
+            </div>
+
+            {retroError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-500">
+                {retroError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Textarea
+                label="Completed Tasks *"
+                placeholder="List tasks fully completed on that day..."
+                value={retroCompletedTasks}
+                onChange={(e) => setRetroCompletedTasks(e.target.value)}
+                required
+              />
+
+              <Textarea
+                label="In Progress Tasks"
+                placeholder="Tasks currently in progress..."
+                value={retroInProgress}
+                onChange={(e) => setRetroInProgress(e.target.value)}
+              />
+
+              <Textarea
+                label="Pending Tasks"
+                placeholder="Tasks yet to be started..."
+                value={retroPending}
+                onChange={(e) => setRetroPending(e.target.value)}
+              />
+
+              <Textarea
+                label="Plan for Next Day"
+                placeholder="Outline what you planned to work on next..."
+                value={retroTomorrow}
+                onChange={(e) => setRetroTomorrow(e.target.value)}
+              />
+            </div>
+
+            <Textarea
+              label="Issues / Blockers"
+              placeholder="List any blockers or write None..."
+              value={retroBlockers}
+              onChange={(e) => setRetroBlockers(e.target.value)}
+            />
+
+            <div className="flex justify-end pt-4 border-t border-border">
+              <Button
+                type="submit"
+                isLoading={submitRetroMutation.isPending}
+                className="w-full sm:w-auto bg-gradient-to-r from-primary to-accent text-white font-bold tracking-wider shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform duration-200"
+              >
+                <CheckCircle2 className="w-5 h-5 mr-2" />
+                SUBMIT RETROACTIVE REPORT & UNLOCK
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </Card>
   );
 };

@@ -56,8 +56,9 @@ export const WFHRequestModal: React.FC<WFHRequestModalProps> = ({ isOpen, onClos
       reset();
       onClose();
     },
-    onError: () => {
-      addToast('Submission Failed', 'Could not submit WFH request.', 'error');
+    onError: (err: any) => {
+      const errMsg = err.response?.data?.message || 'Could not submit WFH request.';
+      addToast('Submission Failed', errMsg, 'error');
     },
   });
 

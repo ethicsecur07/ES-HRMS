@@ -69,6 +69,21 @@ const applyPermission = async (req, res) => {
             res.status(400).json({ message: err.message });
             return;
         }
+        // Check for approved leaves on this date to prevent permissions during leaves
+        const approvedLeave = await Leave_js_1.Leave.findOne({
+            organizationId: orgId,
+            employeeId,
+            leaveType: { $ne: 'WFH' },
+            status: 'APPROVED',
+            startDate: { $lte: date },
+            endDate: { $gte: date },
+        });
+        if (approvedLeave) {
+            res.status(400).json({
+                message: `Permission request blocked: You already have an approved leave (${approvedLeave.leaveType}) from ${approvedLeave.startDate} to ${approvedLeave.endDate}.`,
+            });
+            return;
+        }
         // Check monthly permission limit
         const limitCheck = await LeavePolicyEngine_js_1.LeavePolicyEngine.checkMonthlyPermissionLimit(orgId, employeeId, totalHours);
         if (!limitCheck.allowed) {

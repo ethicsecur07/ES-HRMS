@@ -9,6 +9,7 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   maxWidth?: string;
+  preventClose?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -17,6 +18,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
   maxWidth = 'max-w-lg',
+  preventClose = false,
 }) => {
   const modalContent = (
     <AnimatePresence>
@@ -26,7 +28,7 @@ export const Modal: React.FC<ModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={preventClose ? undefined : onClose}
             className="fixed inset-0"
           />
 
@@ -39,12 +41,14 @@ export const Modal: React.FC<ModalProps> = ({
           >
             <div className="flex items-center justify-between border-b border-border pb-4 mb-6">
               <h3 className="text-xl font-bold text-foreground tracking-tight">{title}</h3>
-              <button
-                onClick={onClose}
-                className="rounded-full p-1.5 hover:bg-accent hover:text-accent-foreground text-muted-foreground transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              {!preventClose && (
+                <button
+                  onClick={onClose}
+                  className="rounded-full p-1.5 hover:bg-accent hover:text-accent-foreground text-muted-foreground transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
             </div>
 
             <div className="max-h-[75vh] overflow-y-auto pr-1">{children}</div>

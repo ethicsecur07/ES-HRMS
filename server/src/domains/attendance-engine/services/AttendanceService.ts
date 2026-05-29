@@ -8,6 +8,8 @@ import { ShiftService } from './ShiftService.js';
 import { createAuditLog } from '../../../services/auditLog.service.js';
 import { getIO } from '../../../sockets/socketHandler.js';
 import { LatePenaltyService } from '../../leave-engine/services/LatePenaltyService.js';
+import { PermissionRequest } from '../../../models/PermissionRequest.js';
+import { Leave } from '../../../models/Leave.js';
 
 // Haversine formula helper
 const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -47,6 +49,7 @@ export class AttendanceService {
         if (employee) employeeId = employee._id;
       }
       if (employeeId) {
+        await AttendanceService.checkAndProcessForgotCheckout(organizationId, employeeId, email);
         query.employeeId = employeeId;
       } else {
         return [];
@@ -76,6 +79,7 @@ export class AttendanceService {
         if (employee) employeeId = employee._id;
       }
       if (employeeId) {
+        await AttendanceService.checkAndProcessForgotCheckout(organizationId, employeeId, email);
         query.employeeId = employeeId;
       } else {
         return [];
@@ -110,6 +114,20 @@ export class AttendanceService {
       const employee = await Employee.findOne({ _id: empId, organizationId: orgId }).session(session);
       if (!employee) {
         throw new Error('Target employee not found in this organization.');
+      }
+
+      // 1.5 Enforce Approved Leave Block (Do not allow check-in on approved leave days)
+      const approvedLeaveToday = await Leave.findOne({
+        organizationId: orgId,
+        employeeId: empId,
+        leaveType: { $ne: 'WFH' }, // WFH is not a leave, they must check in
+        status: 'APPROVED',
+        startDate: { $lte: today },
+        endDate: { $gte: today },
+      }).session(session);
+
+      if (approvedLeaveToday) {
+        throw new Error(`Check-in blocked: You have an approved leave (${approvedLeaveToday.leaveType}) today. You cannot record attendance on approved leave days.`);
       }
 
       // 2. Prevent duplicate check-in
@@ -166,6 +184,45 @@ export class AttendanceService {
         if (currentHour > 9 || (currentHour === 9 && currentMinute > 35)) {
           isLate = true;
           lateReason = 'Late check-in after default 9:35 AM threshold';
+        }
+      }
+
+      // 4b. Enforce Morning/Scheduled Permission Block
+      const activePermissions = await PermissionRequest.find({
+        organizationId: orgId,
+        employeeId: empId,
+        date: today,
+        approvalStatus: { $ne: 'REJECTED' }
+      }).session(session);
+
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      for (const perm of activePermissions) {
+        const [startH, startM] = perm.startTime.split(':').map(Number);
+        const [endH, endM] = perm.endTime.split(':').map(Number);
+        const startMin = startH * 60 + startM;
+        const endMin = endH * 60 + endM;
+
+        if (currentMinutes >= startMin && currentMinutes <= endMin) {
+          throw new Error(`Check-in blocked: You have a scheduled permission from ${perm.startTime} to ${perm.endTime} at this time. You cannot check in during your permission hours.`);
+        }
+      }
+
+      // 4c. Enforce Late Check-In Month Limits (Max 2 late days, 3rd late day requires request to leave)
+      if (isLate) {
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+          .toISOString()
+          .split('T')[0];
+
+        const priorLateCount = await Attendance.countDocuments({
+          organizationId: orgId,
+          employeeId: empId,
+          isLate: true,
+          date: { $gte: monthStart, $lte: monthEnd }
+        }).session(session);
+
+        if (priorLateCount >= 2) {
+          throw new Error(`Check-in blocked: This is late check-in #3 for this month. You must request a leave for today.`);
         }
       }
 
@@ -258,16 +315,33 @@ export class AttendanceService {
     session.startTransaction();
 
     try {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
       const attendance = await Attendance.findOne({ _id: attId, organizationId: orgId }).session(session);
       if (!attendance) {
         throw new Error('Attendance record not found.');
+      }
+
+      if (currentHour < 17 || (currentHour === 17 && currentMinute < 40)) {
+        const todayStr = attendance.date;
+        const approvedPerm = await PermissionRequest.findOne({
+          organizationId: orgId,
+          employeeId: attendance.employeeId,
+          date: todayStr,
+          approvalStatus: 'APPROVED'
+        }).session(session);
+
+        if (!approvedPerm) {
+          throw new Error('Checkout is only permitted after 5:40 PM unless you have an approved permission request today.');
+        }
       }
 
       if (attendance.logoutTime) {
         throw new Error('Employee has already checked out for today.');
       }
 
-      const now = new Date();
       let earlyCheckoutNote = '';
 
       // Resolve shift to check early checkout boundaries
@@ -391,5 +465,47 @@ export class AttendanceService {
     );
 
     return attendance;
+  }
+
+  /**
+   * Scans for past days' check-ins without checkout, and auto-resolves them to exactly 9 hours.
+   */
+  static async checkAndProcessForgotCheckout(
+    organizationId: string | mongoose.Types.ObjectId,
+    employeeId: string | mongoose.Types.ObjectId,
+    email: string
+  ): Promise<void> {
+    const orgId = new mongoose.Types.ObjectId(organizationId.toString());
+    const empId = new mongoose.Types.ObjectId(employeeId.toString());
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Find previous attendance records where logoutTime is missing
+    const openAttendances = await Attendance.find({
+      organizationId: orgId,
+      employeeId: empId,
+      date: { $lt: todayStr },
+      logoutTime: { $exists: false }
+    });
+
+    for (const att of openAttendances) {
+      const loginTime = new Date(att.loginTime);
+      // Set logout to exactly 9 hours after login
+      const logoutTime = new Date(loginTime.getTime() + 9 * 60 * 60 * 1000);
+      
+      att.logoutTime = logoutTime;
+      att.workingHours = 9;
+      att.isAutoCheckedOut = true;
+      att.pendingReportUpdate = true;
+      await att.save();
+
+      await createAuditLog(
+        'ATTENDANCE_AUTO_CHECKOUT',
+        email,
+        'ATTENDANCE',
+        att.id,
+        `Auto-checked out for forgot checkout on ${att.date}. Assigned 9 working hours.`,
+        orgId
+      );
+    }
   }
 }

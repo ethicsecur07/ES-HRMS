@@ -65,8 +65,9 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({ 
       reset();
       onClose();
     },
-    onError: () => {
-      addToast('Submission Failed', 'Could not submit permission request.', 'error');
+    onError: (err: any) => {
+      const errMsg = err.response?.data?.message || 'Could not submit permission request.';
+      addToast('Submission Failed', errMsg, 'error');
     },
   });
 

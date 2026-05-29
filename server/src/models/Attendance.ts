@@ -23,6 +23,8 @@ export interface IAttendance extends Document {
   taskSubmitted: boolean;
   locationVerified: boolean;
   overrideReason?: string;
+  isAutoCheckedOut?: boolean;
+  pendingReportUpdate?: boolean;
   
   // Advanced Attendance Features
   biometricId?: string;
@@ -84,6 +86,8 @@ const attendanceSchema = new Schema<IAttendance>(
     taskSubmitted: { type: Boolean, default: false },
     locationVerified: { type: Boolean, default: true },
     overrideReason: { type: String },
+    isAutoCheckedOut: { type: Boolean, default: false },
+    pendingReportUpdate: { type: Boolean, default: false },
 
     // Advanced Attendance Engine
     biometricId: { type: String },

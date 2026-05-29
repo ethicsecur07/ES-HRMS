@@ -106,7 +106,9 @@ export const useNotificationStore = create<NotificationState>()(
 
       markAsRead: async (id) => {
         try {
-          await notificationApi.markAsRead(id);
+          if (/^[0-9a-fA-F]{24}$/.test(id)) {
+            await notificationApi.markAsRead(id);
+          }
           set((state) => {
             const updated = state.notifications.map((n) => (n._id === id ? { ...n, read: true } : n));
             return {

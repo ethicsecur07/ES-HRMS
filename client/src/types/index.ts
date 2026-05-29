@@ -115,6 +115,8 @@ export interface Attendance {
   locationVerified: boolean;
   overrideReason?: string;
   overtime?: { isApproved: boolean };
+  isAutoCheckedOut?: boolean;
+  pendingReportUpdate?: boolean;
 }
 
 export interface TaskReport {
