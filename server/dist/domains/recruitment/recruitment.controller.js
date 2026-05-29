@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateOfferTemplate = exports.getOfferTemplate = exports.sendCandidateOffer = exports.deleteCandidate = exports.updateCandidate = exports.updateCandidateStage = exports.getCandidates = exports.createCandidate = void 0;
+exports.getCandidateOfferLetter = exports.updateOfferTemplate = exports.getOfferTemplate = exports.sendCandidateOffer = exports.deleteCandidate = exports.updateCandidate = exports.updateCandidateStage = exports.getCandidates = exports.createCandidate = void 0;
 const Candidate_js_1 = require("../../models/Candidate.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const offerLetterPdf_service_js_1 = require("../../services/offerLetterPdf.service.js");
@@ -8,6 +8,68 @@ const s3_js_1 = require("../../utils/s3.js");
 const email_service_js_1 = require("../../services/email.service.js");
 const logger_js_1 = require("../../utils/logger.js");
 const OfferTemplate_js_1 = require("../../models/OfferTemplate.js");
+const applicant_model_js_1 = require("../../models/applicant.model.js");
+const OrganizationAuthConfig_js_1 = require("../../models/OrganizationAuthConfig.js");
+const findOrCreateCandidate = async (id) => {
+    let candidate = await Candidate_js_1.Candidate.findById(id);
+    if (candidate)
+        return candidate;
+    // Try promoting local Applicant
+    try {
+        const applicant = await applicant_model_js_1.ApplicantModel.findById(id);
+        if (applicant) {
+            const name = applicant.name || 'Applicant';
+            const [firstName = '', ...lastNameParts] = name.trim().split(/\s+/);
+            const lastName = lastNameParts.join(' ') || ' ';
+            candidate = new Candidate_js_1.Candidate({
+                _id: applicant._id, // Retain original ID!
+                firstName,
+                lastName,
+                email: applicant.email,
+                phone: applicant.mobile,
+                appliedRole: applicant.role,
+                resumeUrl: applicant.resumeUrl,
+                stage: 'NEW'
+            });
+            await candidate.save();
+            logger_js_1.logger.info(`[RecruitmentController] Promoted local applicant to candidate: ${applicant.email}`);
+            return candidate;
+        }
+    }
+    catch (err) {
+        logger_js_1.logger.error('[RecruitmentController] Local applicant promotion check failed', { error: err.message });
+    }
+    // Try promoting external Applicant
+    try {
+        const extRes = await fetch(`https://qcyokzjqdb.execute-api.ap-south-1.amazonaws.com/prod/api/applicants/${id}`);
+        if (extRes.ok) {
+            const payload = await extRes.json();
+            const app = payload.data;
+            if (app) {
+                const name = app.name || 'Applicant';
+                const [firstName = '', ...lastNameParts] = name.trim().split(/\s+/);
+                const lastName = lastNameParts.join(' ') || ' ';
+                candidate = new Candidate_js_1.Candidate({
+                    _id: app._id, // Retain original ID!
+                    firstName,
+                    lastName,
+                    email: app.email,
+                    phone: app.mobile || '',
+                    appliedRole: app.role || 'Applicant',
+                    resumeUrl: app.resumeUrl || '',
+                    stage: 'NEW'
+                });
+                await candidate.save();
+                logger_js_1.logger.info(`[RecruitmentController] Promoted external applicant to candidate: ${app.email}`);
+                return candidate;
+            }
+        }
+    }
+    catch (extErr) {
+        logger_js_1.logger.error('[RecruitmentController] External applicant promotion check failed', { error: extErr.message });
+    }
+    return null;
+};
 const createCandidate = async (req, res) => {
     try {
         const candidate = new Candidate_js_1.Candidate(req.body);
@@ -26,7 +88,77 @@ const createCandidate = async (req, res) => {
 exports.createCandidate = createCandidate;
 const getCandidates = async (req, res) => {
     try {
-        const candidates = await Candidate_js_1.Candidate.find().sort({ createdAt: -1 });
+        // 1. Fetch all local candidate documents
+        const localCandidates = await Candidate_js_1.Candidate.find().sort({ createdAt: -1 });
+        const localEmails = new Set(localCandidates.map(c => c.email.toLowerCase().trim()));
+        // 2. Fetch all local applicant documents
+        let localApplicants = [];
+        try {
+            localApplicants = await applicant_model_js_1.ApplicantModel.find().sort({ createdAt: -1 });
+        }
+        catch (localAppErr) {
+            logger_js_1.logger.error('[RecruitmentController] Failed to fetch local applicants', { error: localAppErr.message });
+        }
+        // 3. Fetch all external applicants
+        let externalApplicants = [];
+        try {
+            const extRes = await fetch('https://qcyokzjqdb.execute-api.ap-south-1.amazonaws.com/prod/api/applicants');
+            if (extRes.ok) {
+                const payload = await extRes.json();
+                externalApplicants = payload.data || [];
+            }
+        }
+        catch (extErr) {
+            logger_js_1.logger.error('[RecruitmentController] Failed to fetch external applicants', { error: extErr.message });
+        }
+        // 4. Merge them dynamically, avoiding duplicate emails
+        const mappedLocalApplicants = localApplicants
+            .filter(app => app.email && !localEmails.has(app.email.toLowerCase().trim()))
+            .map(app => {
+            const name = app.name || 'Applicant';
+            const [firstName = '', ...lastNameParts] = name.trim().split(/\s+/);
+            const lastName = lastNameParts.join(' ') || ' ';
+            // Add to Set to prevent subsequent external list from adding the same email
+            localEmails.add(app.email.toLowerCase().trim());
+            return {
+                _id: app._id,
+                firstName,
+                lastName,
+                email: app.email,
+                phone: app.mobile || '',
+                appliedRole: app.role || 'Applicant',
+                resumeUrl: app.resumeUrl || '',
+                stage: 'NEW',
+                createdAt: app.createdAt || new Date(),
+                updatedAt: app.updatedAt || new Date(),
+                isLocalApplicant: true
+            };
+        });
+        const mappedExternalApplicants = externalApplicants
+            .filter(app => app.email && !localEmails.has(app.email.toLowerCase().trim()))
+            .map(app => {
+            const name = app.name || 'Applicant';
+            const [firstName = '', ...lastNameParts] = name.trim().split(/\s+/);
+            const lastName = lastNameParts.join(' ') || ' ';
+            return {
+                _id: app._id,
+                firstName,
+                lastName,
+                email: app.email,
+                phone: app.mobile || '',
+                appliedRole: app.role || 'Applicant',
+                resumeUrl: app.resumeUrl || '',
+                stage: 'NEW',
+                createdAt: app.createdAt ? new Date(app.createdAt) : new Date(),
+                updatedAt: app.updatedAt ? new Date(app.updatedAt) : new Date(),
+                isExternal: true
+            };
+        });
+        const candidates = [
+            ...localCandidates,
+            ...mappedLocalApplicants,
+            ...mappedExternalApplicants
+        ];
         res.status(200).json({ success: true, candidates });
     }
     catch (error) {
@@ -38,11 +170,13 @@ const updateCandidateStage = async (req, res) => {
     try {
         const { id } = req.params;
         const { stage } = req.body;
-        const candidate = await Candidate_js_1.Candidate.findByIdAndUpdate(id, { stage }, { new: true });
+        const candidate = await findOrCreateCandidate(id);
         if (!candidate) {
             res.status(404).json({ success: false, message: 'Candidate not found' });
             return;
         }
+        candidate.stage = stage;
+        await candidate.save();
         (0, socketHandler_js_1.getIO)()?.emit('candidate_updated', candidate);
         res.status(200).json({ success: true, candidate });
     }
@@ -54,11 +188,13 @@ exports.updateCandidateStage = updateCandidateStage;
 const updateCandidate = async (req, res) => {
     try {
         const { id } = req.params;
-        const candidate = await Candidate_js_1.Candidate.findByIdAndUpdate(id, req.body, { new: true });
+        let candidate = await findOrCreateCandidate(id);
         if (!candidate) {
             res.status(404).json({ success: false, message: 'Candidate not found' });
             return;
         }
+        Object.assign(candidate, req.body);
+        await candidate.save();
         (0, socketHandler_js_1.getIO)()?.emit('candidate_updated', candidate);
         res.status(200).json({ success: true, candidate });
     }
@@ -75,8 +211,9 @@ const deleteCandidate = async (req, res) => {
     try {
         const { id } = req.params;
         const candidate = await Candidate_js_1.Candidate.findByIdAndDelete(id);
-        if (!candidate) {
-            res.status(404).json({ success: false, message: 'Candidate not found' });
+        const applicant = await applicant_model_js_1.ApplicantModel.findByIdAndDelete(id);
+        if (!candidate && !applicant) {
+            res.status(404).json({ success: false, message: 'Candidate or Applicant not found' });
             return;
         }
         (0, socketHandler_js_1.getIO)()?.emit('candidate_deleted', { candidateId: id });
@@ -90,17 +227,30 @@ exports.deleteCandidate = deleteCandidate;
 const sendCandidateOffer = async (req, res) => {
     try {
         const { id } = req.params;
-        const candidate = await Candidate_js_1.Candidate.findById(id);
+        const candidate = await findOrCreateCandidate(id);
         if (!candidate) {
             res.status(404).json({ success: false, message: 'Candidate not found' });
             return;
         }
-        const { date, candidateName, address, appliedRole, duration, startDate, endDate, stipendDetails, technologies, footerPhone, footerEmail, footerWebsite, footerAddress, bodyText, signatoryName, signatoryTitle, pdfTitle, pdfSubject, emailSubject, emailBody, customPdfUrl, salaryOffered = 0 } = req.body;
+        const { date, candidateName, address, appliedRole, duration, startDate, endDate, stipendDetails, technologies, footerPhone, footerEmail, footerWebsite, footerAddress, bodyText, signatoryName, signatoryTitle, pdfTitle, pdfSubject, emailSubject, emailBody, customPdfUrl, customPdfBase64, customPdfName, salaryOffered = 0 } = req.body;
         let pdfBuffer;
         let uploadedUrl;
         let fileName;
-        if (customPdfUrl) {
-            logger_js_1.logger.info(`[RecruitmentController] Using custom uploaded PDF offer letter for ${candidateName}: ${customPdfUrl}`);
+        if (customPdfBase64) {
+            logger_js_1.logger.info(`[RecruitmentController] Using custom base64 PDF offer letter: ${customPdfName}`);
+            fileName = customPdfName || `Offer_Letter_${candidateName.replace(/\s+/g, '_')}.pdf`;
+            try {
+                pdfBuffer = Buffer.from(customPdfBase64, 'base64');
+                uploadedUrl = await (0, s3_js_1.uploadFileToS3)(pdfBuffer, fileName, 'application/pdf');
+                logger_js_1.logger.info(`[RecruitmentController] Custom PDF uploaded successfully: ${uploadedUrl}`);
+            }
+            catch (uploadErr) {
+                logger_js_1.logger.error('[RecruitmentController] Failed to process/upload custom PDF base64', { error: uploadErr.message });
+                throw new Error(`Failed to upload custom PDF offer letter: ${uploadErr.message}`);
+            }
+        }
+        else if (customPdfUrl) {
+            logger_js_1.logger.info(`[RecruitmentController] Using custom uploaded PDF offer letter URL for ${candidateName}: ${customPdfUrl}`);
             uploadedUrl = customPdfUrl;
             // Extract the filename from the URL, ignoring query parameters (like Cloudinary versioning)
             fileName = customPdfUrl.split('/').pop()?.split('?')[0] || `Offer_Letter_${candidateName.replace(/\s+/g, '_')}.pdf`;
@@ -146,6 +296,7 @@ const sendCandidateOffer = async (req, res) => {
         candidate.offerDetails = {
             salaryOffered,
             offerLetterUrl: uploadedUrl,
+            offerLetterBase64: pdfBuffer.toString('base64'),
             status: 'PENDING'
         };
         await candidate.save();
@@ -192,6 +343,29 @@ const sendCandidateOffer = async (req, res) => {
         </div>
       </div>
     `;
+        // Fetch Organization Custom Microsoft OAuth2 Credentials from DB if available
+        const orgId = req.user?.organizationId;
+        let microsoftCredentials;
+        if (orgId) {
+            try {
+                const authConfig = await OrganizationAuthConfig_js_1.OrganizationAuthConfig.findOne({
+                    organizationId: orgId,
+                    provider: 'MICROSOFT',
+                    isEnabled: true
+                });
+                if (authConfig && authConfig.tenantId && authConfig.clientId && authConfig.clientSecret) {
+                    microsoftCredentials = {
+                        tenantId: authConfig.tenantId,
+                        clientId: authConfig.clientId,
+                        clientSecret: authConfig.clientSecret
+                    };
+                    logger_js_1.logger.info(`[RecruitmentController] Found active Microsoft Organization Auth Config for orgId: ${orgId}. Using dynamic credentials.`);
+                }
+            }
+            catch (err) {
+                logger_js_1.logger.error('[RecruitmentController] Failed to query OrganizationAuthConfig', { error: err.message });
+            }
+        }
         let emailSent = true;
         let emailError = '';
         try {
@@ -206,7 +380,8 @@ const sendCandidateOffer = async (req, res) => {
                         content: pdfBuffer,
                         contentType: 'application/pdf'
                     }
-                ]
+                ],
+                microsoftCredentials
             });
         }
         catch (mailErr) {
@@ -320,3 +495,44 @@ const updateOfferTemplate = async (req, res) => {
     }
 };
 exports.updateOfferTemplate = updateOfferTemplate;
+const getCandidateOfferLetter = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const candidate = await Candidate_js_1.Candidate.findById(id);
+        if (!candidate || !candidate.offerDetails) {
+            res.status(404).json({ success: false, message: 'Offer details not found for this candidate.' });
+            return;
+        }
+        let pdfBuffer;
+        if (candidate.offerDetails.offerLetterBase64) {
+            pdfBuffer = Buffer.from(candidate.offerDetails.offerLetterBase64, 'base64');
+        }
+        else if (candidate.offerDetails.offerLetterUrl) {
+            logger_js_1.logger.info(`[RecruitmentController] Fetching offer letter PDF from URL for download fallback: ${candidate.offerDetails.offerLetterUrl}`);
+            try {
+                pdfBuffer = await (0, s3_js_1.fetchFileBuffer)(candidate.offerDetails.offerLetterUrl);
+            }
+            catch (fetchErr) {
+                logger_js_1.logger.error('[RecruitmentController] Fallback fetch failed', { error: fetchErr.message });
+                res.status(500).json({ success: false, message: `Failed to download offer letter PDF: ${fetchErr.message}` });
+                return;
+            }
+        }
+        else {
+            res.status(404).json({ success: false, message: 'Offer letter PDF not found for this candidate.' });
+            return;
+        }
+        const fileName = `Offer_Letter_${candidate.firstName}_${candidate.lastName}.pdf`.replace(/\s+/g, '_');
+        res.writeHead(200, {
+            'Content-Type': 'application/pdf',
+            'Content-Length': pdfBuffer.length,
+            'Content-Disposition': `inline; filename="${fileName}"`
+        });
+        res.end(pdfBuffer);
+    }
+    catch (error) {
+        logger_js_1.logger.error('[RecruitmentController] getCandidateOfferLetter error', { error });
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.getCandidateOfferLetter = getCandidateOfferLetter;

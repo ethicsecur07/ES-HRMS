@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const applicant_controller_js_1 = require("../controllers/applicant.controller.js");
+const upload_middleware_js_1 = require("../middleware/upload.middleware.js");
+const router = (0, express_1.Router)();
+router.post('/apply', upload_middleware_js_1.upload.single('resume'), applicant_controller_js_1.ApplicantController.submitApplication);
+router.get('/', applicant_controller_js_1.ApplicantController.getAll);
+router.get('/:id', applicant_controller_js_1.ApplicantController.getById);
+exports.default = router;

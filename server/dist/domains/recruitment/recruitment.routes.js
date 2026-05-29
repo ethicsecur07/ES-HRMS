@@ -14,4 +14,5 @@ router.put('/:id/stage', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.r
 router.put('/:id', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('RECRUITMENT', 'edit'), recruitment_controller_js_1.updateCandidate);
 router.delete('/:id', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('RECRUITMENT', 'delete'), recruitment_controller_js_1.deleteCandidate);
 router.post('/:id/send-offer', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('RECRUITMENT', 'edit'), recruitment_controller_js_1.sendCandidateOffer);
+router.get('/:id/offer-letter', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('RECRUITMENT', 'view'), recruitment_controller_js_1.getCandidateOfferLetter);
 exports.default = router;

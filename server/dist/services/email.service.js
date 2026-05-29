@@ -29,10 +29,18 @@ const sendEmail = async (options) => {
                 lower.includes('client_id') ||
                 lower.includes('client_secret'));
         };
-        const hasOAuthCredentials = TENANT_ID && CLIENT_ID && CLIENT_SECRET &&
-            !isPlaceholder(TENANT_ID) &&
-            !isPlaceholder(CLIENT_ID) &&
-            !isPlaceholder(CLIENT_SECRET);
+        const hasOrgOAuth = !!(options.microsoftCredentials &&
+            options.microsoftCredentials.tenantId &&
+            options.microsoftCredentials.clientId &&
+            options.microsoftCredentials.clientSecret &&
+            !isPlaceholder(options.microsoftCredentials.tenantId) &&
+            !isPlaceholder(options.microsoftCredentials.clientId) &&
+            !isPlaceholder(options.microsoftCredentials.clientSecret));
+        const hasOAuthCredentials = hasOrgOAuth ||
+            (TENANT_ID && CLIENT_ID && CLIENT_SECRET &&
+                !isPlaceholder(TENANT_ID) &&
+                !isPlaceholder(CLIENT_ID) &&
+                !isPlaceholder(CLIENT_SECRET));
         const hasSmtpPassword = SMTP_PASS && SMTP_PASS.trim() !== '';
         let isGraphSent = false;
         if (hasSmtpPassword) {
@@ -53,7 +61,7 @@ const sendEmail = async (options) => {
         else if (hasOAuthCredentials) {
             logger_js_1.logger.info(`[EmailService] Attempting Microsoft Graph API sendMail...`);
             try {
-                const graphToken = await (0, tokenService_js_1.getMicrosoftAccessToken)('https://graph.microsoft.com/.default');
+                const graphToken = await (0, tokenService_js_1.getMicrosoftAccessToken)('https://graph.microsoft.com/.default', options.microsoftCredentials);
                 const graphAttachments = options.attachments?.map(att => ({
                     '@odata.type': '#microsoft.graph.fileAttachment',
                     name: att.filename,
@@ -101,7 +109,7 @@ const sendEmail = async (options) => {
             }
             if (!isGraphSent) {
                 logger_js_1.logger.info(`[EmailService] Attempting fallback to Microsoft OAuth2 SMTP AUTH token retrieval...`);
-                const token = await (0, tokenService_js_1.getMicrosoftAccessToken)('https://outlook.office365.com/.default');
+                const token = await (0, tokenService_js_1.getMicrosoftAccessToken)('https://outlook.office365.com/.default', options.microsoftCredentials);
                 transporter = nodemailer_1.default.createTransport({
                     host: SMTP_HOST,
                     port: Number(SMTP_PORT),

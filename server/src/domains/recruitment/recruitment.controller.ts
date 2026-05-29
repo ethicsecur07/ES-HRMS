@@ -7,6 +7,7 @@ import { sendEmail } from '../../services/email.service.js';
 import { logger } from '../../utils/logger.js';
 import { OfferTemplate } from '../../models/OfferTemplate.js';
 import { ApplicantModel } from '../../models/applicant.model.js';
+import { OrganizationAuthConfig } from '../../models/OrganizationAuthConfig.js';
 
 const findOrCreateCandidate = async (id: string): Promise<any> => {
   let candidate = await Candidate.findById(id);
@@ -388,6 +389,31 @@ export const sendCandidateOffer = async (req: Request, res: Response): Promise<v
       </div>
     `;
 
+    // Fetch Organization Custom Microsoft OAuth2 Credentials from DB if available
+    const orgId = (req as any).user?.organizationId;
+    let microsoftCredentials: { tenantId: string; clientId: string; clientSecret: string } | undefined;
+
+    if (orgId) {
+      try {
+        const authConfig = await OrganizationAuthConfig.findOne({
+          organizationId: orgId,
+          provider: 'MICROSOFT',
+          isEnabled: true
+        });
+        
+        if (authConfig && authConfig.tenantId && authConfig.clientId && authConfig.clientSecret) {
+          microsoftCredentials = {
+            tenantId: authConfig.tenantId,
+            clientId: authConfig.clientId,
+            clientSecret: authConfig.clientSecret
+          };
+          logger.info(`[RecruitmentController] Found active Microsoft Organization Auth Config for orgId: ${orgId}. Using dynamic credentials.`);
+        }
+      } catch (err: any) {
+        logger.error('[RecruitmentController] Failed to query OrganizationAuthConfig', { error: err.message });
+      }
+    }
+
     let emailSent = true;
     let emailError = '';
     try {
@@ -402,7 +428,8 @@ export const sendCandidateOffer = async (req: Request, res: Response): Promise<v
             content: pdfBuffer,
             contentType: 'application/pdf'
           }
-        ]
+        ],
+        microsoftCredentials
       });
     } catch (mailErr: any) {
       logger.error('[RecruitmentController] sendEmail failed, but continuing response', { error: mailErr.message || mailErr });

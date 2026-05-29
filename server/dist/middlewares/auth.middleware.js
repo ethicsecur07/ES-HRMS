@@ -6,12 +6,18 @@ const UserSession_js_1 = require("../models/UserSession.js");
 const Organization_js_1 = require("../models/Organization.js");
 const User_js_1 = require("../models/User.js");
 const authenticate = async (req, res, next) => {
+    let token = '';
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    }
+    else if (req.query.token) {
+        token = req.query.token;
+    }
+    if (!token) {
         res.status(401).json({ message: 'Unauthorized access. Token missing.' });
         return;
     }
-    const token = authHeader.split(' ')[1];
     try {
         // Developer Sandbox Bypass
         if (token.startsWith('demo-jwt-token-')) {

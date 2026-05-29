@@ -6,8 +6,10 @@ const logger_js_1 = require("../utils/logger.js");
  * Fetches a fresh Microsoft OAuth2 Access Token using Client Credentials Flow.
  * Used to authenticate secure SMTP AUTH client submissions via suseendrakumar@ethicsecur.co.in.
  */
-const getMicrosoftAccessToken = async (scope = 'https://graph.microsoft.com/.default') => {
-    const { TENANT_ID, CLIENT_ID, CLIENT_SECRET } = process.env;
+const getMicrosoftAccessToken = async (scope = 'https://graph.microsoft.com/.default', credentials) => {
+    const tenantId = credentials?.tenantId || process.env.TENANT_ID;
+    const clientId = credentials?.clientId || process.env.CLIENT_ID;
+    const clientSecret = credentials?.clientSecret || process.env.CLIENT_SECRET;
     const isPlaceholder = (val) => {
         if (!val)
             return true;
@@ -20,16 +22,16 @@ const getMicrosoftAccessToken = async (scope = 'https://graph.microsoft.com/.def
             lower.includes('client_id') ||
             lower.includes('client_secret'));
     };
-    if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET ||
-        isPlaceholder(TENANT_ID) || isPlaceholder(CLIENT_ID) || isPlaceholder(CLIENT_SECRET)) {
-        throw new Error('Microsoft OAuth2 settings are unconfigured placeholders or incomplete in the server .env file. Please configure TENANT_ID, CLIENT_ID, and CLIENT_SECRET with real Azure AD details.');
+    if (!tenantId || !clientId || !clientSecret ||
+        isPlaceholder(tenantId) || isPlaceholder(clientId) || isPlaceholder(clientSecret)) {
+        throw new Error('Microsoft OAuth2 settings are unconfigured placeholders or incomplete in the configuration. Please configure TENANT_ID, CLIENT_ID, and CLIENT_SECRET with real Azure AD details.');
     }
     try {
-        const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
+        const url = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
         const params = new URLSearchParams();
         params.append('grant_type', 'client_credentials');
-        params.append('client_id', CLIENT_ID);
-        params.append('client_secret', CLIENT_SECRET);
+        params.append('client_id', clientId);
+        params.append('client_secret', clientSecret);
         params.append('scope', scope);
         const response = await fetch(url, {
             method: 'POST',
