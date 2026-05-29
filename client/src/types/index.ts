@@ -234,6 +234,16 @@ export interface CompanySettings {
 
 export type RecruitmentStage = 'NEW' | 'SCREENING' | 'INTERVIEW' | 'TECHNICAL' | 'HR' | 'OFFER' | 'HIRED';
 
+export interface StageEvaluation {
+  stage: RecruitmentStage;
+  comments?: string;
+  ratingCommunication?: number;
+  ratingTechnical?: number;
+  toolsExperiences?: string;
+  completed?: boolean;
+  completedAt?: string;
+}
+
 export interface Candidate {
   _id: string;
   firstName: string;
@@ -253,6 +263,7 @@ export interface Candidate {
     status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   };
   notes?: string;
+  evaluations?: StageEvaluation[];
   createdAt: string;
   updatedAt: string;
 }
