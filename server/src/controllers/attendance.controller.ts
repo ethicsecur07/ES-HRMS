@@ -57,25 +57,33 @@ export const checkIn = async (req: AuthRequest, res: Response): Promise<void> =>
       lng
     );
 
-    // Calculate warning if the check-in is late (1st or 2nd time)
+    // Build a warning message if the check-in is late (only 1st late is allowed; 2nd is blocked)
     let warning: string | undefined = undefined;
     if (attendance.isLate) {
       const now = new Date();
-      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
       const mongoose = (await import('mongoose')).default;
       const empId = new mongoose.Types.ObjectId(employeeId);
       const orgId = new mongoose.Types.ObjectId(organizationId);
       const Attendance = (await import('../models/Attendance.js')).Attendance;
+      const Organization = (await import('../models/Organization.js')).Organization;
+      const { AttendanceService } = await import('../domains/attendance-engine/services/AttendanceService.js');
 
-      const lateCountThisMonth = await Attendance.countDocuments({
+      const org = await Organization.findOne({ _id: orgId }).select('settings.salaryCycleStartDay');
+      const startDay = org?.settings?.salaryCycleStartDay ?? 10;
+
+      const { cycleStart, cycleEnd } = AttendanceService.getSalaryCycleDates(now, startDay);
+
+      const lateCountThisCycle = await Attendance.countDocuments({
         organizationId: orgId,
         employeeId: empId,
         isLate: true,
-        date: { $gte: monthStart, $lte: monthEnd }
+        date: { $gte: cycleStart, $lte: cycleEnd }
       });
 
-      warning = `Late check-in recorded! (This is late day #${lateCountThisMonth} this month. On the 3rd late check-in, you will be blocked and required to request leave.)`;
+      warning =
+        `⏰ Come fast! Late check-in recorded ` +
+        `(${lateCountThisCycle === 1 ? '1st' : `${lateCountThisCycle}th`} time this salary cycle ${cycleStart} – ${cycleEnd}). ` +
+        `Your next late check-in this cycle will be counted as absent — please apply for leave!`;
     }
 
     res.status(201).json({
@@ -85,8 +93,12 @@ export const checkIn = async (req: AuthRequest, res: Response): Promise<void> =>
       }
     });
   } catch (error: any) {
-    res.status(error.message === 'Attendance already recorded for today' || error.message.includes('already') ? 400 : 500).json({ message: error.message });
+    const msg: string = error.message || '';
+    const isAlready = msg.includes('already');
+    const isBlocked = msg.includes('blocked');
+    res.status(isAlready ? 400 : isBlocked ? 403 : 500).json({ message: msg });
   }
+
 };
 
 export const checkOut = async (req: AuthRequest, res: Response): Promise<void> => {

@@ -4,17 +4,21 @@ import { authPermissionApi, type PermissionActions, type MatrixUpdateRequest } f
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
-import { Settings, ShieldCheck, Users, Save, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Settings, ShieldCheck, Users, Save, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { usePermission } from '../hooks/usePermission';
+
 
 const ACTIONS_LIST: (keyof PermissionActions)[] = ['view', 'create', 'edit', 'delete', 'approve', 'assign', 'export'];
 
 export const PermissionPage: React.FC = () => {
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermission();
 
   // Matrix State
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+
   const [matrixState, setMatrixState] = useState<Record<string, Record<string, PermissionActions>>>({});
 
   // Fetch Matrix
@@ -177,7 +181,7 @@ export const PermissionPage: React.FC = () => {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ['permissionMatrix'] });
-        addToast('Permissions Synced', 'All role permissions have been refreshed including PROJECTS and RECRUITMENT modules.', 'success');
+        addToast('Permissions Synced', 'All role permissions have been refreshed including PROJECTS, RECRUITMENT, and LEAVE_POLICY modules.', 'success');
       } else {
         addToast('Sync Failed', data.message || 'Failed to sync permissions', 'error');
       }
@@ -254,7 +258,7 @@ export const PermissionPage: React.FC = () => {
           isLoading={syncPermissionsMutation.isPending}
           variant="outline"
           className="flex items-center gap-1.5 text-xs font-bold border-primary/30 text-primary hover:bg-primary/10"
-          title="Re-sync all role permissions to include new modules (PROJECTS, RECRUITMENT, etc.)"
+          title="Re-sync all role permissions to include new modules (PROJECTS, RECRUITMENT, LEAVE_POLICY, etc.)"
         >
           <RefreshCw className="w-4 h-4" />
           Sync Default Permissions
@@ -300,7 +304,22 @@ export const PermissionPage: React.FC = () => {
         >
           <ShieldCheck className="w-4 h-4" /> Permissions Matrix
         </NavLink>
+        {hasPermission('LEAVE_POLICY', 'view') && (
+          <NavLink
+            to="/settings/leave-policy"
+            className={({ isActive }) =>
+              `px-6 py-3 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-2 transition-all ${
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`
+            }
+          >
+            <Calendar className="w-4 h-4" /> Leave Policy
+          </NavLink>
+        )}
       </div>
+
 
       <div className="space-y-6">
           <div className="flex flex-col md:flex-row gap-6">

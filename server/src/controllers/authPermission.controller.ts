@@ -10,6 +10,7 @@ const DEFAULT_MODULES = [
   'EMPLOYEES',
   'ATTENDANCE',
   'LEAVES',
+  'LEAVE_POLICY',
   'TASKS',
   'PAYROLL',
   'FINANCE',
@@ -27,6 +28,7 @@ const DEFAULT_MODULES = [
   'CHAT',
   'NOTIFICATIONS',
 ];
+
 
 /**
  * Get permission matrix: lists all modules and how they are configured for each role.

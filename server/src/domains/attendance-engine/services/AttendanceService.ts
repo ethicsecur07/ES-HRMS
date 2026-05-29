@@ -10,6 +10,7 @@ import { getIO } from '../../../sockets/socketHandler.js';
 import { LatePenaltyService } from '../../leave-engine/services/LatePenaltyService.js';
 import { PermissionRequest } from '../../../models/PermissionRequest.js';
 import { Leave } from '../../../models/Leave.js';
+import { Organization } from '../../../models/Organization.js';
 
 // Haversine formula helper
 const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -207,23 +208,34 @@ export class AttendanceService {
         }
       }
 
-      // 4c. Enforce Late Check-In Month Limits (Max 2 late days, 3rd late day requires request to leave)
+      // 4c. Enforce Late Check-In Salary-Cycle Limits:
+      //   - 1st late in the cycle → allowed, warning returned in API response
+      //   - 2nd late in the cycle → blocked, counted as absent (employee must apply for leave)
       if (isLate) {
-        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-          .toISOString()
-          .split('T')[0];
+        // Fetch org salary cycle start day (default 10 → cycle runs 10th to 9th)
+        const org = await Organization.findOne({ _id: orgId })
+          .session(session)
+          .select('settings.salaryCycleStartDay');
+        const startDay = org?.settings?.salaryCycleStartDay ?? 10;
+
+        const { cycleStart, cycleEnd } = AttendanceService.getSalaryCycleDates(now, startDay);
 
         const priorLateCount = await Attendance.countDocuments({
           organizationId: orgId,
           employeeId: empId,
           isLate: true,
-          date: { $gte: monthStart, $lte: monthEnd }
+          date: { $gte: cycleStart, $lte: cycleEnd }
         }).session(session);
 
-        if (priorLateCount >= 2) {
-          throw new Error(`Check-in blocked: This is late check-in #3 for this month. You must request a leave for today.`);
+        // 2nd late in this salary cycle → block the check-in
+        if (priorLateCount >= 1) {
+          throw new Error(
+            `Check-in blocked: This is your 2nd late check-in this salary cycle ` +
+            `(${cycleStart} → ${cycleEnd}). Today will be counted as absent. ` +
+            `Please apply for leave to cover this absence.`
+          );
         }
+        // priorLateCount === 0 → 1st late, allow with a warning (returned by controller)
       }
 
       // 5. Create Attendance record
@@ -507,5 +519,40 @@ export class AttendanceService {
         orgId
       );
     }
+  }
+
+  /**
+   * Returns the salary-cycle start and end date strings for a given date and cycle start day.
+   * Example: startDay=10, today=May 29 → { cycleStart: '2026-05-10', cycleEnd: '2026-06-09' }
+   * Example: startDay=10, today=May 5  → { cycleStart: '2026-04-10', cycleEnd: '2026-05-09' }
+   */
+  static getSalaryCycleDates(now: Date, startDay: number): { cycleStart: string; cycleEnd: string } {
+    const day = now.getDate();
+    const month = now.getMonth(); // 0-indexed
+    const year = now.getFullYear();
+
+    // Determine which month the current salary cycle started
+    let cycleStartDate: Date;
+    if (day >= startDay) {
+      // Cycle started this month
+      cycleStartDate = new Date(year, month, startDay);
+    } else {
+      // Cycle started last month (new Date handles month=-1 → Dec of prev year)
+      cycleStartDate = new Date(year, month - 1, startDay);
+    }
+
+    // Next cycle starts one calendar month later from the cycle start
+    const nextCycleStart = new Date(cycleStartDate);
+    nextCycleStart.setMonth(nextCycleStart.getMonth() + 1);
+
+    // Cycle ends the day before the next cycle starts
+    const cycleEndDate = new Date(nextCycleStart);
+    cycleEndDate.setDate(cycleEndDate.getDate() - 1);
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    return { cycleStart: fmt(cycleStartDate), cycleEnd: fmt(cycleEndDate) };
   }
 }

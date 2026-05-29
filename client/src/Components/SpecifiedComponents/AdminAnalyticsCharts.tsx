@@ -7,7 +7,7 @@ import { Users, TrendingUp, DollarSign, FolderKanban, Building2 } from 'lucide-r
 
 import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
-  AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, LabelList,
+  PieChart, Pie, Cell, BarChart, Bar, LabelList,
 } from 'recharts';
 
 interface AdminAnalyticsChartsProps {
@@ -86,7 +86,48 @@ const CustomDeptTooltip = ({ active, payload }: any) => {
   );
 };
 
+// ── Custom Attendance Tooltip ───────────────────────────────────────────
+const CustomAttendanceTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.length) return null;
+  
+  const total = payload.reduce((sum: number, entry: any) => sum + (entry.value || 0), 0);
+  
+  return (
+    <div
+      style={{
+        background: 'hsl(var(--card))',
+        border: '1px solid hsl(var(--border))',
+        borderRadius: 10,
+        padding: '10px 16px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+      }}
+      className="space-y-1.5 text-xs text-left"
+    >
+      <p className="font-bold text-foreground text-sm border-b border-border pb-1.5 mb-1.5">
+        {payload[0]?.payload?.dateStr || payload[0]?.payload?.date} Attendance
+      </p>
+      {payload.slice().reverse().map((entry: any) => {
+        const val = entry.value || 0;
+        const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+        return (
+          <div key={entry.name} className="flex items-center justify-between gap-4 font-semibold">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: entry.color || entry.fill }} />
+              <span className="text-muted-foreground">{entry.name}</span>
+            </div>
+            <span className="text-foreground">
+              {val} <span className="text-[10px] text-muted-foreground font-medium">({pct}%)</span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stats }) => {
+  const [timeframe, setTimeframe] = useState<'today' | 'week'>('week');
+
   // ── Fetch all active employees to compute department breakdown ──────────────
   // We fetch directly from the employees API (same source as Employee Directory)
   // because the analytics aggregate is unreliable. limit=500 covers any real org.
@@ -98,14 +139,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
 
   if (!stats) return null;
 
-  // Payroll trend data (mocked months around current cost)
-  const payrollTrendData = [
-    { month: 'Jan', cost: stats.monthlyPayrollCost * 0.9 },
-    { month: 'Feb', cost: stats.monthlyPayrollCost * 0.95 },
-    { month: 'Mar', cost: stats.monthlyPayrollCost * 0.92 },
-    { month: 'Apr', cost: stats.monthlyPayrollCost * 0.98 },
-    { month: 'May', cost: stats.monthlyPayrollCost },
-  ];
+
 
   // ── Derive project stats from projectProductivity (always correct) ──────────
   // The countDocuments backend calls can fail due to orgId type mismatch,
@@ -148,6 +182,14 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
     }));
 
   const totalDeptEmployees = departmentTrendData.reduce((s, d) => s + d.employeeCount, 0);
+
+  const rawTrends = stats.attendanceTrends || [];
+  const attendanceChartData = timeframe === 'today'
+    ? rawTrends.filter((item: any) => {
+        const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short' });
+        return item.date === todayStr;
+      })
+    : rawTrends;
 
   return (
     <div className="space-y-6 text-left">
@@ -303,31 +345,78 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
           </div>
         </Card>
 
-        {/* ── Payroll Analytics ─────────────────────────────────────────── */}
-        <Card className="flex flex-col justify-between p-6 bg-card">
-          <div className="mb-4">
-            <h3 className="text-lg font-bold text-foreground tracking-tight mb-0.5">Payroll Analytics</h3>
-            <p className="text-xs text-muted-foreground">Monthly company expenditure</p>
+        {/* ── Attendance Overview ─────────────────────────────────────────── */}
+        <Card className="flex flex-col justify-between p-6 bg-card border border-border shadow-md">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="text-lg font-bold text-foreground tracking-tight mb-0.5">
+                Attendance Overview
+              </h3>
+              <p className="text-xs text-muted-foreground">Weekly distribution of leaves, WFH, and present employees</p>
+            </div>
+            <select
+              className="px-3 py-1.5 bg-muted text-foreground text-xs font-semibold rounded-xl border border-border hover:border-primary transition-all cursor-pointer outline-none shadow-sm"
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value as any)}
+            >
+              <option value="week">Today</option>
+              <option value="today">Today Only</option>
+            </select>
           </div>
+
+          {/* Bar Chart */}
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={payrollTrendData} margin={{ top: 5, right: 0, left: 10, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(val) => `$${val / 1000}k`} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <RechartsTooltip
-                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
-                  formatter={(val: any) => formatCurrency(Number(val))}
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+              <BarChart
+                data={attendanceChartData}
+                margin={{ top: 10, right: 5, left: -25, bottom: 5 }}
+                barSize={12}
+                stackOffset="expand"
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <Area type="monotone" dataKey="cost" name="Payroll Cost" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorCost)" />
-              </AreaChart>
+                <YAxis
+                  tickFormatter={(val) => `${Math.round(val * 100)}%`}
+                  tick={{ fontSize: 11, fill: '#94a3b8' }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={[0, 1]}
+                />
+                <RechartsTooltip
+                  content={<CustomAttendanceTooltip />}
+                  cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                />
+                {/* 3nd present (bottom) */}
+                <Bar
+                  dataKey="present"
+                  name="Present"
+                  stackId="a"
+                  fill="#6366f1"
+                  radius={[0, 0, 10, 10]}
+                />
+                {/* 2nd wfh (center) */}
+                <Bar
+                  dataKey="wfh"
+                  name="WFH"
+                  stackId="a"
+                  fill="#ff9f43"
+                  radius={[0, 0, 0, 0]}
+                />
+                {/* 1st leave (top) */}
+                <Bar
+                  dataKey="leave"
+                  name="Leave"
+                  stackId="a"
+                  fill="#f43f5e"
+                  radius={[10, 10, 0, 0]}
+                />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </Card>
