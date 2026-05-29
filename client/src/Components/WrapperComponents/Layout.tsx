@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { io } from 'socket.io-client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { leaveApi } from '../../api_service/leaveApi';
 import { wfhApi } from '../../api_service/wfhApi';
@@ -13,7 +12,7 @@ import { useModuleStore } from '../../store/useModuleStore.js';
 import { X } from 'lucide-react';
 
 export const Layout: React.FC = () => {
-  const { toasts, removeToast, addNotification } = useNotificationStore();
+  const { toasts, removeToast, addNotification, socket, initializeSocket } = useNotificationStore();
   const { role, user, isAuthenticated, token } = useAuthStore();
   const fetchModulesAndRoutes = useModuleStore(state => state.fetchModulesAndRoutes);
   
@@ -146,33 +145,21 @@ export const Layout: React.FC = () => {
       });
     }
   }, [leaves, wfh, perms, isPrivileged, addNotification, role, user]);
-  // Socket.io client-side integration for real-time notifications & live updates
+  // Socket.io client-side integration for real-time notifications & live updates using the store socket
   useEffect(() => {
-    const getSocketUrl = () => {
-      const envApiUrl = import.meta.env.VITE_API_URL;
-      if (envApiUrl && !envApiUrl.includes('localhost')) {
-        return envApiUrl.replace('/api', '');
-      }
-      return `${window.location.protocol}//${window.location.hostname}:5000`;
-    };
-    const socketUrl = getSocketUrl();
-    const socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
-      auth: { token }
-    });
+    if (isAuthenticated && token && user?._id) {
+      initializeSocket(token, user._id);
+    }
+  }, [isAuthenticated, token, user?._id, initializeSocket]);
 
-    socket.on('connect', () => {
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleConnect = () => {
       console.log('Connected to EthicSec real-time socket server:', socket.id);
-      if (role) {
-        socket.emit('join_room', role);
-      }
-      if (user?._id) {
-        socket.emit('join_room', `user_${user._id}`);
-      }
-    });
+    };
 
-    socket.on('new_notification', (notif: any) => {
+    const handleNewNotification = (notif: any) => {
       // Suppress Toast for CHAT notifications since receive_message handles it
       if (notif?.type !== 'CHAT') {
         useNotificationStore.getState().addToast(
@@ -182,24 +169,32 @@ export const Layout: React.FC = () => {
         );
       }
       useNotificationStore.getState().addNotification(notif);
-    });
+    };
 
-    socket.on('receive_message', (msg: any) => {
+    const handleReceiveMessage = (msg: any) => {
       const activeChatUserId = useNotificationStore.getState().activeChatUserId;
       const isChatPage = window.location.pathname === '/chat';
-      
-      // Only show Toast if the user is not actively viewing the sender's chat
-      if (!(isChatPage && activeChatUserId === msg?.senderId)) {
+      const isViewingThisConversation = isChatPage && (
+        activeChatUserId === msg?.senderId ||
+        activeChatUserId === msg?.receiverId
+      );
+
+      // Show toast only when NOT actively viewing this chat
+      if (!isViewingThisConversation && msg?.senderId !== user?._id) {
+        const senderName = msg?.senderName || 'Someone';
         useNotificationStore.getState().addToast(
           'New Message',
-          'You received a new chat message.',
+          `${senderName} sent you a message.`,
           'info'
         );
       }
-      queryClient.invalidateQueries({ queryKey: ['chat'] });
-    });
 
-    socket.on('receive_notification', (data: { _id?: string; title: string; message: string; type?: string; recipientId?: string }) => {
+      // Invalidate queries for real-time message list
+      queryClient.invalidateQueries({ queryKey: ['chat', msg?.senderId] });
+      queryClient.invalidateQueries({ queryKey: ['chat', msg?.receiverId] });
+    };
+
+    const handleReceiveNotification = (data: any) => {
       useNotificationStore.getState().addToast(
         data.title || 'Live Notification',
         data.message || 'New update received from HRMS server.',
@@ -210,7 +205,7 @@ export const Layout: React.FC = () => {
         recipientId: data.recipientId || 'all',
         title: data.title || 'System Notification',
         message: data.message || '',
-        type: (data.type as 'LEAVE' | 'WFH' | 'ATTENDANCE' | 'PAYROLL' | 'ANNOUNCEMENT' | 'PERMISSION' | 'GENERAL') || 'GENERAL',
+        type: (data.type as any) || 'GENERAL',
       } as any);
 
       // Invalidate queries to refresh lists in real-time
@@ -222,12 +217,20 @@ export const Layout: React.FC = () => {
       } else if (notificationType === 'PERMISSION') {
         queryClient.invalidateQueries({ queryKey: ['permissions'] });
       }
-    });
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('new_notification', handleNewNotification);
+    socket.on('receive_message', handleReceiveMessage);
+    socket.on('receive_notification', handleReceiveNotification);
 
     return () => {
-      socket.disconnect();
+      socket.off('connect', handleConnect);
+      socket.off('new_notification', handleNewNotification);
+      socket.off('receive_message', handleReceiveMessage);
+      socket.off('receive_notification', handleReceiveNotification);
     };
-  }, [role, user?._id, queryClient]);
+  }, [socket, user?._id, queryClient]);
 
   return (
     <SidebarExpandedContext.Provider value={{ expanded: sidebarExpanded, setExpanded: setSidebarExpanded }}>

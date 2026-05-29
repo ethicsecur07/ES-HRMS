@@ -270,11 +270,18 @@ export interface Candidate {
   updatedAt: string;
 }
 
+export type ChatMessageType = 'text' | 'file' | 'image';
+
 export interface ChatMessage {
   _id: string;
   senderId: string;
   receiverId: string;
   content: string;
+  messageType: ChatMessageType;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
   read: boolean;
   createdAt: string;
 }

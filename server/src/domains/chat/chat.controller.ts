@@ -2,6 +2,15 @@ import { Request, Response } from 'express';
 import { Message } from '../../models/Message.js';
 import { getIO } from '../../sockets/socketHandler.js';
 import { notificationService } from '../../services/notification.service.js';
+import { v2 as cloudinary } from 'cloudinary';
+import multer from 'multer';
+
+// Multer in-memory storage for chat file uploads
+const storage = multer.memoryStorage();
+export const chatUpload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
+});
 
 export const getConversation = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -10,10 +19,8 @@ export const getConversation = async (req: Request, res: Response): Promise<void
 
     let query;
     if (otherUserId === 'broadcast' || otherUserId.startsWith('group_')) {
-      // For broadcast and group chats, messages are queried by their channel identifier
       query = { receiverId: otherUserId };
     } else {
-      // 1:1 chat query
       query = {
         $or: [
           { senderId: userId, receiverId: otherUserId },
@@ -24,12 +31,27 @@ export const getConversation = async (req: Request, res: Response): Promise<void
 
     const messages = await Message.find(query).sort({ createdAt: 1 });
 
-    // Mark received messages as read (only relevant for 1:1 chats)
+    // Mark received messages as read (only for 1:1 chats)
     if (otherUserId !== 'broadcast' && !otherUserId.startsWith('group_')) {
-      await Message.updateMany(
-        { senderId: otherUserId, receiverId: userId, read: false },
-        { read: true }
-      );
+      const unreadIds = messages
+        .filter(m => m.senderId === otherUserId && m.receiverId === userId && !m.read)
+        .map(m => m._id);
+
+      if (unreadIds.length > 0) {
+        await Message.updateMany(
+          { _id: { $in: unreadIds } },
+          { read: true }
+        );
+
+        // Notify sender that messages have been read via socket
+        const io = getIO();
+        if (io) {
+          io.to(`user_${otherUserId}`).emit('messages_read', {
+            readBy: userId,
+            messageIds: unreadIds.map(id => id.toString()),
+          });
+        }
+      }
     }
 
     res.status(200).json({ data: { messages } });
@@ -43,15 +65,20 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
     const senderId = (req as any).user.id;
     const { receiverId, content } = req.body;
 
+    if (!receiverId || (!content && !req.file)) {
+      res.status(400).json({ success: false, message: 'receiverId and content or file are required.' });
+      return;
+    }
+
     const message = new Message({
       senderId,
       receiverId,
-      content
+      content: content || '',
+      messageType: 'text',
     });
 
     await message.save();
 
-    // Emit via socket directly for chat
     const io = getIO();
     if (io) {
       if (receiverId === 'broadcast') {
@@ -59,11 +86,13 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       } else if (receiverId.startsWith('group_')) {
         io.to(receiverId).emit('receive_message', message);
       } else {
+        // Emit to recipient and also back to sender (for multi-device sync)
         io.to(`user_${receiverId}`).emit('receive_message', message);
+        io.to(`user_${senderId}`).emit('receive_message', message);
       }
     }
 
-    // Only dispatch notification for 1:1 messages to avoid broadcast spam
+    // Only dispatch notification for 1:1 messages
     if (receiverId !== 'broadcast' && !receiverId.startsWith('group_')) {
       await notificationService.dispatchNotification({
         organizationId: (req as any).user.organizationId,
@@ -78,5 +107,97 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
     res.status(201).json({ data: message });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const sendFileMessage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const senderId = (req as any).user.id;
+    const { receiverId } = req.body;
+
+    if (!req.file) {
+      res.status(400).json({ success: false, message: 'No file uploaded.' });
+      return;
+    }
+    if (!receiverId) {
+      res.status(400).json({ success: false, message: 'receiverId is required.' });
+      return;
+    }
+
+    // Determine message type
+    const isImage = req.file.mimetype.startsWith('image/');
+    const messageType = isImage ? 'image' : 'file';
+
+    // Upload to Cloudinary
+    const b64 = Buffer.from(req.file.buffer).toString('base64');
+    const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+    const uploadResult = await cloudinary.uploader.upload(dataURI, {
+      folder: 'es_hrms_chat',
+      resource_type: isImage ? 'image' : 'raw',
+    });
+
+    const message = new Message({
+      senderId,
+      receiverId,
+      content: req.file.originalname,
+      messageType,
+      fileUrl: uploadResult.secure_url,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      fileType: req.file.mimetype,
+    });
+
+    await message.save();
+
+    const io = getIO();
+    if (io) {
+      if (receiverId === 'broadcast') {
+        io.to(`org_${(req as any).user.organizationId}`).emit('receive_message', message);
+      } else if (receiverId.startsWith('group_')) {
+        io.to(receiverId).emit('receive_message', message);
+      } else {
+        io.to(`user_${receiverId}`).emit('receive_message', message);
+        io.to(`user_${senderId}`).emit('receive_message', message);
+      }
+    }
+
+    res.status(201).json({ data: message });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const markMessageRead = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    const { messageId } = req.params;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      res.status(404).json({ success: false, message: 'Message not found.' });
+      return;
+    }
+
+    // Only the receiver can mark as read
+    if (message.receiverId !== userId) {
+      res.status(403).json({ success: false, message: 'Forbidden.' });
+      return;
+    }
+
+    message.read = true;
+    await message.save();
+
+    // Notify sender via socket
+    const io = getIO();
+    if (io) {
+      io.to(`user_${message.senderId}`).emit('message_read', {
+        messageId: message._id.toString(),
+        readBy: userId,
+      });
+    }
+
+    res.status(200).json({ data: { message } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

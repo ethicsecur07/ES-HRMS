@@ -17,6 +17,12 @@ interface NotificationState {
   unreadCount: number;
   clearedNotificationIds: string[];
   activeChatUserId: string | null;
+  onlineUserIds: string[];
+  /** Per-conversation unread DM counts: key = senderId */
+  unreadChatCounts: Record<string, number>;
+  /** Last message timestamp per conversation: key = userId/groupId */
+  lastMessageAt: Record<string, string>;
+
   setActiveChatUserId: (id: string | null) => void;
   addNotification: (notification: Omit<NotificationItem, '_id' | 'createdAt' | 'read'>) => void;
   markAsRead: (id: string) => void;
@@ -25,8 +31,10 @@ interface NotificationState {
   removeToast: (id: string) => void;
   clearNotifications: () => void;
   logoutClear: () => void;
-  initializeSocket: (token: string) => void;
+  initializeSocket: (token: string, currentUserId?: string) => void;
   fetchNotifications: () => Promise<void>;
+  /** Clear unread count when opening a conversation */
+  clearUnreadChat: (conversationId: string) => void;
   socket: Socket | null;
 }
 
@@ -41,23 +49,39 @@ export const useNotificationStore = create<NotificationState>()(
       clearedNotificationIds: [],
       socket: null,
       activeChatUserId: null,
+      onlineUserIds: [],
+      unreadChatCounts: {},
+      lastMessageAt: {},
+
       setActiveChatUserId: (id) => set({ activeChatUserId: id }),
+
+      clearUnreadChat: (conversationId) =>
+        set((state) => ({
+          unreadChatCounts: { ...state.unreadChatCounts, [conversationId]: 0 },
+        })),
 
       fetchNotifications: async () => {
         try {
           const notifs = await notificationApi.getNotifications();
-          set({ 
+          set({
             notifications: notifs,
-            unreadCount: notifs.filter(n => !n.read).length
+            unreadCount: notifs.filter((n) => !n.read).length,
           });
         } catch (err) {
           console.error('Failed to fetch notifications:', err);
         }
       },
 
-      initializeSocket: (token) => {
+      initializeSocket: (token, currentUserId) => {
         const state = get();
-        if (state.socket) return; // Already connected
+        if (state.socket) {
+          // Update token in case it changed (e.g., token refresh)
+          state.socket.auth = { token };
+          if (state.socket.disconnected) {
+            state.socket.connect();
+          }
+          return;
+        }
 
         const getSocketUrl = () => {
           const envApiUrl = import.meta.env.VITE_API_URL;
@@ -70,7 +94,7 @@ export const useNotificationStore = create<NotificationState>()(
         const socket = io(socketUrl, {
           transports: ['websocket', 'polling'],
           autoConnect: true,
-          auth: { token }
+          auth: { token },
         });
 
         socket.on('connect', () => {
@@ -79,7 +103,73 @@ export const useNotificationStore = create<NotificationState>()(
 
         socket.on('new_notification', (notif: NotificationItem) => {
           get().addNotification(notif);
-          get().addToast(notif.title, notif.message, 'info');
+          // Only show toast for non-chat notifications (chat has its own badge)
+          if (notif.type !== 'CHAT') {
+            get().addToast(notif.title, notif.message, 'info');
+          }
+        });
+
+        // ── Online Presence ──────────────────────────────────────────────────
+        socket.on('online_users', (userIds: string[]) => {
+          set({ onlineUserIds: userIds });
+        });
+
+        socket.on('user_online', ({ userId }: { userId: string }) => {
+          set((s) => ({
+            onlineUserIds: s.onlineUserIds.includes(userId)
+              ? s.onlineUserIds
+              : [...s.onlineUserIds, userId],
+          }));
+        });
+
+        socket.on('user_offline', ({ userId }: { userId: string }) => {
+          set((s) => ({
+            onlineUserIds: s.onlineUserIds.filter((id) => id !== userId),
+          }));
+        });
+
+        // ── Chat message tracking (for unread badges & sorting) ────────────
+        socket.on('receive_message', (msg: any) => {
+          const { activeChatUserId } = get();
+          const senderId: string = msg.senderId;
+          const receiverId: string = msg.receiverId;
+          const now: string = msg.createdAt || new Date().toISOString();
+
+          // Skip messages we ourselves sent (server echoes back to sender room too)
+          const isOwnMessage = currentUserId && senderId === currentUserId;
+
+          // Determine the conversation key for sorting & unread count
+          // For groups/broadcast: key is the room id
+          // For DMs: key is the OTHER person (sender if we are receiver, receiver if we are sender)
+          let conversationKey: string | null = null;
+
+          if (receiverId === 'broadcast' || receiverId?.startsWith('group_')) {
+            conversationKey = receiverId;
+          } else if (isOwnMessage) {
+            // We sent it — conversation is with the receiver
+            conversationKey = receiverId;
+          } else {
+            // We received it — conversation is with the sender
+            conversationKey = senderId;
+          }
+
+          if (!conversationKey) return;
+
+          // Always update lastMessageAt (for both sent and received)
+          set((s) => ({
+            lastMessageAt: { ...s.lastMessageAt, [conversationKey!]: now },
+          }));
+
+          // Only increment unread for RECEIVED messages in non-active conversations
+          const isCurrentlyViewing = activeChatUserId === conversationKey;
+          if (!isOwnMessage && !isCurrentlyViewing) {
+            set((s) => ({
+              unreadChatCounts: {
+                ...s.unreadChatCounts,
+                [conversationKey!]: (s.unreadChatCounts[conversationKey!] || 0) + 1,
+              },
+            }));
+          }
         });
 
         set({ socket });
@@ -88,7 +178,11 @@ export const useNotificationStore = create<NotificationState>()(
       addNotification: (notif) =>
         set((state) => {
           const targetId = (notif as any)._id;
-          if (targetId && (state.notifications.some((n) => n._id === targetId) || state.clearedNotificationIds.includes(targetId))) {
+          if (
+            targetId &&
+            (state.notifications.some((n) => n._id === targetId) ||
+              state.clearedNotificationIds.includes(targetId))
+          ) {
             return {};
           }
           const newItem: NotificationItem = {
@@ -110,7 +204,9 @@ export const useNotificationStore = create<NotificationState>()(
             await notificationApi.markAsRead(id);
           }
           set((state) => {
-            const updated = state.notifications.map((n) => (n._id === id ? { ...n, read: true } : n));
+            const updated = state.notifications.map((n) =>
+              n._id === id ? { ...n, read: true } : n
+            );
             return {
               notifications: updated,
               unreadCount: updated.filter((n) => !n.read).length,
@@ -151,7 +247,9 @@ export const useNotificationStore = create<NotificationState>()(
             notifications: INITIAL_NOTIFICATIONS,
             toasts: [],
             unreadCount: 0,
-            clearedNotificationIds: Array.from(new Set([...state.clearedNotificationIds, ...clearedIds])),
+            clearedNotificationIds: Array.from(
+              new Set([...state.clearedNotificationIds, ...clearedIds])
+            ),
           };
         }),
 
@@ -166,15 +264,20 @@ export const useNotificationStore = create<NotificationState>()(
           unreadCount: 0,
           clearedNotificationIds: [],
           activeChatUserId: null,
-          socket: null
+          onlineUserIds: [],
+          unreadChatCounts: {},
+          lastMessageAt: {},
+          socket: null,
         });
       },
     }),
     {
       name: 'es-hrms-notifications',
-      partialize: (state) => ({ 
+      partialize: (state) => ({
         notifications: state.notifications,
-        clearedNotificationIds: state.clearedNotificationIds 
+        clearedNotificationIds: state.clearedNotificationIds,
+        lastMessageAt: state.lastMessageAt,
+        unreadChatCounts: state.unreadChatCounts,
       }),
     }
   )
