@@ -31,4 +31,21 @@ export const attendanceApi = {
     const response = await axiosInstance.put<Attendance>(`/attendance/${id}`, data);
     return response.data;
   },
+
+  getPendingReports: async () => {
+    const response = await axiosInstance.get<Attendance[]>('/attendance/pending-reports');
+    return response.data;
+  },
+
+  submitPendingReport: async (data: {
+    attendanceId: string;
+    completedTasks: string;
+    inProgressTasks?: string;
+    pendingTasks?: string;
+    blockers?: string;
+    tomorrowPlan?: string;
+  }) => {
+    const response = await axiosInstance.post<{ message: string; data: any }>('/attendance/submit-pending-report', data);
+    return response.data;
+  },
 };

@@ -78,6 +78,22 @@ class LeaveService {
                     violations: violations.map((v) => v.message),
                 };
             }
+            // 4.5 Block if there is an approved WFH on the target dates
+            const approvedWFH = await Leave_js_1.Leave.findOne({
+                organizationId,
+                employeeId,
+                leaveType: 'WFH',
+                status: 'APPROVED',
+                startDate: { $lte: endDate },
+                endDate: { $gte: startDate },
+            }).session(session);
+            if (approvedWFH) {
+                await session.abortTransaction();
+                return {
+                    success: false,
+                    message: `Leave request blocked: You already have an approved WFH scheduled on ${approvedWFH.startDate}.`,
+                };
+            }
             // 5. Overlap detection — check for conflicting leaves
             const overlap = await Leave_js_1.Leave.findOne({
                 organizationId,
@@ -143,8 +159,11 @@ class LeaveService {
                 return { success: false, message: `Cannot approve a leave that is already ${leave.status}.` };
             }
             // Deduct balance atomically
+            const employeeIdStr = leave.employeeId && leave.employeeId._id
+                ? leave.employeeId._id.toString()
+                : leave.employeeId.toString();
             if (leave.leaveType !== 'WFH' && leave.leaveType !== 'Unpaid Leave') { // WFH and Unpaid Leave bypass standard balance
-                const balanceResult = await LeaveBalanceService_js_1.LeaveBalanceService.deductBalance(organizationId, leave.employeeId.toString(), leave.leaveType, leave.totalDays, session);
+                const balanceResult = await LeaveBalanceService_js_1.LeaveBalanceService.deductBalance(organizationId, employeeIdStr, leave.leaveType, leave.totalDays, session);
                 if (!balanceResult) {
                     await session.abortTransaction();
                     return {
@@ -158,7 +177,7 @@ class LeaveService {
             leave.approvedBy = new mongoose_1.default.Types.ObjectId(approverId);
             await leave.save({ session });
             await session.commitTransaction();
-            await (0, auditLog_service_js_1.createAuditLog)('LEAVE_APPROVED', approverEmail, 'LEAVE', leave.id, `Approved ${leave.leaveType} (${leave.totalDays} days) for employee ${leave.employeeId}`, organizationId);
+            await (0, auditLog_service_js_1.createAuditLog)('LEAVE_APPROVED', approverEmail, 'LEAVE', leave.id, `Approved ${leave.leaveType} (${leave.totalDays} days) for employee ${employeeIdStr}`, organizationId);
             return { success: true, message: 'Leave approved successfully.', leave };
         }
         catch (error) {

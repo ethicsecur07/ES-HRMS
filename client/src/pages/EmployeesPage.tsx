@@ -10,6 +10,7 @@ import { designationApi } from '../api_service/designationApi';
 import { authApi } from '../api_service/authApi';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { usePermission } from '../hooks/usePermission';
+import { useAuthStore } from '../store/useAuthStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Textarea } from '../Components/WrapperComponents/Input';
@@ -99,6 +100,7 @@ type EmployeeFormValues = z.infer<typeof baseEmployeeSchema>;
 
 export const EmployeesPage: React.FC = () => {
   const { hasPermission } = usePermission();
+  const { user } = useAuthStore();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string>('');
@@ -364,26 +366,34 @@ export const EmployeesPage: React.FC = () => {
       header: 'Employee',
       accessor: (row: Employee) => (
         <div
-          onClick={() => navigate(`/employees/${row._id}`)}
-          className="flex items-center gap-3 cursor-pointer group"
-          title="Click to view Employee Details"
+          onClick={() => {
+            if (user?.role !== 'EMPLOYEE') {
+              navigate(`/employees/${row._id}`);
+            }
+          }}
+          className={`flex items-center gap-3 ${user?.role !== 'EMPLOYEE' ? 'cursor-pointer group' : ''}`}
+          title={user?.role !== 'EMPLOYEE' ? 'Click to view Employee Details' : undefined}
         >
           {row.profileImage ? (
             <img
               src={row.profileImage}
               alt=""
-              className="w-10 h-10 rounded-xl object-cover border border-border flex-shrink-0 group-hover:border-primary transition-colors"
+              className={`w-10 h-10 rounded-xl object-cover border border-border flex-shrink-0 ${
+                user?.role !== 'EMPLOYEE' ? 'group-hover:border-primary' : ''
+              } transition-colors`}
             />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0 uppercase group-hover:border-primary transition-colors">
+            <div className={`w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0 uppercase ${
+              user?.role !== 'EMPLOYEE' ? 'group-hover:border-primary' : ''
+            } transition-colors`}>
               {row.fullName.charAt(0)}
             </div>
           )}
           <div>
-            <p className="font-bold text-xs text-foreground group-hover:text-primary transition-colors">
+            <p className={`font-bold text-xs text-foreground ${user?.role !== 'EMPLOYEE' ? 'group-hover:text-primary' : ''} transition-colors`}>
               {row.fullName}
             </p>
-            <p className="text-[10px] text-muted-foreground font-mono group-hover:text-foreground transition-colors">
+            <p className={`text-[10px] text-muted-foreground font-mono ${user?.role !== 'EMPLOYEE' ? 'group-hover:text-foreground' : ''} transition-colors`}>
               {row.employeeCode && !row.employeeCode.startsWith('TEMP-EMP-') ? `${row.employeeCode} | ` : ''}{row.email}
             </p>
           </div>
@@ -445,7 +455,12 @@ export const EmployeesPage: React.FC = () => {
         </div>
       ),
     },
-  ];
+  ].filter((col) => {
+    if (col.header === 'Actions' && user?.role === 'EMPLOYEE') {
+      return false;
+    }
+    return true;
+  });
 
   if (isLoading) {
     return (

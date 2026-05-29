@@ -76,6 +76,21 @@ const applyWFH = async (req, res) => {
             });
             return;
         }
+        // Check for approved leaves on this date to prevent WFH during leaves
+        const approvedLeave = await Leave_js_1.Leave.findOne({
+            organizationId: orgId,
+            employeeId,
+            leaveType: { $ne: 'WFH' },
+            status: 'APPROVED',
+            startDate: { $lte: date },
+            endDate: { $gte: date },
+        });
+        if (approvedLeave) {
+            res.status(400).json({
+                message: `WFH request blocked: You already have an approved leave (${approvedLeave.leaveType}) from ${approvedLeave.startDate} to ${approvedLeave.endDate}.`,
+            });
+            return;
+        }
         // Overlap detection
         const overlap = await Leave_js_1.Leave.findOne({
             organizationId: orgId,

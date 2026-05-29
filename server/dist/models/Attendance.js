@@ -57,6 +57,8 @@ const attendanceSchema = new mongoose_1.Schema({
     taskSubmitted: { type: Boolean, default: false },
     locationVerified: { type: Boolean, default: true },
     overrideReason: { type: String },
+    isAutoCheckedOut: { type: Boolean, default: false },
+    pendingReportUpdate: { type: Boolean, default: false },
     // Advanced Attendance Engine
     biometricId: { type: String },
     deviceId: { type: String },

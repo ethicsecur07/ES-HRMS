@@ -116,8 +116,9 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
       reset();
       onClose();
     },
-    onError: () => {
-      addToast('Submission Failed', 'Could not submit application. Please try again.', 'error');
+    onError: (err: any) => {
+      const errMsg = err.response?.data?.message || 'Could not submit application. Please try again.';
+      addToast('Submission Failed', errMsg, 'error');
     },
   });
 

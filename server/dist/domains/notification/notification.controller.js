@@ -18,6 +18,10 @@ exports.getUserNotifications = getUserNotifications;
 const markAsRead = async (req, res) => {
     try {
         const { id } = req.params;
+        if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+            res.status(200).json({ success: true, message: 'Virtual notification marked as read' });
+            return;
+        }
         const notification = await Notification_js_1.Notification.findByIdAndUpdate(id, { read: true }, { new: true });
         res.status(200).json({ success: true, notification });
     }

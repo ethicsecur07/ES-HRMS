@@ -195,8 +195,8 @@ export const LeaveWFHPage: React.FC = () => {
               </Button>
             </>
           )}
-          {/* Employee / Admin can cancel PENDING or APPROVED leaves */}
-          {(row.status === 'PENDING' || row.status === 'APPROVED') && (
+          {/* Only Employees can cancel their own PENDING leaves */}
+          {role === 'EMPLOYEE' && row.status === 'PENDING' && (
             <Button
               size="sm"
               variant="outline"

@@ -121,6 +121,24 @@ export class LeaveService {
         };
       }
 
+      // 4.5 Block if there is an approved WFH on the target dates
+      const approvedWFH = await Leave.findOne({
+        organizationId,
+        employeeId,
+        leaveType: 'WFH',
+        status: 'APPROVED',
+        startDate: { $lte: endDate },
+        endDate: { $gte: startDate },
+      }).session(session);
+
+      if (approvedWFH) {
+        await session.abortTransaction();
+        return {
+          success: false,
+          message: `Leave request blocked: You already have an approved WFH scheduled on ${approvedWFH.startDate}.`,
+        };
+      }
+
       // 5. Overlap detection — check for conflicting leaves
       const overlap = await Leave.findOne({
         organizationId,
@@ -213,10 +231,14 @@ export class LeaveService {
       }
 
       // Deduct balance atomically
+      const employeeIdStr = leave.employeeId && (leave.employeeId as any)._id
+        ? (leave.employeeId as any)._id.toString()
+        : leave.employeeId.toString();
+
       if (leave.leaveType !== 'WFH' && leave.leaveType !== 'Unpaid Leave') { // WFH and Unpaid Leave bypass standard balance
         const balanceResult = await LeaveBalanceService.deductBalance(
           organizationId,
-          leave.employeeId.toString(),
+          employeeIdStr,
           leave.leaveType,
           leave.totalDays,
           session
@@ -243,7 +265,7 @@ export class LeaveService {
         approverEmail,
         'LEAVE',
         leave.id,
-        `Approved ${leave.leaveType} (${leave.totalDays} days) for employee ${leave.employeeId}`,
+        `Approved ${leave.leaveType} (${leave.totalDays} days) for employee ${employeeIdStr}`,
         organizationId
       );
 
