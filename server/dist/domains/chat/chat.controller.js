@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.markMessageRead = exports.sendFileMessage = exports.sendMessage = exports.getConversation = exports.chatUpload = void 0;
+exports.getRecentConversations = exports.markMessageRead = exports.sendFileMessage = exports.sendMessage = exports.getConversation = exports.chatUpload = void 0;
 const Message_js_1 = require("../../models/Message.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const notification_service_js_1 = require("../../services/notification.service.js");
@@ -187,3 +187,53 @@ const markMessageRead = async (req, res) => {
     }
 };
 exports.markMessageRead = markMessageRead;
+const getRecentConversations = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const recentConversations = await Message_js_1.Message.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { senderId: userId },
+                        { receiverId: userId },
+                        { receiverId: 'broadcast' },
+                        { receiverId: { $regex: /^group_/ } }
+                    ]
+                }
+            },
+            {
+                $sort: { createdAt: -1 }
+            },
+            {
+                $group: {
+                    _id: {
+                        $cond: [
+                            {
+                                $or: [
+                                    { $eq: ["$receiverId", "broadcast"] },
+                                    { $eq: [{ $substr: ["$receiverId", 0, 6] }, "group_"] }
+                                ]
+                            },
+                            "$receiverId",
+                            {
+                                $cond: [
+                                    { $eq: ["$senderId", userId] },
+                                    "$receiverId",
+                                    "$senderId"
+                                ]
+                            }
+                        ]
+                    },
+                    lastMessageAt: { $first: "$createdAt" },
+                    lastMessageContent: { $first: "$content" },
+                    lastMessageType: { $first: "$messageType" }
+                }
+            }
+        ]);
+        res.status(200).json({ recentConversations });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.getRecentConversations = getRecentConversations;

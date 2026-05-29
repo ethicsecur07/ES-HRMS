@@ -42,6 +42,25 @@ export const ChatPage: React.FC = () => {
   const qc = useQueryClient();
   const otherOnlineCount = onlineUserIds.filter(id => id !== user?._id).length;
 
+  const { data: recentConversations = [] } = useQuery({
+    queryKey: ['chat', 'recent'],
+    queryFn: () => chatApi.getRecentConversations(),
+  });
+
+  useEffect(() => {
+    if (recentConversations.length > 0) {
+      const updates: Record<string, string> = {};
+      recentConversations.forEach((conv: any) => {
+        if (conv._id && conv.lastMessageAt) {
+          updates[conv._id] = conv.lastMessageAt;
+        }
+      });
+      useNotificationStore.setState((s) => ({
+        lastMessageAt: { ...s.lastMessageAt, ...updates }
+      }));
+    }
+  }, [recentConversations]);
+
   const [activeTab, setActiveTab] = useState<SidebarTab>('direct');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -49,6 +68,7 @@ export const ChatPage: React.FC = () => {
   const [showEmoji, setShowEmoji] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [filePreview, setFilePreview] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [activeImageUrl, setActiveImageUrl] = useState<string | null>(null);
 
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -90,6 +110,10 @@ export const ChatPage: React.FC = () => {
     onSuccess: (newMsg) => {
       setMessage('');
       qc.setQueryData<typeof messages>(['chat', selectedUser], (old = []) => [...old, newMsg]);
+      useNotificationStore.setState((s) => ({
+        lastMessageAt: { ...s.lastMessageAt, [selectedUser!]: newMsg.createdAt || new Date().toISOString() }
+      }));
+      qc.invalidateQueries({ queryKey: ['chat', 'recent'] });
     },
   });
 
@@ -99,6 +123,10 @@ export const ChatPage: React.FC = () => {
     onSuccess: (newMsg) => {
       setFilePreview(null);
       qc.setQueryData<typeof messages>(['chat', selectedUser], (old = []) => [...old, newMsg]);
+      useNotificationStore.setState((s) => ({
+        lastMessageAt: { ...s.lastMessageAt, [selectedUser!]: newMsg.createdAt || new Date().toISOString() }
+      }));
+      qc.invalidateQueries({ queryKey: ['chat', 'recent'] });
     },
   });
 
@@ -180,6 +208,17 @@ export const ChatPage: React.FC = () => {
     if (selectedUser) clearUnreadChat(selectedUser);
     return () => { setActiveChatUserId(null); };
   }, [selectedUser, setActiveChatUserId, clearUnreadChat]);
+
+  // Update lastMessageAt dynamically when messages are fetched/loaded
+  useEffect(() => {
+    if (selectedUser && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      const time = lastMsg.createdAt;
+      useNotificationStore.setState((s) => ({
+        lastMessageAt: { ...s.lastMessageAt, [selectedUser]: time }
+      }));
+    }
+  }, [messages, selectedUser]);
 
   // ── Auto-scroll messages ──────────────────────────────────────────────────
   useEffect(() => {
@@ -357,7 +396,7 @@ export const ChatPage: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-extrabold text-base text-foreground tracking-tight">Messages</h2>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse shadow-[0_0_6px_2px_rgba(249,115,22,0.3)]"></span>
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px_2px_hsl(var(--primary)/0.3)]"></span>
               <span className="text-[10px] text-muted-foreground font-semibold">{otherOnlineCount > 0 ? `${onlineUserIds.length} online` : 'online'}</span>
             </div>
           </div>
@@ -425,7 +464,7 @@ export const ChatPage: React.FC = () => {
                             : <span className="bg-gradient-to-br from-primary/40 to-primary/20 text-primary w-full h-full flex items-center justify-center">{emp.fullName.charAt(0).toUpperCase()}</span>
                           }
                         </div>
-                        <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${online ? 'bg-orange-500 shadow-[0_0_4px_1px_rgba(249,115,22,0.4)]' : 'bg-muted-foreground/65'}`}></span>
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${online ? 'bg-primary shadow-[0_0_4px_1px_hsl(var(--primary)/0.4)]' : 'bg-muted-foreground/65'}`}></span>
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
@@ -443,7 +482,7 @@ export const ChatPage: React.FC = () => {
                         </div>
                         <div className="text-[10px] truncate mt-0.5">
                           {online
-                            ? <span className="text-orange-500 font-semibold">● Online</span>
+                            ? <span className="text-primary font-semibold">● Online</span>
                             : <span className="text-muted-foreground">{emp.designation}</span>
                           }
                         </div>
@@ -585,7 +624,7 @@ export const ChatPage: React.FC = () => {
                       })()}
                     </div>
                     {isOnline(selectedUser) && (
-                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 border-2 border-card"></span>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border-2 border-card"></span>
                     )}
                   </div>
                 )}
@@ -594,11 +633,11 @@ export const ChatPage: React.FC = () => {
                   <h3 className="font-bold text-sm text-foreground leading-tight">{getHeaderTitle()}</h3>
                   <p className={`text-[10px] font-medium flex items-center gap-1 mt-0.5 ${
                     !selectedUser?.startsWith('group_') && selectedUser !== 'broadcast' && isOnline(selectedUser)
-                      ? 'text-orange-500'
+                      ? 'text-primary'
                       : 'text-muted-foreground'
                   }`}>
                     {!selectedUser?.startsWith('group_') && selectedUser !== 'broadcast' && isOnline(selectedUser) && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
                     )}
                     {getHeaderSubtitle()}
                   </p>
@@ -674,13 +713,13 @@ export const ChatPage: React.FC = () => {
                               {/* File/Image message */}
                               {msg.messageType === 'image' && msg.fileUrl ? (
                                 <div className="space-y-1.5">
-                                  <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">
+                                  <div onClick={() => setActiveImageUrl(msg.fileUrl || null)}>
                                     <img
                                       src={msg.fileUrl}
                                       alt={msg.fileName || 'Image'}
-                                      className="max-w-[240px] max-h-[200px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                      className="max-w-[240px] max-h-[200px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
                                     />
-                                  </a>
+                                  </div>
                                 </div>
                               ) : msg.messageType === 'file' && msg.fileUrl ? (
                                 <a
@@ -862,7 +901,7 @@ export const ChatPage: React.FC = () => {
                 <MessageSquare className="w-10 h-10 text-primary opacity-40" />
               </div>
               {otherOnlineCount > 0 && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-orange-500 border-2 border-card flex items-center justify-center">
+                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary border-2 border-card flex items-center justify-center">
                   <span className="text-[8px] font-bold text-white">{onlineUserIds.length}</span>
                 </div>
               )}
@@ -875,7 +914,7 @@ export const ChatPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-4 text-[11px] text-muted-foreground font-medium mt-2">
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                <div className="w-2 h-2 rounded-full bg-primary"></div>
                 <span>{otherOnlineCount > 0 ? `${onlineUserIds.length} people online` : 'online'}</span>
               </div>
               <div className="w-1 h-1 rounded-full bg-border"></div>
@@ -894,6 +933,39 @@ export const ChatPage: React.FC = () => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.15); border-radius: 99px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.3); }
       `}</style>
+
+      {/* Enlarged Image Modal */}
+      <AnimatePresence>
+        {activeImageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActiveImageUrl(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm cursor-zoom-out"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl bg-card border border-border p-2 shadow-2xl flex flex-col items-center justify-center"
+            >
+              <button
+                onClick={() => setActiveImageUrl(null)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-background/60 hover:bg-background/80 text-foreground transition-all hover:scale-105 active:scale-95 z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={activeImageUrl}
+                alt="Enlarged chat visual"
+                className="max-w-full max-h-[80vh] rounded-xl object-contain"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
