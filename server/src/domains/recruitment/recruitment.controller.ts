@@ -38,33 +38,33 @@ const findOrCreateCandidate = async (id: string): Promise<any> => {
     logger.error('[RecruitmentController] Local applicant promotion check failed', { error: err.message });
   }
 
-  // Try promoting external Applicant
+  // Try promoting external Applicant from AWS API
   try {
     const extRes = await fetch(`https://qcyokzjqdb.execute-api.ap-south-1.amazonaws.com/prod/api/applicants/${id}`);
     if (extRes.ok) {
-      const payload = await extRes.json();
-      const app = payload.data;
-      if (app) {
-        const name = app.name || 'Applicant';
+      const extData = await extRes.json();
+      const applicant = extData.data;
+      if (applicant) {
+        const name = applicant.name || 'Applicant';
         const [firstName = '', ...lastNameParts] = name.trim().split(/\s+/);
         const lastName = lastNameParts.join(' ') || ' ';
         candidate = new Candidate({
-          _id: app._id, // Retain original ID!
+          _id: applicant._id, // Retain original ID!
           firstName,
           lastName,
-          email: app.email,
-          phone: app.mobile || '',
-          appliedRole: app.role || 'Applicant',
-          resumeUrl: app.resumeUrl || '',
+          email: applicant.email,
+          phone: applicant.mobile || applicant.phone || '',
+          appliedRole: applicant.role,
+          resumeUrl: applicant.resumeUrl,
           stage: 'NEW'
         });
         await candidate.save();
-        logger.info(`[RecruitmentController] Promoted external applicant to candidate: ${app.email}`);
+        logger.info(`[RecruitmentController] Promoted external applicant to local candidate: ${applicant.email}`);
         return candidate;
       }
     }
-  } catch (extErr: any) {
-    logger.error('[RecruitmentController] External applicant promotion check failed', { error: extErr.message });
+  } catch (err: any) {
+    logger.error('[RecruitmentController] External applicant promotion check failed', { error: err.message });
   }
 
   return null;
@@ -101,33 +101,64 @@ export const getCandidates = async (req: Request, res: Response): Promise<void> 
       logger.error('[RecruitmentController] Failed to fetch local applicants', { error: localAppErr.message });
     }
 
-    // 3. Fetch all external applicants
+    // 3. Fetch all external applicants from AWS API
     let externalApplicants: any[] = [];
     try {
       const extRes = await fetch('https://qcyokzjqdb.execute-api.ap-south-1.amazonaws.com/prod/api/applicants');
       if (extRes.ok) {
-        const payload = await extRes.json();
-        externalApplicants = payload.data || [];
+        const extData = await extRes.json();
+        if (extData && Array.isArray(extData.data)) {
+          externalApplicants = extData.data;
+          logger.info(`[RecruitmentController] Successfully fetched ${externalApplicants.length} external applicants from AWS`);
+        }
       }
-    } catch (extErr: any) {
-      logger.error('[RecruitmentController] Failed to fetch external applicants', { error: extErr.message });
+    } catch (extAppErr: any) {
+      logger.error('[RecruitmentController] Failed to fetch external applicants from AWS', { error: extAppErr.message });
     }
 
-    // 4. Merge them dynamically, avoiding duplicate emails
-    const mappedLocalApplicants = localApplicants
-      .filter(app => app.email && !localEmails.has(app.email.toLowerCase().trim()))
+    // Load global roundsNeeded settings and deletedExternalIds
+    const authReq = req as any;
+    const orgId = authReq.user?.organizationId;
+    let roundsNeeded = ['NEW', 'SCREENING', 'INTERVIEW', 'TECHNICAL', 'HR', 'OFFER', 'HIRED'];
+    let deletedExternalIds: string[] = [];
+    
+    if (orgId) {
+      const template = await OfferTemplate.findOne({ organizationId: orgId });
+      if (template) {
+        if (template.roundsNeeded && template.roundsNeeded.length > 0) {
+          roundsNeeded = template.roundsNeeded;
+        }
+        if (template.deletedExternalIds && template.deletedExternalIds.length > 0) {
+          deletedExternalIds = template.deletedExternalIds.map((id: string) => id.toString());
+        }
+      }
+    }
+
+    const deletedSet = new Set(deletedExternalIds);
+
+    // 4. Merge them dynamically, avoiding duplicate emails and deleted entries
+    const mergedApplicants = [
+      ...localApplicants,
+      ...externalApplicants
+    ];
+
+    const mappedApplicants = mergedApplicants
+      .filter(app => {
+        const appId = app._id?.toString();
+        return app.email && !localEmails.has(app.email.toLowerCase().trim()) && !deletedSet.has(appId);
+      })
       .map(app => {
         const name = app.name || 'Applicant';
         const [firstName = '', ...lastNameParts] = name.trim().split(/\s+/);
         const lastName = lastNameParts.join(' ') || ' ';
-        // Add to Set to prevent subsequent external list from adding the same email
+        // Add to Set to prevent subsequent list from adding the same email
         localEmails.add(app.email.toLowerCase().trim());
         return {
           _id: app._id,
           firstName,
           lastName,
           email: app.email,
-          phone: app.mobile || '',
+          phone: app.mobile || app.phone || '',
           appliedRole: app.role || 'Applicant',
           resumeUrl: app.resumeUrl || '',
           stage: 'NEW',
@@ -137,34 +168,13 @@ export const getCandidates = async (req: Request, res: Response): Promise<void> 
         };
       });
 
-    const mappedExternalApplicants = externalApplicants
-      .filter(app => app.email && !localEmails.has(app.email.toLowerCase().trim()))
-      .map(app => {
-        const name = app.name || 'Applicant';
-        const [firstName = '', ...lastNameParts] = name.trim().split(/\s+/);
-        const lastName = lastNameParts.join(' ') || ' ';
-        return {
-          _id: app._id,
-          firstName,
-          lastName,
-          email: app.email,
-          phone: app.mobile || '',
-          appliedRole: app.role || 'Applicant',
-          resumeUrl: app.resumeUrl || '',
-          stage: 'NEW',
-          createdAt: app.createdAt ? new Date(app.createdAt) : new Date(),
-          updatedAt: app.updatedAt ? new Date(app.updatedAt) : new Date(),
-          isExternal: true
-        };
-      });
-
+    // Also filter local candidates that were explicitly deleted (blacklisted)
     const candidates = [
-      ...localCandidates,
-      ...mappedLocalApplicants,
-      ...mappedExternalApplicants
+      ...localCandidates.filter((c: any) => !deletedSet.has(c._id.toString())),
+      ...mappedApplicants
     ];
 
-    res.status(200).json({ success: true, candidates });
+    res.status(200).json({ success: true, candidates, roundsNeeded });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -222,12 +232,37 @@ export const updateCandidate = async (req: Request, res: Response): Promise<void
 export const deleteCandidate = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const authReq = req as any;
+    const orgId = authReq.user?.organizationId;
+
     const candidate = await Candidate.findByIdAndDelete(id);
     const applicant = await ApplicantModel.findByIdAndDelete(id);
 
-    if (!candidate && !applicant) {
-      res.status(404).json({ success: false, message: 'Candidate or Applicant not found' });
-      return;
+    // Blacklist this ID so it won't reappear from external AWS source
+    if (orgId) {
+      await OfferTemplate.findOneAndUpdate(
+        { organizationId: orgId },
+        { $addToSet: { deletedExternalIds: id.toString() } },
+        { upsert: false } // Only add to existing templates
+      );
+    }
+
+    // Also attempt to delete from the external AWS API in case it is an external applicant
+    let externalDeleted = false;
+    try {
+      const extRes = await fetch(`https://qcyokzjqdb.execute-api.ap-south-1.amazonaws.com/prod/api/applicants/${id}`, {
+        method: 'DELETE'
+      });
+      if (extRes.ok) {
+        externalDeleted = true;
+        logger.info(`[RecruitmentController] Successfully deleted external applicant ${id}`);
+      }
+    } catch (extErr: any) {
+      logger.error('[RecruitmentController] External applicant deletion failed/skipped', { error: extErr.message });
+    }
+
+    if (!candidate && !applicant && !externalDeleted) {
+      logger.warn(`[RecruitmentController] Candidate/Applicant ${id} not found locally or externally. Proceeding with UI clearing.`);
     }
 
     getIO()?.emit('candidate_deleted', { candidateId: id });
@@ -510,6 +545,10 @@ ES EthicSecur SofTec Pvt Ltd`,
       if (!template.pdfSubject) { template.pdfSubject = 'Subject: Intern Offer letter- {{appliedRole}}'; updated = true; }
       if (!template.emailBody) {
         template.emailBody = `Dear {{candidateName}},\n\nWe are pleased to extend a formal offer of employment to you for the position of {{appliedRole}} at ES EthicSecur SofTec. Please review the attached PDF Offer Letter containing the comprehensive terms of your employment, starting date, and conditions.\n\nTo accept this offer, please sign the letter and return it by replying to this email.\n\nWe look forward to welcoming you to the team!\n\nBest regards,\nHR Department\nES EthicSecur SofTec Pvt Ltd`;
+        updated = true;
+      }
+      if (!template.roundsNeeded || template.roundsNeeded.length === 0) {
+        template.roundsNeeded = ['NEW', 'SCREENING', 'INTERVIEW', 'TECHNICAL', 'HR', 'OFFER', 'HIRED'];
         updated = true;
       }
       if (updated) {

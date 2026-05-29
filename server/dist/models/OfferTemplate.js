@@ -62,6 +62,12 @@ ES EthicSecur SofTec Pvt Ltd`
     footerAddress: { type: String, default: '2nd floor , nv arcade building, near 5 roads, next to reliance mall, salem-636004' },
     signatoryName: { type: String, default: 'ES EthicSecur SofTec Private Limited' },
     signatoryTitle: { type: String, default: 'HR Department' },
+    roundsNeeded: {
+        type: [String],
+        default: ['NEW', 'SCREENING', 'INTERVIEW', 'TECHNICAL', 'HR', 'OFFER', 'HIRED']
+    },
+    customRounds: { type: [String], default: [] },
+    deletedExternalIds: { type: [String], default: [] },
     organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true }
 }, { timestamps: true });
 exports.OfferTemplate = mongoose_1.default.model('OfferTemplate', OfferTemplateSchema);

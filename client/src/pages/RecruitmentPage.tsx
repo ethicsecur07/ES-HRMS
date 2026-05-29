@@ -25,7 +25,10 @@ import {
   Trash2,
   Edit3,
   Star,
-  ClipboardCheck
+  ClipboardCheck,
+  ChevronDown,
+  ChevronUp,
+  PlusCircle
 } from 'lucide-react';
 import { formatDate } from '../utils/formatters';
 
@@ -69,6 +72,13 @@ export const RecruitmentPage: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editCandidate, setEditCandidate] = useState<Candidate | null>(null);
 
+  // Per-column "Show More" expansion state
+  const [columnExpanded, setColumnExpanded] = useState<Record<string, boolean>>({});
+  const CARDS_PER_COLUMN = 5;
+
+  // Add custom round state
+  const [newRoundInput, setNewRoundInput] = useState('');
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -91,6 +101,59 @@ export const RecruitmentPage: React.FC = () => {
     queryKey: ['candidates'],
     queryFn: recruitmentApi.getAll
   });
+
+  const { data: templateData } = useQuery({
+    queryKey: ['offerTemplate'],
+    queryFn: recruitmentApi.getDefaultTemplate
+  });
+
+  const globalRoundsNeeded = templateData?.template?.roundsNeeded || STAGES;
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: recruitmentApi.updateDefaultTemplate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['offerTemplate'] });
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      addToast('Pipeline Updated', 'Global ATS recruitment stages updated successfully.', 'success');
+    },
+    onError: (error: any) => {
+      addToast('Update Failed', error?.response?.data?.message || 'Could not update pipeline settings.', 'error');
+    }
+  });
+
+  const handleToggleStage = (stage: RecruitmentStage) => {
+    let newRounds: RecruitmentStage[];
+    if (globalRoundsNeeded.includes(stage)) {
+      newRounds = globalRoundsNeeded.filter(r => r !== stage);
+    } else {
+      // Re-insert at original position among STAGES
+      newRounds = STAGES.filter(r => r === stage || globalRoundsNeeded.includes(r));
+    }
+    updateTemplateMutation.mutate({ roundsNeeded: newRounds });
+  };
+
+  const handleAddCustomRound = () => {
+    const trimmed = newRoundInput.trim().toUpperCase().replace(/\s+/g, '_');
+    if (!trimmed) return;
+    if (globalRoundsNeeded.includes(trimmed as RecruitmentStage)) {
+      addToast('Duplicate Round', 'This round already exists in the pipeline.', 'error');
+      return;
+    }
+    // Insert before HIRED
+    const hiredIdx = globalRoundsNeeded.indexOf('HIRED' as RecruitmentStage);
+    let newRounds: string[];
+    if (hiredIdx !== -1) {
+      newRounds = [
+        ...globalRoundsNeeded.slice(0, hiredIdx),
+        trimmed,
+        ...globalRoundsNeeded.slice(hiredIdx)
+      ];
+    } else {
+      newRounds = [...globalRoundsNeeded, trimmed];
+    }
+    updateTemplateMutation.mutate({ roundsNeeded: newRounds as RecruitmentStage[] });
+    setNewRoundInput('');
+  };
 
   const createMutation = useMutation({
     mutationFn: recruitmentApi.create,
@@ -121,12 +184,27 @@ export const RecruitmentPage: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: recruitmentApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['candidates'] });
-      addToast('Candidate Deleted', 'Candidate was removed from the pipeline.', 'success');
+    onMutate: async (id: string) => {
+      // Optimistically remove from cache immediately
+      await queryClient.cancelQueries({ queryKey: ['candidates'] });
+      const previous = queryClient.getQueryData<Candidate[]>(['candidates']);
+      queryClient.setQueryData<Candidate[]>(['candidates'], (old) =>
+        old ? old.filter(c => c._id !== id) : []
+      );
+      return { previous };
     },
-    onError: (error: any) => {
+    onSuccess: () => {
+      addToast('Candidate Removed', 'Candidate was removed from the pipeline.', 'success');
+    },
+    onError: (error: any, _id, context: any) => {
+      // Rollback on error
+      if (context?.previous) {
+        queryClient.setQueryData(['candidates'], context.previous);
+      }
       addToast('Delete Failed', error?.response?.data?.message || 'Could not delete candidate.', 'error');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
     }
   });
 
@@ -208,10 +286,10 @@ export const RecruitmentPage: React.FC = () => {
     c.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  const candidatesByStage = STAGES.reduce((acc, stage) => {
+  const candidatesByStage = globalRoundsNeeded.reduce((acc, stage) => {
     acc[stage] = filteredCandidates.filter(c => c.stage === stage);
     return acc;
-  }, {} as Record<RecruitmentStage, Candidate[]>);
+  }, {} as Record<string, Candidate[]>);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,15 +343,105 @@ export const RecruitmentPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ATS Pipeline Configuration Panel */}
+      <div className="p-5 rounded-2xl bg-card border border-border shadow-sm shrink-0 text-left">
+        <div className="flex items-center gap-2 mb-2">
+          <ClipboardCheck className="w-5 h-5 text-primary animate-pulse" />
+          <h3 className="text-sm font-bold text-foreground">ATS Pipeline Stages Configuration</h3>
+          <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wide">
+            Global settings
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">
+          Enable or disable specific rounds globally. Candidates will dynamically adapt their progress ratios, metrics, and timeline dots based on these global settings.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {globalRoundsNeeded.map((stg) => {
+            if (stg === 'NEW' || stg === 'HIRED') return null;
+            const isBuiltin = STAGES.includes(stg as RecruitmentStage);
+            const isChecked = true; // Already in active rounds means checked
+            return (
+              <label 
+                key={stg} 
+                className="flex items-center gap-2.5 text-xs font-bold text-foreground cursor-pointer select-none group bg-muted/30 hover:bg-muted/70 border border-border/50 hover:border-primary/20 px-4 py-2.5 rounded-xl transition-all duration-200 shadow-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  disabled={updateTemplateMutation.isPending}
+                  onChange={() => {
+                    if (isBuiltin) {
+                      handleToggleStage(stg as RecruitmentStage);
+                    } else {
+                      // Remove custom round
+                      updateTemplateMutation.mutate({ roundsNeeded: globalRoundsNeeded.filter(r => r !== stg) as RecruitmentStage[] });
+                    }
+                  }}
+                  className="w-4 h-4 rounded text-primary focus:ring-primary border-border bg-background cursor-pointer accent-primary"
+                />
+                <span className="group-hover:text-primary transition-colors">
+                  {STAGE_LABELS[stg as RecruitmentStage] || stg.replace(/_/g, ' ')}
+                </span>
+              </label>
+            );
+          })}
+          {/* Disabled (unchecked) built-in stages */}
+          {STAGES.filter(stg => stg !== 'NEW' && stg !== 'HIRED' && !globalRoundsNeeded.includes(stg)).map((stg) => (
+            <label 
+              key={stg} 
+              className="flex items-center gap-2.5 text-xs font-bold text-muted-foreground cursor-pointer select-none group bg-muted/10 hover:bg-muted/30 border border-border/30 hover:border-primary/20 px-4 py-2.5 rounded-xl transition-all duration-200 shadow-sm opacity-50"
+            >
+              <input
+                type="checkbox"
+                checked={false}
+                disabled={updateTemplateMutation.isPending}
+                onChange={() => handleToggleStage(stg)}
+                className="w-4 h-4 rounded text-primary focus:ring-primary border-border bg-background cursor-pointer accent-primary"
+              />
+              <span className="group-hover:text-primary transition-colors">
+                {STAGE_LABELS[stg]}
+              </span>
+            </label>
+          ))}
+          {/* Add New Custom Round */}
+          <div className="flex items-center gap-2 ml-auto">
+            <input
+              type="text"
+              value={newRoundInput}
+              onChange={(e) => setNewRoundInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddCustomRound()}
+              placeholder="New Round Name..."
+              className="bg-background text-foreground border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary w-44"
+              disabled={updateTemplateMutation.isPending}
+            />
+            <button
+              onClick={handleAddCustomRound}
+              disabled={updateTemplateMutation.isPending || !newRoundInput.trim()}
+              className="flex items-center gap-1.5 text-xs font-bold text-primary border border-primary/30 bg-primary/10 hover:bg-primary/20 px-3 py-2 rounded-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <PlusCircle className="w-3.5 h-3.5" /> Add Round
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="flex-1 overflow-x-auto overflow-y-hidden">
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="flex h-full gap-4 pb-4 min-w-max">
-            {STAGES.map((stage) => (
+            {globalRoundsNeeded.map((stage) => {
+              const stageColor = STAGE_COLORS[stage as RecruitmentStage] || 'border-slate-500/20 bg-slate-500/10 text-slate-500';
+              const stageLabel = STAGE_LABELS[stage as RecruitmentStage] || stage.replace(/_/g, ' ');
+              const stageCandidates = candidatesByStage[stage] || [];
+              const isExpanded = columnExpanded[stage] || false;
+              const visibleCandidates = isExpanded ? stageCandidates : stageCandidates.slice(0, CARDS_PER_COLUMN);
+              const hiddenCount = stageCandidates.length - CARDS_PER_COLUMN;
+
+              return (
               <div key={stage} className="flex flex-col w-[300px] h-full shrink-0">
-                <div className={`mb-3 py-2 px-3 rounded-lg border flex items-center justify-between ${STAGE_COLORS[stage]}`}>
-                  <h3 className="font-bold text-xs uppercase tracking-wider">{STAGE_LABELS[stage]}</h3>
+                <div className={`mb-3 py-2 px-3 rounded-lg border flex items-center justify-between ${stageColor}`}>
+                  <h3 className="font-bold text-xs uppercase tracking-wider">{stageLabel}</h3>
                   <span className="bg-background/50 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    {candidatesByStage[stage]?.length || 0}
+                    {stageCandidates.length}
                   </span>
                 </div>
 
@@ -286,7 +454,7 @@ export const RecruitmentPage: React.FC = () => {
                         snapshot.isDraggingOver ? 'bg-primary/5 border border-primary/20' : 'bg-muted/30 border border-transparent'
                       }`}
                     >
-                      {candidatesByStage[stage]?.map((candidate, index) => (
+                      {visibleCandidates.map((candidate, index) => (
                         <Draggable key={candidate._id} draggableId={candidate._id} index={index} isDragDisabled={!hasPermission('RECRUITMENT', 'edit')}>
                           {(provided, snapshot) => (
                             <div
@@ -388,13 +556,14 @@ export const RecruitmentPage: React.FC = () => {
 
                               {/* Evaluations & Step Pipeline Progress */}
                               {(() => {
-                                const totalCompletedStages = candidate.evaluations?.filter(e => e.completed).length || 0;
+                                const activeRoundsList = globalRoundsNeeded;
+                                const totalCompletedStages = candidate.evaluations?.filter(e => e.completed && activeRoundsList.includes(e.stage)).length || 0;
 
                                 // Calculate average ratings
                                 let totalRatingsSum = 0;
                                 let ratingsCount = 0;
                                 candidate.evaluations?.forEach(e => {
-                                  if (e.completed) {
+                                  if (e.completed && activeRoundsList.includes(e.stage)) {
                                     if (e.ratingTechnical) { totalRatingsSum += e.ratingTechnical; ratingsCount++; }
                                     if (e.ratingCommunication) { totalRatingsSum += e.ratingCommunication; ratingsCount++; }
                                   }
@@ -406,7 +575,7 @@ export const RecruitmentPage: React.FC = () => {
                                     <div className="flex items-center justify-between text-[11px]">
                                       <span className="text-muted-foreground flex items-center gap-1 font-bold">
                                         <ClipboardCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                        {totalCompletedStages} / 7 Steps Completed
+                                        {totalCompletedStages} / {activeRoundsList.length} Steps Completed
                                       </span>
                                       {averageRating && (
                                         <span className="flex items-center gap-0.5 font-extrabold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded text-[10px] shadow-sm">
@@ -418,15 +587,16 @@ export const RecruitmentPage: React.FC = () => {
 
                                     {/* Stage progress timeline dots */}
                                     <div className="flex items-center gap-1 mt-0.5">
-                                      {STAGES.map((stg) => {
+                                      {globalRoundsNeeded.map((stg) => {
                                         const isStgCompleted = !!candidate.evaluations?.find(e => e.stage === stg && e.completed) || 
-                                          (STAGES.indexOf(candidate.stage) > STAGES.indexOf(stg));
+                                          (globalRoundsNeeded.indexOf(candidate.stage) > globalRoundsNeeded.indexOf(stg));
                                         const isCurrent = candidate.stage === stg;
+                                        const stgLabel = STAGE_LABELS[stg as RecruitmentStage] || stg.replace(/_/g, ' ');
                                         
                                         return (
                                           <div
                                             key={stg}
-                                            title={`${STAGE_LABELS[stg]}: ${isStgCompleted ? 'Completed' : isCurrent ? 'Active' : 'Pending'}`}
+                                            title={`${stgLabel}: ${isStgCompleted ? 'Completed' : isCurrent ? 'Active' : 'Pending'}`}
                                             className={`h-1.5 rounded-full flex-1 transition-all ${
                                               isStgCompleted
                                                 ? 'bg-emerald-500 shadow-sm shadow-emerald-500/10'
@@ -479,11 +649,31 @@ export const RecruitmentPage: React.FC = () => {
                         </Draggable>
                       ))}
                       {provided.placeholder}
+                      {/* Show More / Show Less button */}
+                      {hiddenCount > 0 && (
+                        <button
+                          onClick={() => setColumnExpanded(prev => ({ ...prev, [stage]: true }))}
+                          className="w-full mt-1 py-2 text-[11px] font-bold text-primary hover:text-primary/80 flex items-center justify-center gap-1 bg-primary/5 hover:bg-primary/10 rounded-lg border border-primary/10 transition-all duration-200"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                          Show {hiddenCount} more
+                        </button>
+                      )}
+                      {isExpanded && stageCandidates.length > CARDS_PER_COLUMN && (
+                        <button
+                          onClick={() => setColumnExpanded(prev => ({ ...prev, [stage]: false }))}
+                          className="w-full mt-1 py-2 text-[11px] font-bold text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 bg-muted/20 hover:bg-muted/40 rounded-lg border border-border/30 transition-all duration-200"
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                          Show less
+                        </button>
+                      )}
                     </div>
                   )}
                 </Droppable>
               </div>
-            ))}
+              );
+            })}
           </div>
         </DragDropContext>
       </div>
