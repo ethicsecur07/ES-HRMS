@@ -9,13 +9,14 @@ import {
   BarChart2, Users, Activity, Eye, Shield,
   Loader2, CheckCircle2, Star, Paperclip, FileText, Trophy,
   Download, UploadCloud, Info, CheckSquare, Square,
-  ListTodo
+  ListTodo, Video
 } from 'lucide-react';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import { Input, Select, Textarea } from '../Components/WrapperComponents/Input';
 import { Button } from '../Components/WrapperComponents/Button';
 import { usePermission } from '../hooks/usePermission';
 import { useAuthStore } from '../store/useAuthStore';
+import { ScheduleMeetingModal } from '../Components/SpecifiedComponents/ScheduleMeetingModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type TabType = 'overview' | 'milestones' | 'tasks' | 'members' | 'timeline' | 'files' | 'analytics' | 'activity';
@@ -67,6 +68,7 @@ export const ProjectDetailsPage = () => {
   const [isEditSprintOpen, setIsEditSprintOpen] = useState(false);
   const [isCreateMilestoneOpen, setIsCreateMilestoneOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isScheduleMeetingOpen, setIsScheduleMeetingOpen] = useState(false);
 
   // Edit Project Form
   const [projectName, setProjectName] = useState('');
@@ -461,6 +463,12 @@ export const ProjectDetailsPage = () => {
           {/* Action buttons — hidden for Admin */}
           {!isAdmin && (
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsScheduleMeetingOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/20 transition-colors text-sm font-semibold"
+              >
+                <Video className="w-4 h-4" /> Schedule Meeting
+              </button>
               {canEditProject && (
                 <button
                   onClick={() => setIsEditProjectOpen(true)}
@@ -1227,6 +1235,15 @@ export const ProjectDetailsPage = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Schedule Meeting Modal */}
+      <ScheduleMeetingModal
+        isOpen={isScheduleMeetingOpen}
+        onClose={() => setIsScheduleMeetingOpen(false)}
+        defaultType="CLIENT"
+        projectId={id}
+        projectName={project?.name}
+      />
     </div>
   );
 };

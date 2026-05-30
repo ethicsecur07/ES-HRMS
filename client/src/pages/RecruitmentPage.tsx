@@ -12,6 +12,7 @@ import { usePermission } from '../hooks/usePermission';
 import { Input } from '../Components/WrapperComponents/Input';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import { OfferLetterModal } from '../Components/SpecifiedComponents/OfferLetterModal';
+import { ScheduleMeetingModal } from '../Components/SpecifiedComponents/ScheduleMeetingModal';
 import { EvaluationModal } from '../Components/SpecifiedComponents/EvaluationModal';
 import { 
   Users, 
@@ -28,7 +29,8 @@ import {
   ClipboardCheck,
   ChevronDown,
   ChevronUp,
-  PlusCircle
+  PlusCircle,
+  Video
 } from 'lucide-react';
 import { formatDate } from '../utils/formatters';
 
@@ -71,6 +73,8 @@ export const RecruitmentPage: React.FC = () => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editCandidate, setEditCandidate] = useState<Candidate | null>(null);
+  const [showInterviewModal, setShowInterviewModal] = useState(false);
+  const [interviewCandidate, setInterviewCandidate] = useState<Candidate | null>(null);
 
   // Per-column "Show More" expansion state
   const [columnExpanded, setColumnExpanded] = useState<Record<string, boolean>>({});
@@ -504,6 +508,18 @@ export const RecruitmentPage: React.FC = () => {
                                             <Edit3 className="w-3.5 h-3.5" /> Edit Details
                                           </button>
                                         )}
+                                        {hasPermission('RECRUITMENT', 'edit') && (
+                                          <button
+                                            onClick={() => {
+                                              setActiveMenuId(null);
+                                              setInterviewCandidate(candidate);
+                                              setShowInterviewModal(true);
+                                            }}
+                                            className="w-full px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted flex items-center gap-2 hover:text-indigo-500 transition-colors text-left"
+                                          >
+                                            <Video className="w-3.5 h-3.5" /> Schedule Interview
+                                          </button>
+                                        )}
                                         <button
                                            onClick={() => {
                                              setActiveMenuId(null);
@@ -616,7 +632,18 @@ export const RecruitmentPage: React.FC = () => {
                                 <div className="text-[10px] text-muted-foreground font-mono">
                                   {formatDate(candidate.createdAt)}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {(candidate as any).interviewSchedule?.teamsJoinUrl && (
+                                    <a
+                                      href={(candidate as any).interviewSchedule.teamsJoinUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 hover:underline border border-indigo-500/20 bg-indigo-500/10 px-1.5 py-0.5 rounded cursor-pointer"
+                                      title="Join Teams Interview"
+                                    >
+                                      <Video className="w-3 h-3" /> Join Interview
+                                    </a>
+                                  )}
                                   {candidate.offerDetails?.offerLetterUrl && (
                                     <a 
                                       href={getDownloadUrl(candidate._id)}
@@ -816,6 +843,16 @@ export const RecruitmentPage: React.FC = () => {
         isOpen={showEvalModal}
         onClose={() => { setShowEvalModal(false); setEvalCandidate(null); }}
         candidate={evalCandidate}
+      />
+
+      <ScheduleMeetingModal
+        isOpen={showInterviewModal}
+        onClose={() => { setShowInterviewModal(false); setInterviewCandidate(null); }}
+        defaultType="INTERVIEW"
+        candidateId={interviewCandidate?._id}
+        candidateName={interviewCandidate ? `${interviewCandidate.firstName} ${interviewCandidate.lastName}` : undefined}
+        candidateEmail={interviewCandidate?.email}
+        candidateRole={interviewCandidate?.appliedRole}
       />
     </div>
   );
