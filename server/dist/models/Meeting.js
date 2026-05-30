@@ -33,43 +33,39 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Candidate = void 0;
+exports.Meeting = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-const CandidateSchema = new mongoose_1.Schema({
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    phone: { type: String, required: true },
-    resumeUrl: { type: String },
-    appliedRole: { type: String, required: true },
-    stage: {
+const MeetingAttendeeSchema = new mongoose_1.Schema({
+    name: { type: String, required: true },
+    email: { type: String, required: true },
+    role: { type: String },
+}, { _id: false });
+const MeetingSchema = new mongoose_1.Schema({
+    organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', index: true },
+    title: { type: String, required: true },
+    meetingType: {
         type: String,
-        enum: ['NEW', 'SCREENING', 'INTERVIEW', 'TECHNICAL', 'HR', 'OFFER', 'HIRED'],
-        default: 'NEW'
+        enum: ['INTERVIEW', 'CLIENT', 'TEAM'],
+        required: true,
     },
-    interviewSchedule: {
-        date: { type: Date },
-        interviewer: { type: String },
-        teamsJoinUrl: { type: String },
-        meetingId: { type: String },
-    },
-    offerDetails: {
-        salaryOffered: { type: Number },
-        offerLetterUrl: { type: String },
-        offerLetterBase64: { type: String },
-        status: { type: String, enum: ['PENDING', 'ACCEPTED', 'REJECTED'], default: 'PENDING' }
-    },
+    teamsJoinUrl: { type: String, required: true },
+    teamsMeetingId: { type: String, required: true },
+    startDateTime: { type: Date, required: true },
+    endDateTime: { type: Date, required: true },
+    organizer: { type: String, required: true },
+    attendees: [MeetingAttendeeSchema],
+    candidateId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Candidate' },
+    projectId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Project' },
     notes: { type: String },
-    evaluations: [
-        {
-            stage: { type: String, required: true },
-            comments: { type: String },
-            ratingCommunication: { type: Number, min: 0, max: 5 },
-            ratingTechnical: { type: Number, min: 0, max: 5 },
-            toolsExperiences: { type: String },
-            completed: { type: Boolean, default: false },
-            completedAt: { type: Date }
-        }
-    ]
+    status: {
+        type: String,
+        enum: ['SCHEDULED', 'COMPLETED', 'CANCELLED'],
+        default: 'SCHEDULED',
+    },
+    createdBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
 }, { timestamps: true });
-exports.Candidate = mongoose_1.default.model('Candidate', CandidateSchema);
+MeetingSchema.index({ startDateTime: 1 });
+MeetingSchema.index({ meetingType: 1 });
+MeetingSchema.index({ status: 1 });
+MeetingSchema.index({ createdBy: 1 });
+exports.Meeting = mongoose_1.default.model('Meeting', MeetingSchema);

@@ -31,6 +31,7 @@ const DEFAULT_MODULE_CODES = [
     'RECRUITMENT',
     'CHAT',
     'NOTIFICATIONS',
+    'MEETINGS',
 ];
 const DEFAULT_MODULES = [
     { name: 'Dashboard', code: 'DASHBOARD', version: '1.0.0', isActive: true },
@@ -53,6 +54,7 @@ const DEFAULT_MODULES = [
     { name: 'ATS Recruitment', code: 'RECRUITMENT', version: '1.0.0', isActive: true },
     { name: 'Internal Chat', code: 'CHAT', version: '1.0.0', isActive: true },
     { name: 'System Notifications', code: 'NOTIFICATIONS', version: '1.0.0', isActive: true },
+    { name: 'Teams Meetings Center', code: 'MEETINGS', version: '1.0.0', isActive: true },
 ];
 const DEFAULT_ROUTES = [
     { moduleCode: 'DASHBOARD', routePath: '/dashboard', displayName: 'Dashboard', order: 1 },
@@ -72,6 +74,7 @@ const DEFAULT_ROUTES = [
     { moduleCode: 'RECRUITMENT', routePath: '/recruitment', displayName: 'Recruitment', order: 16 },
     { moduleCode: 'CHAT', routePath: '/chat', displayName: 'Chat', order: 17 },
     { moduleCode: 'NOTIFICATIONS', routePath: '/notifications', displayName: 'Notifications', order: 18 },
+    { moduleCode: 'MEETINGS', routePath: '/meetings', displayName: 'Meetings', order: 19 },
 ];
 // Helper to ensure core Modules and ModuleRoutes exist in database
 const ensureCoreModulesAndRoutes = async () => {

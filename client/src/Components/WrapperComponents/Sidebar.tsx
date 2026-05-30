@@ -18,7 +18,8 @@ import {
   ListTodo,
   Network,
   FolderOpen,
-  MessageSquare
+  MessageSquare,
+  Video
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { employeeApi } from '../../api_service/employeeApi';
@@ -120,6 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       case '/projects': return ListTodo;
       case '/recruitment': return Users;
       case '/notifications': return Bell;
+      case '/meetings': return Video;
       default: return LayoutDashboard;
     }
   };

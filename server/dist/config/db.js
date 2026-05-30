@@ -8,7 +8,7 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const logger_js_1 = require("../utils/logger.js");
 const connectDB = async () => {
     try {
-        const mongoURI = process.env.MONGO_URI || 'mongodb+srv://logapriyanvky_db_user:JOezGJTTfPWNp82A@es-hrms.xsowliv.mongodb.net/?appName=ES-HRMS';
+        const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://logapriyanvky_db_user:JOezGJTTfPWNp82A@es-hrms.xsowliv.mongodb.net/?appName=ES-HRMS';
         await mongoose_1.default.connect(mongoURI, {
             serverSelectionTimeoutMS: 5000
         });

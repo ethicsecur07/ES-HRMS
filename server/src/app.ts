@@ -44,6 +44,7 @@ import chatRoutes from './domains/chat/chat.routes.js';
 import notificationRoutes from './domains/notification/notification.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import selfServiceRoutes from './routes/selfService.routes.js';
+import meetingRoutes from './routes/meeting.routes.js';
 
 
 import { errorHandler } from './middlewares/errorHandler.js';
@@ -106,6 +107,7 @@ app.use('/metrics', metricsMiddleware);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/reports', reportsRoutes);
   app.use('/api/self-service', selfServiceRoutes);
+  app.use('/api/meetings', meetingRoutes);
   app.use('/api/analytics', analyticsRoutes);
   app.use('/api/permissions', permissionRoutes);
   app.use('/api/tasks', taskRoutes);

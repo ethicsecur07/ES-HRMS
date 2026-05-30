@@ -28,6 +28,7 @@ const NotificationCenter = lazy(() => import('./pages/NotificationCenter').then(
 const ChatPage = lazy(() => import('./pages/ChatPage').then(m => ({ default: m.ChatPage })));
 const ProjectDetailsPage = lazy(() => import('./pages/ProjectDetailsPage').then(m => ({ default: m.ProjectDetailsPage })));
 const RecruitmentPage = lazy(() => import('./pages/RecruitmentPage').then(m => ({ default: m.RecruitmentPage })));
+const MeetingsPage = lazy(() => import('./pages/MeetingsPage').then(m => ({ default: m.MeetingsPage })));
 // Roles and Permissions Management
 const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage').then(m => ({ default: m.RoleManagementPage })));
 const PermissionPage = lazy(() => import('./pages/PermissionPage').then(m => ({ default: m.PermissionPage })));
@@ -170,6 +171,7 @@ export const App: React.FC = () => {
                   <Route path="/chat" element={<ChatPage />} />
                   <Route path="/projects/:id" element={<ProjectDetailsPage />} />
                   <Route path="/recruitment" element={<RecruitmentPage />} />
+                  <Route path="/meetings" element={<MeetingsPage />} />
 
                   <Route path="/employees" element={<EmployeesPage />} />
                   <Route path="/employees/:id" element={<EmployeeDetailsPage />} />

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createCandidate, getCandidates, updateCandidateStage, updateCandidate, deleteCandidate, sendCandidateOffer, getOfferTemplate, updateOfferTemplate, getCandidateOfferLetter } from './recruitment.controller.js';
+import { createCandidate, getCandidates, updateCandidateStage, updateCandidate, deleteCandidate, sendCandidateOffer, getOfferTemplate, updateOfferTemplate, getCandidateOfferLetter, scheduleInterview } from './recruitment.controller.js';
 import { rbacGuard } from '../../middlewares/rbacGuard.js';
 import { authenticate } from '../../middlewares/auth.middleware.js';
 
@@ -15,5 +15,6 @@ router.put('/:id', authenticate as any, rbacGuard('RECRUITMENT', 'edit'), update
 router.delete('/:id', authenticate as any, rbacGuard('RECRUITMENT', 'delete'), deleteCandidate);
 router.post('/:id/send-offer', authenticate as any, rbacGuard('RECRUITMENT', 'edit'), sendCandidateOffer as any);
 router.get('/:id/offer-letter', authenticate as any, rbacGuard('RECRUITMENT', 'view'), getCandidateOfferLetter as any);
+router.post('/:id/schedule-interview', authenticate as any, rbacGuard('RECRUITMENT', 'edit'), scheduleInterview as any);
 
 export default router;

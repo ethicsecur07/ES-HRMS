@@ -21,6 +21,8 @@ export interface ICandidate extends Document {
   interviewSchedule?: {
     date: Date;
     interviewer: string;
+    teamsJoinUrl?: string;
+    meetingId?: string;
   };
   offerDetails?: {
     salaryOffered: number;
@@ -49,7 +51,9 @@ const CandidateSchema = new Schema<ICandidate>(
     },
     interviewSchedule: {
       date: { type: Date },
-      interviewer: { type: String }
+      interviewer: { type: String },
+      teamsJoinUrl: { type: String },
+      meetingId: { type: String },
     },
     offerDetails: {
       salaryOffered: { type: Number },

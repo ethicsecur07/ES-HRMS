@@ -3,7 +3,7 @@ import { logger } from '../utils/logger.js';
 
 export const connectDB = async (): Promise<void> => {
   try {
-    const mongoURI = process.env.MONGO_URI || 'mongodb+srv://logapriyanvky_db_user:JOezGJTTfPWNp82A@es-hrms.xsowliv.mongodb.net/?appName=ES-HRMS';
+    const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://logapriyanvky_db_user:JOezGJTTfPWNp82A@es-hrms.xsowliv.mongodb.net/?appName=ES-HRMS';
     await mongoose.connect(mongoURI, {
       serverSelectionTimeoutMS: 5000
     });
