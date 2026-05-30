@@ -6,13 +6,18 @@ import { UserSession } from '../models/UserSession.js';
 
 let ioInstance: SocketIOServer | null = null;
 
-// Online presence map: userId -> { organizationId, socketIds } (supports multi-tab)
-const onlineUsers = new Map<string, { organizationId: string; socketIds: Set<string> }>();
+// User presence status: userId -> { organizationId, allSockets: Set, activeSockets: Set }
+const userPresence = new Map<string, {
+  organizationId: string;
+  allSockets: Set<string>;
+  activeSockets: Set<string>;
+}>();
+const disconnectTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 const getOnlineUserIdsByOrg = (orgId: string): string[] => {
   const ids: string[] = [];
-  for (const [userId, data] of onlineUsers.entries()) {
-    if (data.organizationId === orgId) {
+  for (const [userId, presence] of userPresence.entries()) {
+    if (presence.organizationId === orgId && presence.activeSockets.size > 0) {
       ids.push(userId);
     }
   }
@@ -25,6 +30,8 @@ export const initSockets = (httpServer: Server) => {
       origin: '*',
       methods: ['GET', 'POST'],
     },
+    pingInterval: 10000,
+    pingTimeout: 5000,
   });
 
   ioInstance = io;
@@ -108,14 +115,31 @@ export const initSockets = (httpServer: Server) => {
       logger.info(`Socket ${socket.id} joined rooms: org_${user.organizationId}, user_${user.id}, role_${user.role}`);
 
       // ── Online Presence Tracking ─────────────────────────────────────────
-      // IMPORTANT: Add user to map FIRST, then emit so the list is complete
-      if (!onlineUsers.has(user.id)) {
-        onlineUsers.set(user.id, { organizationId: user.organizationId, socketIds: new Set() });
+      // Clear any pending offline grace-period timeout if they reconnect
+      if (disconnectTimeouts.has(user.id)) {
+        clearTimeout(disconnectTimeouts.get(user.id)!);
+        disconnectTimeouts.delete(user.id);
       }
-      onlineUsers.get(user.id)!.socketIds.add(socket.id);
 
-      // Broadcast to ALL org members (including self) that this user is online
-      io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
+      if (!userPresence.has(user.id)) {
+        userPresence.set(user.id, {
+          organizationId: user.organizationId,
+          allSockets: new Set(),
+          activeSockets: new Set()
+        });
+      }
+      
+      const presence = userPresence.get(user.id)!;
+      presence.allSockets.add(socket.id);
+      
+      // Default to active on connection
+      const wasOffline = presence.activeSockets.size === 0;
+      presence.activeSockets.add(socket.id);
+
+      if (wasOffline) {
+        // Broadcast to ALL org members (including self) that this user is online
+        io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
+      }
 
       // Send the FULL current list of online users in this organization to only the newly connected socket
       socket.emit('online_users', getOnlineUserIdsByOrg(user.organizationId));
@@ -161,18 +185,76 @@ export const initSockets = (httpServer: Server) => {
       }
     });
 
+    // ── Active Presence events ──────────────────────────────────────────────
+    socket.on('user_active', () => {
+      if (!user) return;
+
+      if (disconnectTimeouts.has(user.id)) {
+        clearTimeout(disconnectTimeouts.get(user.id)!);
+        disconnectTimeouts.delete(user.id);
+      }
+
+      if (!userPresence.has(user.id)) {
+        userPresence.set(user.id, {
+          organizationId: user.organizationId,
+          allSockets: new Set([socket.id]),
+          activeSockets: new Set()
+        });
+      }
+
+      const presence = userPresence.get(user.id)!;
+      const wasOffline = presence.activeSockets.size === 0;
+      presence.activeSockets.add(socket.id);
+
+      if (wasOffline) {
+        io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
+        logger.info(`User ${user.email} went online (active).`);
+      }
+    });
+
+    socket.on('user_inactive', () => {
+      if (!user) return;
+
+      const presence = userPresence.get(user.id);
+      if (presence) {
+        presence.activeSockets.delete(socket.id);
+
+        if (presence.activeSockets.size === 0) {
+          io.to(`org_${user.organizationId}`).emit('user_offline', { userId: user.id });
+          logger.info(`User ${user.email} went offline (inactive).`);
+        }
+      }
+    });
+
     // ── Disconnect ──────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
       logger.info(`Socket disconnected: ${socket.id}`);
 
       if (user) {
-        const userData = onlineUsers.get(user.id);
-        if (userData) {
-          userData.socketIds.delete(socket.id);
-          // Only mark user as offline when ALL their sockets disconnect (multi-tab support)
-          if (userData.socketIds.size === 0) {
-            onlineUsers.delete(user.id);
-            io.to(`org_${user.organizationId}`).emit('user_offline', { userId: user.id });
+        const presence = userPresence.get(user.id);
+        if (presence) {
+          presence.allSockets.delete(socket.id);
+          const wasActive = presence.activeSockets.has(socket.id);
+          presence.activeSockets.delete(socket.id);
+
+          // Only mark user as offline when ALL their active sockets disconnect
+          if (presence.activeSockets.size === 0 && wasActive) {
+            const timeout = setTimeout(() => {
+              const currentPresence = userPresence.get(user.id);
+              if (currentPresence && currentPresence.activeSockets.size === 0) {
+                if (currentPresence.allSockets.size === 0) {
+                  userPresence.delete(user.id);
+                }
+                io.to(`org_${user.organizationId}`).emit('user_offline', { userId: user.id });
+                logger.info(`User ${user.email} marked offline after disconnect grace period.`);
+              }
+              disconnectTimeouts.delete(user.id);
+            }, 3000);
+
+            disconnectTimeouts.set(user.id, timeout);
+          } else if (presence.allSockets.size === 0) {
+            // Clean up entry completely if no socket sessions remain at all
+            userPresence.delete(user.id);
           }
         }
       }

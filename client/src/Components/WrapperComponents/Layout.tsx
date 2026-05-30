@@ -152,6 +152,73 @@ export const Layout: React.FC = () => {
     }
   }, [isAuthenticated, token, user?._id, initializeSocket]);
 
+  // Cleanly disconnect socket on page unload/close
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUnload = () => {
+      socket.disconnect();
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+    };
+  }, [socket]);
+
+  // Track active/inactive presence status (tab visibility and window focus)
+  useEffect(() => {
+    if (!socket || !isAuthenticated) return;
+
+    let isUserActive = true; // Default to active on mount
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const updatePresence = (active: boolean) => {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      // Debounce inactive states to avoid flickering during brief defocusing
+      const delay = active ? 0 : 1000;
+
+      timeoutId = setTimeout(() => {
+        if (isUserActive !== active) {
+          isUserActive = active;
+          if (active) {
+            socket.emit('user_active');
+          } else {
+            socket.emit('user_inactive');
+          }
+        }
+      }, delay);
+    };
+
+    const handleVisibilityChange = () => {
+      const active = document.visibilityState === 'visible';
+      updatePresence(active);
+    };
+
+    const handleFocus = () => updatePresence(true);
+    const handleBlur = () => updatePresence(false);
+
+    // Initial event emission to ensure server tracks us as active
+    socket.emit('user_active');
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+      // Clean up by emitting inactive on unmount
+      socket.emit('user_inactive');
+    };
+  }, [socket, isAuthenticated]);
+
   useEffect(() => {
     if (!socket) return;
 
