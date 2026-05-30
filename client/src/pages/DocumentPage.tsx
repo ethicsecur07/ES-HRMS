@@ -32,7 +32,7 @@ export const DocumentPage: React.FC = () => {
   const { hasPermission } = usePermission();
   const queryClient = useQueryClient();
 
-  const isHRAdmin = role === 'ADMIN' || role === 'HR';
+  const isHRAdmin = role === 'ADMIN' || role === 'HR' || role === 'MANAGER';
   const canUpload = hasPermission('DOCUMENTS', 'create') || isHRAdmin;
   const canDelete = hasPermission('DOCUMENTS', 'delete') || isHRAdmin;
 

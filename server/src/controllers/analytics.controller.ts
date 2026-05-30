@@ -71,8 +71,8 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
     const approvedLeaves = await Leave.find({
       organizationId: orgId,
       status: 'APPROVED',
-      startDate: { $lte: new Date(weekDates[6].dateStr) },
-      endDate: { $gte: new Date(weekDates[0].dateStr) }
+      startDate: { $lte: weekDates[6].dateStr },
+      endDate: { $gte: weekDates[0].dateStr }
     });
 
     const attendanceTrends = [];
@@ -80,15 +80,20 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       const present = recentAttendance.filter(a => a.date === dateStr && (a.status === 'OFFICE' || a.status === 'PRESENT')).length;
       const wfh = recentAttendance.filter(a => a.date === dateStr && a.status === 'WFH').length;
       
-      const targetDate = new Date(dateStr);
-      targetDate.setUTCHours(0, 0, 0, 0);
-      const leave = approvedLeaves.filter(l => {
-        const start = new Date(l.startDate);
-        start.setUTCHours(0, 0, 0, 0);
-        const end = new Date(l.endDate);
-        end.setUTCHours(0, 0, 0, 0);
-        return start <= targetDate && end >= targetDate;
-      }).length;
+      const leaveEmployeesFromAttendance = recentAttendance
+        .filter(a => a.date === dateStr && a.status === 'LEAVE')
+        .map(a => a.employeeId.toString());
+
+      const leaveEmployeesFromLeaves = approvedLeaves
+        .filter(l => l.startDate <= dateStr && l.endDate >= dateStr)
+        .map(l => l.employeeId.toString());
+
+      const uniqueLeaveEmployeeIds = new Set([
+        ...leaveEmployeesFromAttendance,
+        ...leaveEmployeesFromLeaves
+      ]);
+
+      const leave = uniqueLeaveEmployeeIds.size;
 
       attendanceTrends.push({ date: dayName, dateStr, present, wfh, leave });
     }
@@ -345,6 +350,7 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
       adminEmail: org.settings?.adminEmail || '',
       activeWorkdays: org.settings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
       loginApprovalRoles: org.settings?.loginApprovalRoles || ['ADMIN'],
+      visibleDepartments: org.settings?.visibleDepartments || ['Development', 'Digital Marketing', 'HR', 'BA', 'BDA'],
     };
     res.status(200).json({
       ...settingsData,
@@ -368,7 +374,7 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
     const oldLeaveLimit = org.settings?.monthlyLeaveLimit || 2;
     const oldPermissionHours = org.settings?.monthlyPermissionHours || 3;
 
-    const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, salaryCycleStartDay, officeWiFiIPs, adminEmail, activeWorkdays, loginApprovalRoles } = req.body;
+    const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, salaryCycleStartDay, officeWiFiIPs, adminEmail, activeWorkdays, loginApprovalRoles, visibleDepartments } = req.body;
     
     const newSalaryCycleStartDay = Number(salaryCycleStartDay) || 1;
     const newLeaveLimit = Number(monthlyLeaveLimit) || 2;
@@ -411,6 +417,10 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
 
     if (loginApprovalRoles && Array.isArray(loginApprovalRoles)) {
       org.settings.loginApprovalRoles = loginApprovalRoles;
+    }
+
+    if (visibleDepartments && Array.isArray(visibleDepartments)) {
+      org.settings.visibleDepartments = visibleDepartments;
     }
 
     // Tell Mongoose the nested settings object has changed

@@ -20,6 +20,7 @@ import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
 import { permissionApi } from '../api_service/permissionApi';
 import { projectApi } from '../api_service/projectApi';
+import { Users, CalendarCheck, Palmtree, BarChart3, ListTodo, Network } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const { user, role } = useAuthStore();
@@ -132,51 +133,110 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* 2. MANAGER DASHBOARD */}
-      {role === 'MANAGER' && (
-        <div className="space-y-8">
-         
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card className="space-y-4 border-l-4 border-l-primary shadow-md p-6 bg-card">
-              <div>
-                <h3 className="text-lg font-bold text-foreground tracking-tight">Team Task Reports</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Daily submissions from your department
-                </p>
-              </div>
-              <TableWrapper
-                columns={[
-                  { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId.fullName || 'Unknown' : row.employeeId) : 'Unknown'}</span> },
-                  ...taskColumns,
-                ]}
-                data={allTasks || []}
-                searchKey="completedTasks"
-                searchPlaceholder="Filter reports..."
-              />
-            </Card>
-
-            <div className="space-y-8">
-              <HRApprovalQueue />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. HR DASHBOARD */}
-      {role === 'HR' && (
+      {/* 2 & 3. MANAGER & HR DASHBOARD */}
+      {(role === 'MANAGER' || role === 'HR') && (
         <div className="space-y-8">
          
           <AdminAnalyticsCharts stats={stats} />
+
+          {/* Quick Access Grid */}
+          <div>
+            <h3 className="text-base font-bold text-foreground mb-3 tracking-tight">Quick Access</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[
+                {
+                  label: 'Employees',
+                  desc: 'Directory & Profiles',
+                  path: '/employees',
+                  gradient: 'from-blue-500/20 to-cyan-600/10',
+                  border: 'border-blue-500/30',
+                  iconBg: 'bg-blue-500/15 text-blue-600',
+                  icon: <Users className="w-6 h-6" />,
+                },
+                {
+                  label: 'Attendance',
+                  desc: 'Logs & Overtime',
+                  path: '/attendance',
+                  gradient: 'from-amber-500/20 to-orange-600/10',
+                  border: 'border-amber-500/30',
+                  iconBg: 'bg-amber-500/15 text-amber-600',
+                  icon: <CalendarCheck className="w-6 h-6" />,
+                },
+                {
+                  label: 'Leave & WFH',
+                  desc: 'Requests & Status',
+                  path: '/leave-wfh',
+                  gradient: 'from-emerald-500/20 to-green-600/10',
+                  border: 'border-emerald-500/30',
+                  iconBg: 'bg-emerald-500/15 text-emerald-600',
+                  icon: <Palmtree className="w-6 h-6" />,
+                },
+                {
+                  label: 'Task Reports',
+                  desc: 'Submissions',
+                  path: '/task-reports',
+                  gradient: 'from-violet-500/20 to-purple-600/10',
+                  border: 'border-violet-500/30',
+                  iconBg: 'bg-violet-500/15 text-violet-600',
+                  icon: <BarChart3 className="w-6 h-6" />,
+                },
+                {
+                  label: 'Projects',
+                  desc: 'Tasks & Sprints',
+                  path: '/projects',
+                  gradient: 'from-pink-500/20 to-rose-600/10',
+                  border: 'border-pink-500/30',
+                  iconBg: 'bg-pink-500/15 text-pink-600',
+                  icon: <ListTodo className="w-6 h-6" />,
+                },
+                {
+                  label: 'Organization',
+                  desc: 'Structure',
+                  path: '/organization',
+                  gradient: 'from-cyan-500/20 to-blue-600/10',
+                  border: 'border-cyan-500/30',
+                  iconBg: 'bg-cyan-500/15 text-cyan-600',
+                  icon: <Network className="w-6 h-6" />,
+                },
+              ].map(({ label, desc, path, gradient, border, iconBg, icon }) => (
+                <button
+                  key={path}
+                  onClick={() => navigate(path)}
+                  className={`group relative flex flex-col items-center gap-3 p-5 rounded-2xl border ${border} bg-gradient-to-br ${gradient} hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer text-center w-full`}
+                >
+                  <div className={`p-3 rounded-xl ${iconBg} group-hover:scale-110 transition-transform duration-200`}>
+                    {icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">{label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{desc}</p>
+                  </div>
+                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
               <Card className="space-y-4 border-l-4 border-l-primary shadow-md p-6 bg-card">
                 <div>
-                  <h3 className="text-lg font-bold text-foreground tracking-tight">Employee Directory Overview</h3>
+                  <h3 className="text-lg font-bold text-foreground tracking-tight">Team Task Reports</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Daily submissions from your department
+                  </p>
                 </div>
-                {/* Simplified view or list */}
-                <div className="p-4 text-sm text-muted-foreground">Navigate to the Employees tab for full directory access.</div>
+                <TableWrapper
+                  columns={[
+                    { header: 'Employee', accessor: (row: TaskReport) => <span className="font-bold text-xs">{row.employeeId ? (typeof row.employeeId === 'object' ? row.employeeId.fullName || 'Unknown' : row.employeeId) : 'Unknown'}</span> },
+                    ...taskColumns,
+                  ]}
+                  data={allTasks || []}
+                  searchKey="completedTasks"
+                  searchPlaceholder="Filter reports..."
+                />
               </Card>
             </div>
             <div className="lg:col-span-1 space-y-8">

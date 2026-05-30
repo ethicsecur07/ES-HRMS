@@ -22,6 +22,7 @@ export interface IOrganization extends Document {
     allowedIPs?: string[];
     adminEmail?: string;
     loginApprovalRoles?: string[];
+    visibleDepartments?: string[];
   };
   createdAt: Date;
   updatedAt: Date;
@@ -59,6 +60,7 @@ const organizationSchema = new Schema<IOrganization>(
       allowedIPs: { type: [String], default: ['127.0.0.1', '::1'] },
       adminEmail: { type: String },
       loginApprovalRoles: { type: [String], default: ['ADMIN'] },
+      visibleDepartments: { type: [String], default: ['Development', 'Digital Marketing', 'HR', 'BA', 'BDA'] },
     },
   },
   { timestamps: true }

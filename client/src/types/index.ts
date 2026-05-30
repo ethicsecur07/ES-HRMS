@@ -232,6 +232,7 @@ export interface CompanySettings {
   adminEmail: string;
   customHolidays?: Array<{ date: string; name: string }>;
   loginApprovalRoles?: string[];
+  visibleDepartments?: string[];
 }
 
 export type RecruitmentStage = 'NEW' | 'SCREENING' | 'INTERVIEW' | 'TECHNICAL' | 'HR' | 'OFFER' | 'HIRED';
