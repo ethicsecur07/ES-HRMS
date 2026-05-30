@@ -18,7 +18,7 @@ interface NotificationState {
   clearedNotificationIds: string[];
   activeChatUserId: string | null;
   onlineUserIds: string[];
-  /** Per-conversation unread DM counts: key = senderId */
+  /** Per-conversation unread DM counts: key = senderId or groupId */
   unreadChatCounts: Record<string, number>;
   /** Last message timestamp per conversation: key = userId/groupId */
   lastMessageAt: Record<string, string>;
@@ -74,8 +74,10 @@ export const useNotificationStore = create<NotificationState>()(
 
       initializeSocket: (token, currentUserId) => {
         const state = get();
+
+        // If a socket already exists and is connected, just update the auth token
+        // and return — do NOT create a second socket or re-register listeners.
         if (state.socket) {
-          // Update token in case it changed (e.g., token refresh)
           state.socket.auth = { token };
           if (state.socket.disconnected) {
             state.socket.connect();
@@ -90,15 +92,34 @@ export const useNotificationStore = create<NotificationState>()(
           }
           return `${window.location.protocol}//${window.location.hostname}:5000`;
         };
+
         const socketUrl = getSocketUrl();
         const socket = io(socketUrl, {
           transports: ['websocket', 'polling'],
           autoConnect: true,
           auth: { token },
+          // Reconnect indefinitely with exponential back-off (Socket.IO default)
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
         });
 
+        // ── Remove any stale listeners before registering fresh ones ──────────
+        // This prevents duplicate handlers if initializeSocket is ever called
+        // again on the same socket object (e.g. React StrictMode double-invoke).
+        socket.removeAllListeners();
+
         socket.on('connect', () => {
-          console.log('Notification socket connected');
+          console.log('[Socket] Connected to EthicSec real-time server:', socket.id);
+        });
+
+        socket.on('disconnect', (reason) => {
+          console.warn('[Socket] Disconnected:', reason);
+        });
+
+        socket.on('connect_error', (err) => {
+          console.error('[Socket] Connection error:', err.message);
         });
 
         socket.on('new_notification', (notif: NotificationItem) => {
@@ -110,10 +131,12 @@ export const useNotificationStore = create<NotificationState>()(
         });
 
         // ── Online Presence ──────────────────────────────────────────────────
+        // Full list of currently-online users in this org (sent on connect)
         socket.on('online_users', (userIds: string[]) => {
           set({ onlineUserIds: userIds });
         });
 
+        // Another user came online
         socket.on('user_online', ({ userId }: { userId: string }) => {
           set((s) => ({
             onlineUserIds: s.onlineUserIds.includes(userId)
@@ -122,25 +145,26 @@ export const useNotificationStore = create<NotificationState>()(
           }));
         });
 
+        // Another user went offline
         socket.on('user_offline', ({ userId }: { userId: string }) => {
           set((s) => ({
             onlineUserIds: s.onlineUserIds.filter((id) => id !== userId),
           }));
         });
 
-        // ── Chat message tracking (for unread badges & sorting) ────────────
+        // ── Chat message tracking (unread badges & sidebar sort order) ───────
         socket.on('receive_message', (msg: any) => {
           const { activeChatUserId } = get();
           const senderId: string = msg.senderId;
           const receiverId: string = msg.receiverId;
           const now: string = msg.createdAt || new Date().toISOString();
 
-          // Skip messages we ourselves sent (server echoes back to sender room too)
+          // Skip messages we ourselves sent (server echoes back to sender room)
           const isOwnMessage = currentUserId && senderId === currentUserId;
 
-          // Determine the conversation key for sorting & unread count
-          // For groups/broadcast: key is the room id
-          // For DMs: key is the OTHER person (sender if we are receiver, receiver if we are sender)
+          // Determine the conversation key for sorting & unread count:
+          //   • Groups / broadcast → use the room id as the key
+          //   • DMs               → key is the OTHER person's id
           let conversationKey: string | null = null;
 
           if (receiverId === 'broadcast' || receiverId?.startsWith('group_')) {
@@ -155,12 +179,13 @@ export const useNotificationStore = create<NotificationState>()(
 
           if (!conversationKey) return;
 
-          // Always update lastMessageAt (for both sent and received)
+          // Always update lastMessageAt (for both sent and received) so the
+          // sidebar sort order stays correct in real-time
           set((s) => ({
             lastMessageAt: { ...s.lastMessageAt, [conversationKey!]: now },
           }));
 
-          // Only increment unread for RECEIVED messages in non-active conversations
+          // Increment unread count only for RECEIVED messages in non-active convos
           const isCurrentlyViewing = activeChatUserId === conversationKey;
           if (!isOwnMessage && !isCurrentlyViewing) {
             set((s) => ({
@@ -256,6 +281,7 @@ export const useNotificationStore = create<NotificationState>()(
       logoutClear: () => {
         const { socket } = get();
         if (socket) {
+          socket.removeAllListeners();
           socket.disconnect();
         }
         set({
@@ -278,6 +304,8 @@ export const useNotificationStore = create<NotificationState>()(
         clearedNotificationIds: state.clearedNotificationIds,
         lastMessageAt: state.lastMessageAt,
         unreadChatCounts: state.unreadChatCounts,
+        // IMPORTANT: socket, onlineUserIds must NOT be persisted —
+        // they are live runtime state that must be re-established on each load.
       }),
     }
   )

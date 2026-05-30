@@ -152,11 +152,17 @@ export const Layout: React.FC = () => {
     }
   }, [isAuthenticated, token, user?._id, initializeSocket]);
 
-  // Cleanly disconnect socket on page unload/close
+  // ── Hard close: tell the server we're gone before the page unloads ─────────
+  // `beforeunload` fires for tab close, browser close, and navigation away.
+  // `pagehide` covers mobile browsers and bfcache-suspended pages.
+  // We use sendBeacon-style synchronous disconnect here for reliability.
   useEffect(() => {
     if (!socket) return;
 
     const handleUnload = () => {
+      // Synchronously signal offline so the server doesn't wait for the
+      // 8-second grace period when the user actually closes the tab.
+      try { socket.emit('user_offline_hard'); } catch (_) {}
       socket.disconnect();
     };
 
@@ -169,53 +175,31 @@ export const Layout: React.FC = () => {
     };
   }, [socket]);
 
-  // Track active/inactive presence status (tab visibility and window focus)
+  // ── Tab visibility presence ──────────────────────────────────────────────
+  // We only use `document.visibilitychange` (tab hidden/shown) for presence.
+  // `window focus/blur` is intentionally omitted because:
+  //   • It fires when DevTools open (false offline)
+  //   • It fires when switching windows/apps (false offline)
+  //   • The online indicator should reflect "is the app open", not "is focused"
+  //
+  // NOTE: The server treats user_active/user_inactive as no-ops for the online
+  // dot — online = socket connected. These events are kept only for future
+  // "away" indicator support.
   useEffect(() => {
     if (!socket || !isAuthenticated) return;
 
-    let isUserActive = true; // Default to active on mount
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const updatePresence = (active: boolean) => {
-      if (timeoutId) clearTimeout(timeoutId);
-
-      // Debounce inactive states to avoid flickering during brief defocusing
-      const delay = active ? 0 : 1000;
-
-      timeoutId = setTimeout(() => {
-        if (isUserActive !== active) {
-          isUserActive = active;
-          if (active) {
-            socket.emit('user_active');
-          } else {
-            socket.emit('user_inactive');
-          }
-        }
-      }, delay);
-    };
-
     const handleVisibilityChange = () => {
-      const active = document.visibilityState === 'visible';
-      updatePresence(active);
+      if (document.visibilityState === 'visible') {
+        socket.emit('user_active');
+      } else {
+        socket.emit('user_inactive');
+      }
     };
-
-    const handleFocus = () => updatePresence(true);
-    const handleBlur = () => updatePresence(false);
-
-    // Initial event emission to ensure server tracks us as active
-    socket.emit('user_active');
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
-      // Clean up by emitting inactive on unmount
-      socket.emit('user_inactive');
     };
   }, [socket, isAuthenticated]);
 
@@ -256,9 +240,11 @@ export const Layout: React.FC = () => {
         );
       }
 
-      // Invalidate queries for real-time message list
-      queryClient.invalidateQueries({ queryKey: ['chat', msg?.senderId] });
-      queryClient.invalidateQueries({ queryKey: ['chat', msg?.receiverId] });
+      // NOTE: We do NOT invalidate ['chat', ...] queries here.
+      // ChatPage manages its own real-time message state via its own socket
+      // listener. Invalidating here causes duplicate refetches and race
+      // conditions when both handlers fire simultaneously.
+      // The sidebar recent-conversations list is refreshed by ChatPage instead.
     };
 
     const handleReceiveNotification = (data: any) => {
