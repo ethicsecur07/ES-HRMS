@@ -26,6 +26,7 @@ const DEFAULT_MODULES = [
     'RECRUITMENT',
     'CHAT',
     'NOTIFICATIONS',
+    'MEETINGS',
 ];
 /**
  * Get permission matrix: lists all modules and how they are configured for each role.

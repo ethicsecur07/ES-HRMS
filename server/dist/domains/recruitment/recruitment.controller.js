@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCandidateOfferLetter = exports.updateOfferTemplate = exports.getOfferTemplate = exports.sendCandidateOffer = exports.deleteCandidate = exports.updateCandidate = exports.updateCandidateStage = exports.getCandidates = exports.createCandidate = void 0;
+exports.scheduleInterview = exports.getCandidateOfferLetter = exports.updateOfferTemplate = exports.getOfferTemplate = exports.sendCandidateOffer = exports.deleteCandidate = exports.updateCandidate = exports.updateCandidateStage = exports.getCandidates = exports.createCandidate = void 0;
 const Candidate_js_1 = require("../../models/Candidate.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const offerLetterPdf_service_js_1 = require("../../services/offerLetterPdf.service.js");
@@ -418,15 +418,23 @@ const sendCandidateOffer = async (req, res) => {
         }
         (0, socketHandler_js_1.getIO)()?.emit('candidate_updated', candidate);
         if (emailSent) {
-            res.status(200).json({ success: true, message: 'Offer letter generated and sent successfully', candidate });
+            res.status(200).json({
+                success: true,
+                message: 'Offer letter generated and sent successfully',
+                data: {
+                    candidate
+                }
+            });
         }
         else {
             res.status(200).json({
                 success: true,
-                warning: true,
                 message: 'Offer letter was generated and uploaded successfully, but email delivery failed.',
-                emailError,
-                candidate
+                data: {
+                    warning: true,
+                    emailError,
+                    candidate
+                }
             });
         }
     }
@@ -567,3 +575,281 @@ const getCandidateOfferLetter = async (req, res) => {
     }
 };
 exports.getCandidateOfferLetter = getCandidateOfferLetter;
+const scheduleInterview = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const authReq = req;
+        const userId = authReq.user?.id;
+        const orgId = authReq.user?.organizationId;
+        const { date, interviewer, interviewerEmail, duration = 60, // minutes
+        notes, attendees = [], } = req.body;
+        if (!date || !interviewer) {
+            res.status(400).json({ success: false, message: 'Missing required fields: date, interviewer' });
+            return;
+        }
+        const candidate = await findOrCreateCandidate(id);
+        if (!candidate) {
+            res.status(404).json({ success: false, message: 'Candidate not found' });
+            return;
+        }
+        // Build start and end times
+        const startDateTime = new Date(date).toISOString();
+        const endDate = new Date(date);
+        endDate.setMinutes(endDate.getMinutes() + duration);
+        const endDateTime = endDate.toISOString();
+        // Fetch org Microsoft credentials if available
+        let microsoftCredentials;
+        if (orgId) {
+            try {
+                const authConfig = await OrganizationAuthConfig_js_1.OrganizationAuthConfig.findOne({
+                    organizationId: orgId,
+                    provider: 'MICROSOFT',
+                    isEnabled: true,
+                });
+                if (authConfig?.tenantId && authConfig?.clientId && authConfig?.clientSecret) {
+                    microsoftCredentials = {
+                        tenantId: authConfig.tenantId,
+                        clientId: authConfig.clientId,
+                        clientSecret: authConfig.clientSecret,
+                    };
+                }
+            }
+            catch (err) {
+                logger_js_1.logger.error('[RecruitmentController] Failed to query OrganizationAuthConfig for interview', { error: err.message });
+            }
+        }
+        // Build attendees list
+        const meetingAttendees = [
+            { name: `${candidate.firstName} ${candidate.lastName}`, email: candidate.email, role: 'Candidate' },
+            ...(interviewerEmail ? [{ name: interviewer, email: interviewerEmail, role: 'Interviewer' }] : []),
+            ...attendees,
+        ];
+        // Create Teams meeting
+        const { createTeamsMeeting } = await import('../../services/teamsMeeting.service.js');
+        const teamsMeeting = await createTeamsMeeting({
+            subject: `Interview: ${candidate.firstName} ${candidate.lastName} — ${candidate.appliedRole}`,
+            startDateTime,
+            endDateTime,
+            attendees: meetingAttendees.map((a) => ({ name: a.name, email: a.email })),
+            meetingType: 'INTERVIEW',
+            microsoftCredentials,
+        });
+        // Update candidate with interview schedule + Teams link
+        candidate.interviewSchedule = {
+            date: new Date(date),
+            interviewer,
+            teamsJoinUrl: teamsMeeting.joinUrl,
+            meetingId: teamsMeeting.meetingId,
+        };
+        await candidate.save();
+        // Persist a Meeting record
+        const { Meeting } = await import('../../models/Meeting.js');
+        const meetingRecord = new Meeting({
+            organizationId: orgId,
+            title: `Interview: ${candidate.firstName} ${candidate.lastName} — ${candidate.appliedRole}`,
+            meetingType: 'INTERVIEW',
+            teamsJoinUrl: teamsMeeting.joinUrl,
+            teamsMeetingId: teamsMeeting.meetingId,
+            startDateTime: new Date(startDateTime),
+            endDateTime: new Date(endDateTime),
+            organizer: process.env.SMTP_USER || 'suseendrakumar@ethicsecur.co.in',
+            attendees: meetingAttendees,
+            candidateId: candidate._id,
+            notes,
+            status: 'SCHEDULED',
+            createdBy: userId,
+        });
+        await meetingRecord.save();
+        // Emit socket event
+        (0, socketHandler_js_1.getIO)()?.emit('meeting_scheduled', {
+            meeting: meetingRecord,
+            joinUrl: teamsMeeting.joinUrl,
+        });
+        (0, socketHandler_js_1.getIO)()?.emit('candidate_updated', candidate);
+        // Optionally send email notification to candidate and interviewer
+        try {
+            const redirectJoinUrl = `${req.protocol}://${req.headers.host}/api/meetings/join/${meetingRecord._id}`;
+            const emailHtml = `
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 32px 24px; text-align: center; color: white;">
+            <h2 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">Congratulations!</h2>
+            <p style="margin: 6px 0 0; font-size: 14px; opacity: 0.9; font-weight: 500;">You have been Shortlisted for the Next Round</p>
+          </div>
+          
+          <!-- Body Content -->
+          <div style="padding: 32px 24px; background-color: #ffffff; text-align: left;">
+            <p style="font-size: 15px; line-height: 1.6; margin-top: 0;">Dear <strong>${candidate.firstName} ${candidate.lastName}</strong>,</p>
+            <p style="font-size: 15px; line-height: 1.6; color: #4b5563;">Thank you for your interest in joining <strong>ES EthicSecur SofTec</strong>. We are pleased to inform you that your application has been shortlisted, and we would like to invite you for the next round of interviews for the position of <strong>${candidate.appliedRole}</strong>.</p>
+            
+            <!-- Round Details Card -->
+            <div style="background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 20px; margin: 24px 0; border-radius: 8px;">
+              <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">Round & Schedule Details</h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 0; color: #64748b; font-weight: 600; width: 140px;">Position:</td>
+                  <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${candidate.appliedRole}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Interview Date:</td>
+                  <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${new Date(date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Time:</td>
+                  <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} (IST)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Interviewer:</td>
+                  <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${interviewer}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Duration:</td>
+                  <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${duration} minutes</td>
+                </tr>
+              </table>
+            </div>
+            
+            <!-- Call to Action -->
+            <div style="text-align: center; margin: 32px 0 24px;">
+              <a href="${redirectJoinUrl}" target="_blank" style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1); transition: background-color 0.2s;">
+                Join Microsoft Teams Interview
+              </a>
+            </div>
+            
+            <p style="font-size: 14px; color: #6b7280; text-align: center; margin-bottom: 32px;">Please join the Teams link 5 minutes prior to your scheduled time.</p>
+            
+            <!-- Company Details -->
+            <div style="border-top: 1px solid #e2e8f0; padding-top: 24px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: #1e293b;">About ES EthicSecur SofTec</h4>
+              <p style="margin: 0 0 16px 0; font-size: 13px; color: #6b7280; line-height: 1.5;">ES EthicSecur SofTec is a premier enterprise software and security technologies company delivering state-of-the-art software solutions, system integrations, and human resource management applications.</p>
+              
+              <table style="width: 100%; font-size: 12.5px; color: #4b5563; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 4px 0; vertical-align: top; width: 60px; font-weight: 600;">Office:</td>
+                  <td style="padding: 4px 0; color: #6b7280;">2nd Floor, NV Arcade Building, Near 5 Roads (Next to Reliance Mall), Salem - 636004, Tamil Nadu</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; vertical-align: top; font-weight: 600;">Website:</td>
+                  <td style="padding: 4px 0;"><a href="https://www.ethicsecur.com" style="color: #4f46e5; text-decoration: none;">www.ethicsecur.com</a></td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; vertical-align: top; font-weight: 600;">Contact:</td>
+                  <td style="padding: 4px 0; color: #6b7280;">info@ethicsecur.com | +91 755028487</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          
+          <!-- Footer -->
+          <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+            <p style="margin: 0;">This is an automated candidate notification from the ES EthicSecur HRMS portal.</p>
+            <p style="margin: 4px 0 0;">© 2026 ES EthicSecur SofTec Pvt Ltd. All rights reserved.</p>
+          </div>
+        </div>
+      `;
+            // Send to candidate
+            await (0, email_service_js_1.sendEmail)({
+                to: candidate.email,
+                subject: `Congratulations! Shortlisted for Next Round — ${candidate.appliedRole} - ES EthicSecur SofTec`,
+                text: `Dear ${candidate.firstName},\n\nWe are pleased to inform you that you have been shortlisted for the next round of interviews for the position of ${candidate.appliedRole} at ES EthicSecur SofTec.\n\nYour interview has been scheduled on ${new Date(date).toLocaleString()}.\n\nInterviewer: ${interviewer}\nDuration: ${duration} minutes\n\nJoin the Teams meeting here: ${redirectJoinUrl}\n\nOffice Address: 2nd Floor, NV Arcade Building, Near 5 Roads, Next to Reliance Mall, Salem - 636004.\nWebsite: www.ethicsecur.com\n\nBest regards,\nHR Department\nES EthicSecur SofTec Pvt Ltd`,
+                html: emailHtml,
+                microsoftCredentials,
+            });
+            // Send detailed assignment email to interviewer
+            if (interviewerEmail) {
+                const interviewerHtml = `
+          <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #0f172a, #1e293b); padding: 32px 24px; text-align: center; color: white;">
+              <h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Interview Assignment</h2>
+              <p style="margin: 6px 0 0; font-size: 14px; opacity: 0.9; font-weight: 500;">You are scheduled to conduct an interview</p>
+            </div>
+            
+            <!-- Body Content -->
+            <div style="padding: 32px 24px; background-color: #ffffff; text-align: left;">
+              <p style="font-size: 15px; line-height: 1.6; margin-top: 0;">Dear <strong>${interviewer}</strong>,</p>
+              <p style="font-size: 15px; line-height: 1.6; color: #4b5563;">You have been assigned to conduct an interview for the candidate <strong>${candidate.firstName} ${candidate.lastName}</strong> for the position of <strong>${candidate.appliedRole}</strong>.</p>
+              
+              <!-- Round Details Card -->
+              <div style="background-color: #f8fafc; border-left: 4px solid #0f172a; padding: 20px; margin: 24px 0; border-radius: 8px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">Interview Details</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; color: #64748b; font-weight: 600; width: 140px;">Candidate:</td>
+                    <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${candidate.firstName} ${candidate.lastName}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Position:</td>
+                    <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${candidate.appliedRole}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Interview Date:</td>
+                    <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${new Date(date).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Time:</td>
+                    <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} (IST)</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Duration:</td>
+                    <td style="padding: 8px 0; color: #1e293b; font-weight: 700;">${duration} minutes</td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- Call to Action -->
+              <div style="text-align: center; margin: 32px 0 24px;">
+                <a href="${redirectJoinUrl}" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; transition: background-color 0.2s;">
+                  Join Interview Room
+                </a>
+              </div>
+              
+              <p style="font-size: 14px; color: #6b7280; text-align: center; margin-bottom: 32px;">The join link will become active 15 minutes before the start time.</p>
+              
+              <!-- Interviewer Guide / Tracking -->
+              <div style="border-top: 1px solid #e2e8f0; padding-top: 24px;">
+                <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: #1e293b;">Interviewer Instructions & Process Tracking</h4>
+                <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #6b7280; line-height: 1.6;">
+                  <li>Verify the candidate's identity and matching profile details.</li>
+                  <li>Review the resume directly inside the HRMS candidate details portal.</li>
+                  <li>After completing the interview, please log into your **HRMS Portal** and navigate to **Recruitment -> Evaluation** to submit your feedback, communication ratings, and technical scores.</li>
+                </ul>
+              </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+              <p style="margin: 0;">This is an automated interviewer assignment from the ES EthicSecur HRMS portal.</p>
+              <p style="margin: 4px 0 0;">© 2026 ES EthicSecur SofTec Pvt Ltd. All rights reserved.</p>
+            </div>
+          </div>
+        `;
+                await (0, email_service_js_1.sendEmail)({
+                    to: interviewerEmail,
+                    subject: `Interview Assignment: ${candidate.firstName} ${candidate.lastName} — ${candidate.appliedRole}`,
+                    text: `Dear ${interviewer},\n\nYou have been assigned to conduct an interview for ${candidate.firstName} ${candidate.lastName} for the position of ${candidate.appliedRole}.\n\nScheduled: ${new Date(date).toLocaleString()}.\nDuration: ${duration} minutes.\n\nJoin the room here: ${redirectJoinUrl}\n\nAfter the interview, please log into HRMS to submit your technical and communication ratings.`,
+                    html: interviewerHtml,
+                    microsoftCredentials,
+                });
+            }
+        }
+        catch (emailErr) {
+            logger_js_1.logger.warn(`[RecruitmentController] Interview email notification failed: ${emailErr.message}`);
+        }
+        logger_js_1.logger.info(`[RecruitmentController] Interview scheduled for candidate ${candidate.email} with Teams meeting.`);
+        res.status(201).json({
+            success: true,
+            message: 'Interview scheduled with Teams meeting',
+            data: {
+                candidate,
+                joinUrl: teamsMeeting.joinUrl,
+                meeting: meetingRecord,
+            }
+        });
+    }
+    catch (error) {
+        logger_js_1.logger.error('[RecruitmentController] scheduleInterview error', { error: error.message });
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.scheduleInterview = scheduleInterview;

@@ -47,6 +47,7 @@ const chat_routes_js_1 = __importDefault(require("./domains/chat/chat.routes.js"
 const notification_routes_js_1 = __importDefault(require("./domains/notification/notification.routes.js"));
 const reports_routes_js_1 = __importDefault(require("./routes/reports.routes.js"));
 const selfService_routes_js_1 = __importDefault(require("./routes/selfService.routes.js"));
+const meeting_routes_js_1 = __importDefault(require("./routes/meeting.routes.js"));
 const errorHandler_js_1 = require("./middlewares/errorHandler.js");
 const traceId_js_1 = require("./middlewares/traceId.js");
 const responseFormatter_js_1 = require("./middlewares/responseFormatter.js");
@@ -96,6 +97,7 @@ const createApp = () => {
     app.use('/api/notifications', notification_routes_js_1.default);
     app.use('/api/reports', reports_routes_js_1.default);
     app.use('/api/self-service', selfService_routes_js_1.default);
+    app.use('/api/meetings', meeting_routes_js_1.default);
     app.use('/api/analytics', analytics_routes_js_1.default);
     app.use('/api/permissions', permission_routes_js_1.default);
     app.use('/api/tasks', task_routes_js_1.default);

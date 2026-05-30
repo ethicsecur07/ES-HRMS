@@ -1,0 +1,218 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.listTeamsMeetings = exports.cancelTeamsMeeting = exports.createTeamsMeeting = exports.resolveUserId = void 0;
+const tokenService_js_1 = require("./tokenService.js");
+const logger_js_1 = require("../utils/logger.js");
+const { SMTP_USER = 'suseendrakumar@ethicsecur.co.in' } = process.env;
+/**
+ * Helper to resolve a user UPN/email to their Microsoft Graph GUID Object ID.
+ * Graph API onlineMeetings endpoints require the user Object ID (GUID) rather than UPN.
+ */
+const resolveUserId = async (graphToken, email) => {
+    const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(email);
+    if (isGuid)
+        return email;
+    try {
+        const userUrl = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}`;
+        const res = await fetch(userUrl, {
+            headers: {
+                Authorization: `Bearer ${graphToken}`,
+            },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.id) {
+                logger_js_1.logger.info(`[TeamsMeetingService] Resolved UPN ${email} to Object ID ${data.id}`);
+                return data.id;
+            }
+        }
+        else {
+            const errText = await res.text();
+            logger_js_1.logger.warn(`[TeamsMeetingService] Failed to resolve UPN ${email} to Object ID: ${res.status} ${errText}`);
+        }
+    }
+    catch (err) {
+        logger_js_1.logger.warn(`[TeamsMeetingService] resolveUserId error for ${email}: ${err.message}`);
+    }
+    return email; // fallback to email if resolution fails
+};
+exports.resolveUserId = resolveUserId;
+/**
+ * Creates a Microsoft Teams Online Meeting via the Graph API.
+ * Uses the client_credentials flow with an Application Access Policy
+ * to create meetings on behalf of the organizer user.
+ */
+const createTeamsMeeting = async (options) => {
+    const organizerEmail = options.organizerEmail || SMTP_USER;
+    logger_js_1.logger.info(`[TeamsMeetingService] Creating Teams meeting: "${options.subject}" on behalf of ${organizerEmail}`);
+    try {
+        const graphToken = await (0, tokenService_js_1.getMicrosoftAccessToken)('https://graph.microsoft.com/.default', options.microsoftCredentials);
+        // Resolve organizer UPN/email to Object ID (GUID)
+        const organizerId = await (0, exports.resolveUserId)(graphToken, organizerEmail);
+        // Try creating via Outlook Calendar Event first so it shows up in Teams Calendar!
+        try {
+            logger_js_1.logger.info(`[TeamsMeetingService] Attempting to create Calendar Event for ${organizerEmail}`);
+            const eventUrl = `https://graph.microsoft.com/v1.0/users/${organizerId}/events`;
+            const eventBody = {
+                subject: options.subject,
+                start: {
+                    dateTime: options.startDateTime,
+                    timeZone: 'UTC',
+                },
+                end: {
+                    dateTime: options.endDateTime,
+                    timeZone: 'UTC',
+                },
+                attendees: options.attendees.map((a) => ({
+                    emailAddress: {
+                        address: a.email,
+                        name: a.name,
+                    },
+                    type: 'required',
+                })),
+                isOnlineMeeting: true,
+                onlineMeetingProvider: 'teamsForBusiness',
+            };
+            const eventResponse = await fetch(eventUrl, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${graphToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(eventBody),
+            });
+            if (eventResponse.ok) {
+                const eventData = await eventResponse.json();
+                const joinUrl = eventData.onlineMeeting?.joinUrl || eventData.onlineMeeting?.joinWebUrl;
+                if (joinUrl) {
+                    logger_js_1.logger.info(`[TeamsMeetingService] Calendar Event with Teams link created successfully! Event ID: ${eventData.id}`);
+                    return {
+                        joinUrl,
+                        meetingId: eventData.onlineMeeting.id || eventData.id,
+                        subject: options.subject,
+                        startDateTime: options.startDateTime,
+                        endDateTime: options.endDateTime,
+                    };
+                }
+            }
+            const errText = await eventResponse.text();
+            logger_js_1.logger.warn(`[TeamsMeetingService] Calendar Event creation failed (likely missing Calendars.ReadWrite permission). Falling back to onlineMeetings: ${eventResponse.status} ${errText}`);
+        }
+        catch (eventErr) {
+            logger_js_1.logger.warn(`[TeamsMeetingService] Calendar Event creation error: ${eventErr.message}. Falling back to onlineMeetings`);
+        }
+        // Fallback: Create onlineMeeting directly (does not put it on the calendar)
+        const requestBody = {
+            subject: options.subject,
+            startDateTime: options.startDateTime,
+            endDateTime: options.endDateTime,
+            participants: {
+                attendees: options.attendees.map((a) => ({
+                    upn: a.email,
+                    identity: {
+                        user: {
+                            displayName: a.name,
+                        },
+                    },
+                    role: 'attendee',
+                })),
+            },
+            lobbyBypassSettings: {
+                scope: 'everyone',
+                isDialInBypassEnabled: true,
+            },
+            isEntryExitAnnounced: false,
+        };
+        const graphUrl = `https://graph.microsoft.com/v1.0/users/${organizerId}/onlineMeetings`;
+        const response = await fetch(graphUrl, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${graphToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            logger_js_1.logger.error(`[TeamsMeetingService] Graph API onlineMeetings failed: ${response.status} ${errorText}`);
+            throw new Error(`Failed to create Teams meeting (${response.status}): ${errorText}. ` +
+                `Ensure Application Access Policy is configured for app and user ${organizerEmail} (Object ID: ${organizerId}).`);
+        }
+        const data = await response.json();
+        logger_js_1.logger.info(`[TeamsMeetingService] Teams meeting created successfully. Join URL: ${data.joinUrl}`);
+        return {
+            joinUrl: data.joinUrl || data.joinWebUrl,
+            meetingId: data.id,
+            subject: data.subject,
+            startDateTime: data.startDateTime,
+            endDateTime: data.endDateTime,
+        };
+    }
+    catch (err) {
+        logger_js_1.logger.warn(`[TeamsMeetingService] Microsoft Graph onlineMeetings API failed (${err.message}). ` +
+            `Generating functional Jitsi Meet fallback conference room instead.`);
+        const cleanSubject = options.subject.replace(/[^a-zA-Z0-9]/g, '-') || 'Meeting';
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        const roomName = `EthicSecur-HRMS-${cleanSubject}-${randomSuffix}`;
+        const fallbackJoinUrl = `https://meet.jit.si/${roomName}`;
+        const fallbackMeetingId = `fallback-${Math.random().toString(36).substring(2, 10)}`;
+        return {
+            joinUrl: fallbackJoinUrl,
+            meetingId: fallbackMeetingId,
+            subject: options.subject,
+            startDateTime: options.startDateTime,
+            endDateTime: options.endDateTime,
+        };
+    }
+};
+exports.createTeamsMeeting = createTeamsMeeting;
+/**
+ * Cancels / deletes an existing Teams Online Meeting.
+ */
+const cancelTeamsMeeting = async (meetingId, organizerEmail, microsoftCredentials) => {
+    if (meetingId.startsWith('fallback-')) {
+        logger_js_1.logger.info(`[TeamsMeetingService] Skipping deletion for fallback meeting ${meetingId}`);
+        return;
+    }
+    const organizer = organizerEmail || SMTP_USER;
+    logger_js_1.logger.info(`[TeamsMeetingService] Cancelling Teams meeting ${meetingId} for ${organizer}`);
+    const graphToken = await (0, tokenService_js_1.getMicrosoftAccessToken)('https://graph.microsoft.com/.default', microsoftCredentials);
+    const organizerId = await (0, exports.resolveUserId)(graphToken, organizer);
+    const graphUrl = `https://graph.microsoft.com/v1.0/users/${organizerId}/onlineMeetings/${meetingId}`;
+    const response = await fetch(graphUrl, {
+        method: 'DELETE',
+        headers: {
+            Authorization: `Bearer ${graphToken}`,
+        },
+    });
+    if (!response.ok && response.status !== 204) {
+        const errorText = await response.text();
+        logger_js_1.logger.error(`[TeamsMeetingService] Failed to cancel meeting: ${response.status} ${errorText}`);
+        throw new Error(`Failed to cancel Teams meeting (${response.status}): ${errorText}`);
+    }
+    logger_js_1.logger.info(`[TeamsMeetingService] Meeting ${meetingId} cancelled successfully.`);
+};
+exports.cancelTeamsMeeting = cancelTeamsMeeting;
+/**
+ * Lists upcoming online meetings created by the organizer.
+ */
+const listTeamsMeetings = async (organizerEmail, microsoftCredentials) => {
+    const organizer = organizerEmail || SMTP_USER;
+    const graphToken = await (0, tokenService_js_1.getMicrosoftAccessToken)('https://graph.microsoft.com/.default', microsoftCredentials);
+    const organizerId = await (0, exports.resolveUserId)(graphToken, organizer);
+    const graphUrl = `https://graph.microsoft.com/v1.0/users/${organizerId}/onlineMeetings`;
+    const response = await fetch(graphUrl, {
+        method: 'GET',
+        headers: {
+            Authorization: `Bearer ${graphToken}`,
+        },
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        logger_js_1.logger.error(`[TeamsMeetingService] Failed to list meetings: ${response.status} ${errorText}`);
+        throw new Error(`Failed to list Teams meetings: ${errorText}`);
+    }
+    const data = await response.json();
+    return data.value || [];
+};
+exports.listTeamsMeetings = listTeamsMeetings;

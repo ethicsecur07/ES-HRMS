@@ -119,6 +119,7 @@ export class PermissionSyncService {
         'RECRUITMENT',
         'CHAT',
         'NOTIFICATIONS',
+        'MEETINGS',
       ];
 
 
@@ -133,10 +134,11 @@ export class PermissionSyncService {
         'DOCUMENTS',
         'CHAT',
         'NOTIFICATIONS',
+        'MEETINGS',
       ];
 
       // Modules accessible to TEAM_LEAD (view-only for project tracking)
-      const teamLeadViewModules = ['PROJECTS', 'RECRUITMENT'];
+      const teamLeadViewModules = ['PROJECTS', 'RECRUITMENT', 'MEETINGS'];
 
       // Prepare upsert operations
       const operations = [];

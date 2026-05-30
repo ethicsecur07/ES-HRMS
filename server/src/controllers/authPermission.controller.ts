@@ -26,6 +26,7 @@ const DEFAULT_MODULES = [
   'RECRUITMENT',
   'CHAT',
   'NOTIFICATIONS',
+  'MEETINGS',
 ];
 
 
