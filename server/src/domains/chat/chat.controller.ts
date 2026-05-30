@@ -54,7 +54,7 @@ export const getConversation = async (req: Request, res: Response): Promise<void
       }
     }
 
-    res.status(200).json({ data: { messages } });
+    res.status(200).json({ success: true, data: { messages } });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -104,7 +104,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       });
     }
 
-    res.status(201).json({ data: message });
+    res.status(201).json({ success: true, data: message });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
   }
@@ -161,7 +161,7 @@ export const sendFileMessage = async (req: Request, res: Response): Promise<void
       }
     }
 
-    res.status(201).json({ data: message });
+    res.status(201).json({ success: true, data: message });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -196,7 +196,7 @@ export const markMessageRead = async (req: Request, res: Response): Promise<void
       });
     }
 
-    res.status(200).json({ data: { message } });
+    res.status(200).json({ success: true, data: { message } });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -247,7 +247,7 @@ export const getRecentConversations = async (req: Request, res: Response): Promi
       }
     ]);
 
-    res.status(200).json({ recentConversations });
+    res.status(200).json({ success: true, data: { recentConversations } });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

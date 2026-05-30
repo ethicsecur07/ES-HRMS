@@ -878,7 +878,7 @@ export const ChatPage: React.FC = () => {
                       'Type a message... '
                     }
                     disabled={fileMutation.isPending || sendMutation.isPending}
-                    className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary/40 focus:bg-background transition-all resize-none min-h-[40px] max-h-[120px] overflow-y-auto disabled:opacity-50"
+                    className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary/40 focus:bg-background transition-all resize-none min-h-[40px] max-h-[120px] overflow-y-auto disabled:opacity-50"
                     style={{ height: 'auto' }}
                     onInput={e => {
                       const t = e.target as HTMLTextAreaElement;
