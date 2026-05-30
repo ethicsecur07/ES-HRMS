@@ -175,7 +175,7 @@ class AttendanceService {
             }
             // 4c. Enforce Late Check-In Salary-Cycle Limits:
             //   - 1st late in the cycle → allowed, warning returned in API response
-            //   - 2nd late in the cycle → blocked, counted as absent (employee must apply for leave)
+            //   - 2nd+ late in the cycle → auto-create & approve a Casual Leave for today, then allow check-in with a warning
             if (isLate) {
                 // Fetch org salary cycle start day (default 10 → cycle runs 10th to 9th)
                 const org = await Organization_js_1.Organization.findOne({ _id: orgId })
@@ -189,11 +189,35 @@ class AttendanceService {
                     isLate: true,
                     date: { $gte: cycleStart, $lte: cycleEnd }
                 }).session(session);
-                // 2nd late in this salary cycle → block the check-in
+                // 2nd+ late in this salary cycle → auto-apply a PENDING Casual Leave for today and block check-in
                 if (priorLateCount >= 1) {
-                    throw new Error(`Check-in blocked: This is your 2nd late check-in this salary cycle ` +
-                        `(${cycleStart} → ${cycleEnd}). Today will be counted as absent. ` +
-                        `Please apply for leave to cover this absence.`);
+                    const todayDateStr = today;
+                    // Only create if no leave already exists for today to avoid duplicates
+                    const existingLeave = await Leave_js_1.Leave.findOne({
+                        organizationId: orgId,
+                        employeeId: empId,
+                        startDate: { $lte: todayDateStr },
+                        endDate: { $gte: todayDateStr },
+                        status: { $in: ['PENDING', 'APPROVED'] },
+                    });
+                    if (!existingLeave) {
+                        await Leave_js_1.Leave.create([
+                            {
+                                organizationId: orgId,
+                                employeeId: empId,
+                                leaveType: 'Casual Leave',
+                                startDate: todayDateStr,
+                                endDate: todayDateStr,
+                                totalDays: 1,
+                                isHalfDay: false,
+                                reason: `Auto-applied: Late check-in (2nd occurrence in salary cycle ${cycleStart} → ${cycleEnd})`,
+                                status: 'PENDING',
+                                appliedAt: now,
+                            }
+                        ]);
+                    }
+                    throw new Error(`Check-in blocked: This is your ${priorLateCount + 1}${priorLateCount + 1 === 2 ? 'nd' : 'th'} late check-in this salary cycle ` +
+                        `(${cycleStart} → ${cycleEnd}). A Casual Leave request has been automatically applied and is pending HR approval.`);
                 }
                 // priorLateCount === 0 → 1st late, allow with a warning (returned by controller)
             }
@@ -384,23 +408,34 @@ class AttendanceService {
         const orgId = new mongoose_1.default.Types.ObjectId(organizationId.toString());
         const empId = new mongoose_1.default.Types.ObjectId(employeeId.toString());
         const todayStr = new Date().toISOString().split('T')[0];
-        // Find previous attendance records where logoutTime is missing
+        const now = new Date();
+        const currentHour = now.getHours();
+        // If it is >= 7:00 PM (19:00), we can check out today's record as well
+        const queryDate = currentHour >= 19 ? { $lte: todayStr } : { $lt: todayStr };
+        // Find attendance records where logoutTime is missing
         const openAttendances = await Attendance_js_1.Attendance.find({
             organizationId: orgId,
             employeeId: empId,
-            date: { $lt: todayStr },
+            date: queryDate,
             logoutTime: { $exists: false }
         });
         for (const att of openAttendances) {
             const loginTime = new Date(att.loginTime);
-            // Set logout to exactly 9 hours after login
-            const logoutTime = new Date(loginTime.getTime() + 9 * 60 * 60 * 1000);
+            // Set logout to exactly 7:00 PM (19:00) on that day in local time
+            const logoutTime = new Date(loginTime);
+            logoutTime.setHours(19, 0, 0, 0);
+            let workingHours = parseFloat(((logoutTime.getTime() - loginTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
+            if (workingHours <= 0) {
+                // Fallback to exactly 9 hours after login if login was after 7:00 PM
+                logoutTime.setTime(loginTime.getTime() + 9 * 60 * 60 * 1000);
+                workingHours = 9;
+            }
             att.logoutTime = logoutTime;
-            att.workingHours = 9;
+            att.workingHours = workingHours;
             att.isAutoCheckedOut = true;
             att.pendingReportUpdate = true;
             await att.save();
-            await (0, auditLog_service_js_1.createAuditLog)('ATTENDANCE_AUTO_CHECKOUT', email, 'ATTENDANCE', att.id, `Auto-checked out for forgot checkout on ${att.date}. Assigned 9 working hours.`, orgId);
+            await (0, auditLog_service_js_1.createAuditLog)('ATTENDANCE_AUTO_CHECKOUT', email, 'ATTENDANCE', att.id, `Auto-checked out at 7:00 PM for forgot checkout on ${att.date}. Total hours: ${workingHours}`, orgId);
         }
     }
     /**

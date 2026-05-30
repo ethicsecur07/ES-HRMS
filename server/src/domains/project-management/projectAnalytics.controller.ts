@@ -4,6 +4,8 @@ import { Project } from '../../models/Project.js';
 import { Task } from '../../models/Task.js';
 import { Sprint } from '../../models/project-management/Sprint.js';
 import { Employee } from '../../models/Employee.js';
+import { isDeptEligible } from './employeeEligibility.controller.js';
+import fs from 'fs';
 
 export const getProjectAnalytics = async (req: RBACRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -159,6 +161,112 @@ export const getDashboardSummary = async (req: RBACRequest, res: Response, next:
         reviewTasks,
         overallTaskCompletionRate,
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getEmployeeQuickStats = async (req: RBACRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const organizationId = req.user?.organizationId;
+    const userId = req.user?.id;
+
+    if (!organizationId || !userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Resolve employee profile
+    let employee = null;
+    if ((req.user as any)?.employeeId) {
+      employee = await Employee.findOne({ _id: (req.user as any).employeeId, organizationId });
+    }
+    if (!employee && userId) {
+      employee = await Employee.findOne({ email: req.user?.email, organizationId });
+    }
+
+    const logPath = 'debug-quick-stats.log';
+    fs.appendFileSync(logPath, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      msg: 'Resolved employee profile',
+      user: req.user,
+      employeeFound: !!employee,
+      employeeDetails: employee ? {
+        id: employee._id,
+        fullName: employee.fullName,
+        email: employee.email,
+        department: employee.department
+      } : null,
+    }, null, 2) + '\n');
+
+    if (!employee) {
+      res.json({
+        departmentProjectCount: 0,
+        onboardProjectCount: 0,
+        assignedProjectCount: 0,
+        completedProjectCount: 0
+      });
+      return;
+    }
+
+    const deptName = employee.department || '';
+
+    // Fetch all projects for this organization and populate team member details to check departments
+    const projects = await Project.find({ organizationId }).populate('teamMemberIds', 'department');
+
+    // 1. Department Related Projects:
+    // - matches department eligibility via isDeptEligible
+    // - OR at least one team member belongs to the employee's department
+    const deptProjects = projects.filter((p) => {
+      const matchesType = isDeptEligible(p.projectType, deptName);
+      const hasDeptMember = p.teamMemberIds && p.teamMemberIds.some((member: any) =>
+        member && member.department && member.department.toLowerCase().trim() === deptName.toLowerCase().trim()
+      );
+      return matchesType || hasDeptMember;
+    });
+    const departmentProjectCount = deptProjects.length;
+
+    // 2. Onboard Projects:
+    // Projects in the employee's department that are ACTIVE or PLANNING
+    const onboardProjectCount = deptProjects.filter(
+      (p) => p.status === 'ACTIVE' || p.status === 'PLANNING'
+    ).length;
+
+    // 3. Employee Assigned Projects:
+    // Projects where employee is a team member, manager, or lead
+    const assignedProjects = projects.filter((p) => {
+      const isTeamMember = p.teamMemberIds && p.teamMemberIds.some((member: any) =>
+        member._id.toString() === employee._id.toString()
+      );
+      const isManager = p.allocatedManagerId && p.allocatedManagerId.toString() === userId.toString();
+      const isLead = p.teamLeadId && p.teamLeadId.toString() === userId.toString();
+      return isTeamMember || isManager || isLead;
+    });
+    const assignedProjectCount = assignedProjects.length;
+
+    // 4. Completed Projects:
+    // Assigned projects that are COMPLETED
+    const completedProjectCount = assignedProjects.filter(
+      (p) => p.status === 'COMPLETED'
+    ).length;
+
+    fs.appendFileSync(logPath, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      msg: 'Computed stats successfully',
+      counts: {
+        departmentProjectCount,
+        onboardProjectCount,
+        assignedProjectCount,
+        completedProjectCount
+      }
+    }, null, 2) + '\n');
+
+    res.json({
+      departmentProjectCount,
+      onboardProjectCount,
+      assignedProjectCount,
+      completedProjectCount
     });
   } catch (err) {
     next(err);

@@ -19,6 +19,7 @@ import { LeaveApplyModal } from '../Components/SpecifiedComponents/LeaveApplyMod
 import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
 import { permissionApi } from '../api_service/permissionApi';
+import { projectApi } from '../api_service/projectApi';
 
 export const DashboardPage: React.FC = () => {
   const { user, role } = useAuthStore();
@@ -34,6 +35,14 @@ export const DashboardPage: React.FC = () => {
     queryKey: ['myEmployee', user?.employeeId],
     queryFn: () => employeeApi.getById(user?.employeeId as string),
     enabled: role === 'EMPLOYEE' && !!user?.employeeId,
+    retry: false,
+    throwOnError: false,
+  });
+
+  const { data: projectStats, isLoading: projectStatsLoading } = useQuery({
+    queryKey: ['employeeProjectStats'],
+    queryFn: projectApi.getEmployeeQuickStats,
+    enabled: role === 'EMPLOYEE',
     retry: false,
     throwOnError: false,
   });
@@ -97,7 +106,7 @@ export const DashboardPage: React.FC = () => {
       {role === 'EMPLOYEE' && (
         <div className="space-y-8">
           <AttendanceCheckIn />
-          <EmployeeQuickStats employee={myEmployee || null} />
+          <EmployeeQuickStats stats={projectStats || null} loading={projectStatsLoading} />
 
           {/* Mini calendar + Task summary side by side */}
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">

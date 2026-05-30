@@ -19,6 +19,7 @@ router.get('/employees/:employeeId/productivity', auth_middleware_js_1.authentic
 router.post('/:projectId/invoice', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('PROJECTS', 'export'), project_controller_js_1.exportProjectInvoice);
 // Project Analytics Dashboard Summaries
 router.get('/dashboard/summary', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('PROJECTS', 'view'), projectAnalytics_controller_js_1.getDashboardSummary);
+router.get('/employee/quick-stats', auth_middleware_js_1.authenticate, projectAnalytics_controller_js_1.getEmployeeQuickStats);
 router.get('/:projectId/analytics', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('PROJECTS', 'view'), projectAnalytics_controller_js_1.getProjectAnalytics);
 router.get('/:projectId/team-workload', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('PROJECTS', 'view'), projectAnalytics_controller_js_1.getTeamWorkload);
 router.get('/:projectId/eligible-employees', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('PROJECTS', 'view'), employeeEligibility_controller_js_1.getEligibleEmployees);

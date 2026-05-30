@@ -68,22 +68,9 @@ export const ProfilePage: React.FC = () => {
   const [panNumber, setPanNumber] = useState('');
   const [taxRegime, setTaxRegime] = useState<'OLD' | 'NEW' | ''>('');
 
-  // Document Upload Form State
-  const [docName, setDocName] = useState('');
-  const [docCategory, setDocCategory] = useState<'CONTRACT' | 'PASSPORT' | 'VISA' | 'ID_PROOF' | 'CERTIFICATE' | 'OTHER'>('ID_PROOF');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
-
-  // Version Upload State (mapped by document ID)
-  const [selectedVersionFile, setSelectedVersionFile] = useState<{ [key: string]: File }>({});
-  const [isUploadingVersion, setIsUploadingVersion] = useState<{ [key: string]: boolean }>({});
   const [showHistory, setShowHistory] = useState<{ [key: string]: boolean }>({});
 
   const [isUploadingImg, setIsUploadingImg] = useState(false);
-
-  // MFA Setup State
-  const [mfaSetupData, setMfaSetupData] = useState<{ qrCode: string; secret: string } | null>(null);
-  const [mfaCodeInput, setMfaCodeInput] = useState('');
 
   // Fetch latest user details on mount to refresh store
   useQuery({
@@ -104,12 +91,7 @@ export const ProfilePage: React.FC = () => {
     enabled: !!user?.employeeId,
   });
 
-  // Fetch MFA Status
-  const { data: mfaStatus, refetch: refetchMfaStatus } = useQuery({
-    queryKey: ['mfaStatus'],
-    queryFn: authV2Api.getMFAStatus,
-    enabled: activeTab === 'security',
-  });
+
 
   // Fetch Active Trusted Devices
   const { data: devices, isLoading: isDevicesLoading, refetch: refetchDevices } = useQuery({
@@ -233,44 +215,7 @@ export const ProfilePage: React.FC = () => {
     },
   });
 
-  const setupMfaMutation = useMutation({
-    mutationFn: authV2Api.setupMFA,
-    onSuccess: (data) => {
-      setMfaSetupData(data);
-      addToast('MFA Setup Initiated', 'Scan the QR code with an authenticator app to get verification codes.', 'success');
-    },
-    onError: (error: any) => {
-      addToast('MFA Setup Failed', error.message || 'Could not initiate MFA setup.', 'error');
-    },
-  });
 
-  const verifyMfaMutation = useMutation({
-    mutationFn: authV2Api.verifyMFA,
-    onSuccess: (data) => {
-      if (data.verified) {
-        setMfaSetupData(null);
-        setMfaCodeInput('');
-        refetchMfaStatus();
-        addToast('MFA Enabled Successfully', 'Your account is now secured with Multi-Factor Authentication.', 'success');
-      } else {
-        addToast('Verification Failed', 'Invalid authenticator verification code. Please try again.', 'error');
-      }
-    },
-    onError: (error: any) => {
-      addToast('Verification Error', error.message || 'Could not verify code.', 'error');
-    },
-  });
-
-  const disableMfaMutation = useMutation({
-    mutationFn: authV2Api.disableMFA,
-    onSuccess: () => {
-      refetchMfaStatus();
-      addToast('MFA Disabled', 'Multi-Factor Authentication has been removed from your account.', 'warning');
-    },
-    onError: (error: any) => {
-      addToast('Error', error.message || 'Could not disable MFA.', 'error');
-    },
-  });
 
   const deviceMutation = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: 'trust' | 'block' | 'remove' }) => {
@@ -287,79 +232,7 @@ export const ProfilePage: React.FC = () => {
     },
   });
 
-  const handleDocUploadSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user?.employeeId) {
-      addToast('Error', 'No employee profile associated with your user account.', 'error');
-      return;
-    }
-    if (!selectedFile || !docName.trim()) {
-      addToast('Validation Error', 'Please enter a document name and select a file.', 'error');
-      return;
-    }
 
-    setIsUploadingDoc(true);
-    try {
-      const formData = new FormData();
-      formData.append('document', selectedFile);
-      const uploadRes = await axiosInstance.post<{ url: string }>('/upload/document', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const fileUrl = uploadRes.data.url;
-
-      await documentApi.uploadDocument({
-        employeeId: user.employeeId,
-        name: docName,
-        category: docCategory,
-        fileUrl,
-      });
-
-      setDocName('');
-      setSelectedFile(null);
-      addToast('Upload Successful', 'The document has been securely uploaded to S3.', 'success');
-      refetchDocs();
-    } catch (err: any) {
-      console.error(err);
-      addToast('Upload Failed', err.response?.data?.message || err.message || 'Error uploading file.', 'error');
-    } finally {
-      setIsUploadingDoc(false);
-    }
-  };
-
-  const handleAddVersionSubmit = async (docId: string) => {
-    const file = selectedVersionFile[docId];
-    if (!file) {
-      addToast('Error', 'Please select a file to upload as a new version.', 'error');
-      return;
-    }
-
-    setIsUploadingVersion(prev => ({ ...prev, [docId]: true }));
-    try {
-      const formData = new FormData();
-      formData.append('document', file);
-      const uploadRes = await axiosInstance.post<{ url: string }>('/upload/document', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const fileUrl = uploadRes.data.url;
-
-      await documentApi.addVersion(docId, fileUrl);
-
-      setSelectedVersionFile(prev => {
-        const copy = { ...prev };
-        delete copy[docId];
-        return copy;
-      });
-      addToast('Version Added', 'A new version has been successfully uploaded.', 'success');
-      refetchDocs();
-    } catch (err: any) {
-      console.error(err);
-      addToast('Upload Failed', err.response?.data?.message || err.message || 'Error uploading version.', 'error');
-    } finally {
-      setIsUploadingVersion(prev => ({ ...prev, [docId]: false }));
-    }
-  };
 
   const handlePersonalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,11 +267,7 @@ export const ProfilePage: React.FC = () => {
     });
   };
 
-  const handleVerifyMfaSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mfaCodeInput.trim()) return;
-    verifyMfaMutation.mutate(mfaCodeInput.trim());
-  };
+
 
   const canEditFinancials = role === 'ADMIN' || role === 'HR' || role === 'MANAGER';
 
@@ -1138,67 +1007,9 @@ export const ProfilePage: React.FC = () => {
 
           {/* TAB 6: DOCUMENTS */}
           {activeTab === 'documents' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
-              {/* Upload form */}
-              <div className="space-y-6">
-                <Card className="p-6 border border-border shadow-md space-y-6 bg-card">
-                  <h3 className="text-lg font-bold text-foreground flex items-center gap-2 border-b border-border pb-3">
-                    <Upload className="w-5 h-5 text-primary" /> Upload New Document
-                  </h3>
-                  <form onSubmit={handleDocUploadSubmit} className="space-y-4">
-                    <Input
-                      label="Document Display Name *"
-                      placeholder="e.g. PAN Card, Passport"
-                      value={docName}
-                      onChange={(e) => setDocName(e.target.value)}
-                      required
-                    />
-                    
-                    <div className="flex flex-col gap-1.5 text-left">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Category *</label>
-                      <Select
-                        value={docCategory}
-                        onChange={(e) => setDocCategory(e.target.value as any)}
-                        options={[
-                          { value: 'ID_PROOF', label: 'ID Proof (PAN, Aadhaar, etc.)' },
-                          { value: 'CONTRACT', label: 'Employment Contract' },
-                          { value: 'PASSPORT', label: 'Passport Details' },
-                          { value: 'VISA', label: 'Visa & Work Permits' },
-                          { value: 'CERTIFICATE', label: 'Certificates (Degree, Experience)' },
-                          { value: 'OTHER', label: 'Other Documents' }
-                        ]}
-                      />
-                    </div>
-
-                    <div className="space-y-1.5 text-left">
-                      <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">Select File *</label>
-                      <div className="relative border border-dashed border-border hover:border-primary/50 transition-all rounded-xl p-6 text-center cursor-pointer bg-muted/20">
-                        <input
-                          type="file"
-                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <FolderOpen className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-xs font-bold text-foreground">
-                          {selectedFile ? selectedFile.name : 'Choose file or drag & drop'}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground mt-1">PDF, JPG, PNG up to 10MB</p>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-primary text-primary-foreground font-bold tracking-wider py-2.5 rounded-xl shadow-md"
-                      isLoading={isUploadingDoc}
-                    >
-                      Securely Upload to S3
-                    </Button>
-                  </form>
-                </Card>
-              </div>
-
+            <div className="animate-in fade-in duration-300 space-y-6">
               {/* Document Listing */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-6">
                 <Card className="p-6 border border-border shadow-md space-y-6 bg-card">
                   <div>
                     <h3 className="text-lg font-bold text-foreground tracking-tight flex items-center gap-2">
@@ -1247,33 +1058,6 @@ export const ProfilePage: React.FC = () => {
                               >
                                 <History className="w-3.5 h-3.5" /> History ({doc.versions?.length || 1})
                               </button>
-
-                              {/* Inline new version file selector trigger */}
-                              <div className="relative overflow-hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold border border-primary/20 cursor-pointer">
-                                <input
-                                  type="file"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      setSelectedVersionFile(prev => ({ ...prev, [doc._id]: file }));
-                                    }
-                                  }}
-                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                />
-                                <Upload className="w-3.5 h-3.5" /> 
-                                {selectedVersionFile[doc._id] ? selectedVersionFile[doc._id].name : 'New Version'}
-                              </div>
-
-                              {selectedVersionFile[doc._id] && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleAddVersionSubmit(doc._id)}
-                                  isLoading={isUploadingVersion[doc._id]}
-                                  className="bg-primary text-white"
-                                >
-                                  Upload
-                                </Button>
-                              )}
                             </div>
                           </div>
 
@@ -1321,7 +1105,7 @@ export const ProfilePage: React.FC = () => {
                       <div className="text-center py-12 border border-dashed border-border rounded-2xl bg-muted/10">
                         <FolderOpen className="w-12 h-12 text-muted-foreground/40 mx-auto mb-2" />
                         <p className="text-sm font-semibold text-muted-foreground">No documents uploaded</p>
-                        <p className="text-xs text-muted-foreground/60 mt-1">Upload employment records, ID proofs, or certifications above.</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1">Your uploaded identity cards, certifications, and employment agreements.</p>
                       </div>
                     )}
                   </div>
@@ -1332,99 +1116,9 @@ export const ProfilePage: React.FC = () => {
 
           {/* TAB 7: SECURITY & MFA */}
           {activeTab === 'security' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
-              {/* MFA Management Control Card */}
-              <div className="space-y-8">
-                <Card className="p-6 border-l-4 border-l-primary shadow-lg bg-card space-y-6 text-left">
-                  <h3 className="text-lg font-black text-foreground flex items-center gap-2 border-b border-border pb-3 tracking-tight">
-                    <KeyRound className="w-5 h-5 text-primary" /> Multi-Factor Auth (MFA)
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Adding an extra layer of security helps shield your account. Once verified, logging in requires entering a dynamic one-time passcode generated by your authenticator app.
-                  </p>
-
-                  {mfaStatus?.isMFAEnabled ? (
-                    <div className="space-y-4">
-                      <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-xs font-bold text-primary flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5 text-primary" /> MFA is currently ENABLED.
-                      </div>
-                      <Button
-                        variant="outline"
-                        className="w-full border-destructive/30 hover:bg-destructive/10 text-destructive font-black tracking-wider text-xs"
-                        onClick={() => {
-                          if (window.confirm('Are you absolutely sure you want to disable Multi-Factor Authentication? This leaves your account less secure.')) {
-                            disableMfaMutation.mutate();
-                          }
-                        }}
-                        isLoading={disableMfaMutation.isPending}
-                      >
-                        DISABLE MFA
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20 text-xs font-bold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0" /> MFA is currently DISABLED.
-                      </div>
-
-                      {!mfaSetupData ? (
-                        <Button
-                          className="w-full bg-primary text-white font-black tracking-wider text-xs shadow-md"
-                          onClick={() => setupMfaMutation.mutate()}
-                          isLoading={setupMfaMutation.isPending}
-                        >
-                          ENABLE 2FA
-                        </Button>
-                      ) : (
-                        <form onSubmit={handleVerifyMfaSubmit} className="space-y-4 pt-2 border-t border-border animate-in slide-in-from-bottom-2 duration-300">
-                          <div className="flex flex-col items-center justify-center p-3.5 bg-white rounded-xl border border-border">
-                            {mfaSetupData.qrCode ? (
-                              <img src={mfaSetupData.qrCode} alt="Scan QR Code" className="w-36 h-36" />
-                            ) : (
-                              <div className="w-36 h-36 flex items-center justify-center bg-muted text-muted-foreground text-xs font-bold font-mono">
-                                No QR Code URL
-                              </div>
-                            )}
-                            <span className="text-[10px] text-muted-foreground font-mono mt-2 select-all select-text font-bold">Key: {mfaSetupData.secret}</span>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground text-center font-medium leading-normal">
-                            Scan this QR code with Google Authenticator or Microsoft Authenticator, then enter the 6-digit verification code below.
-                          </p>
-                          <Input
-                            label="Verification Code *"
-                            value={mfaCodeInput}
-                            onChange={(e) => setMfaCodeInput(e.target.value)}
-                            placeholder="e.g. 123456"
-                            maxLength={6}
-                            required
-                            className="font-mono text-center tracking-widest text-lg font-black"
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="flex-1 text-xs"
-                              onClick={() => setMfaSetupData(null)}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              type="submit"
-                              className="flex-1 bg-primary text-white text-xs font-bold"
-                              isLoading={verifyMfaMutation.isPending}
-                            >
-                              Verify Code
-                            </Button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              </div>
-
+            <div className="space-y-8 animate-in fade-in duration-300">
               {/* Device & Login History Container */}
-              <div className="lg:col-span-2 space-y-8">
+              <div className="space-y-8">
                 {/* Active Devices */}
                 <Card className="p-6 border border-border shadow-md space-y-4 text-left">
                   <div className="flex items-center justify-between border-b border-border pb-3">

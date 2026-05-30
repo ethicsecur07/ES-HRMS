@@ -13,6 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LeaveService = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const Leave_js_1 = require("../../../models/Leave.js");
+const Attendance_js_1 = require("../../../models/Attendance.js");
 const Employee_js_1 = require("../../../models/Employee.js");
 const LeavePolicyEngine_js_1 = require("../policies/LeavePolicyEngine.js");
 const LeaveBalanceService_js_1 = require("./LeaveBalanceService.js");
@@ -176,6 +177,25 @@ class LeaveService {
             leave.status = 'APPROVED';
             leave.approvedBy = new mongoose_1.default.Types.ObjectId(approverId);
             await leave.save({ session });
+            // If this was an auto-applied late check-in leave, update/create the attendance record with LEAVE status
+            if (leave.reason?.startsWith('Auto-applied: Late check-in')) {
+                await Attendance_js_1.Attendance.findOneAndUpdate({
+                    organizationId: leave.organizationId,
+                    employeeId: leave.employeeId,
+                    date: leave.startDate,
+                }, {
+                    $set: {
+                        status: 'LEAVE',
+                        isLate: false, // Approved leave means they are not penalized for late check-in
+                        overrideReason: 'Late check-in – Casual Leave approved by HR',
+                    },
+                    $setOnInsert: {
+                        loginTime: leave.appliedAt || new Date(),
+                        ipAddress: '127.0.0.1',
+                        deviceInfo: 'SYSTEM - AUTO LEAVE',
+                    }
+                }, { upsert: true, new: true, session });
+            }
             await session.commitTransaction();
             await (0, auditLog_service_js_1.createAuditLog)('LEAVE_APPROVED', approverEmail, 'LEAVE', leave.id, `Approved ${leave.leaveType} (${leave.totalDays} days) for employee ${employeeIdStr}`, organizationId);
             return { success: true, message: 'Leave approved successfully.', leave };
@@ -203,6 +223,40 @@ class LeaveService {
         leave.approvedBy = new mongoose_1.default.Types.ObjectId(approverId);
         leave.rejectionReason = rejectionReason;
         await leave.save();
+        // If this was an auto-applied late check-in leave, create/upsert an attendance record with LATE status
+        if (leave.reason?.startsWith('Auto-applied: Late check-in')) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const leaveDateStr = leave.startDate;
+            const loginTime = leave.appliedAt || new Date();
+            let logoutTime = undefined;
+            let workingHours = undefined;
+            if (leaveDateStr < todayStr) {
+                logoutTime = new Date(loginTime);
+                logoutTime.setHours(19, 0, 0, 0);
+                workingHours = parseFloat(((logoutTime.getTime() - loginTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
+                if (workingHours <= 0) {
+                    logoutTime.setTime(loginTime.getTime() + 9 * 60 * 60 * 1000);
+                    workingHours = 9;
+                }
+            }
+            await Attendance_js_1.Attendance.findOneAndUpdate({
+                organizationId: leave.organizationId,
+                employeeId: leave.employeeId,
+                date: leaveDateStr,
+            }, {
+                $set: {
+                    status: 'OFFICE',
+                    isLate: true,
+                    overrideReason: 'Late check-in – Casual Leave rejected by HR',
+                    loginTime,
+                    ...(logoutTime ? { logoutTime, workingHours } : {}),
+                },
+                $setOnInsert: {
+                    ipAddress: '127.0.0.1',
+                    deviceInfo: 'SYSTEM - AUTO REJECT LATE',
+                }
+            }, { upsert: true, new: true });
+        }
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_REJECTED', approverEmail, 'LEAVE', leave.id, `Rejected ${leave.leaveType}. Reason: ${rejectionReason}`, organizationId);
         return { success: true, message: 'Leave rejected.', leave };
     }

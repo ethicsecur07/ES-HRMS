@@ -8,6 +8,8 @@
 
 import mongoose from 'mongoose';
 import { LeaveBalance } from '../../../models/LeaveBalance.js';
+import { LeavePolicy } from '../../../models/LeavePolicy.js';
+import { Employee } from '../../../models/Employee.js';
 import { logger } from '../../../utils/logger.js';
 
 export interface BalanceUpdateResult {
@@ -20,6 +22,63 @@ export interface BalanceUpdateResult {
 
 export class LeaveBalanceService {
   /**
+   * Ensure that LeaveBalance records exist for all active LeavePolicies for an employee.
+   * If any are missing, they are initialized with the policy allowance (or employee defaults).
+   */
+  static async ensureBalancesExist(
+    organizationId: string,
+    employeeId: string,
+    session?: mongoose.ClientSession
+  ): Promise<any[]> {
+    const [balances, policies] = await Promise.all([
+      LeaveBalance.find({ organizationId, employeeId }).session(session ?? null),
+      LeavePolicy.find({ organizationId, isActive: true }).session(session ?? null),
+    ]);
+
+    const missingPolicies = policies.filter(p => !balances.some(b => b.leaveType === p.leaveType));
+    if (missingPolicies.length === 0) {
+      return balances;
+    }
+
+    const employee = await Employee.findOne({ _id: employeeId, organizationId }).session(session ?? null);
+    if (!employee) {
+      return balances;
+    }
+
+    const newBalances = [];
+    for (const policy of missingPolicies) {
+      let initialAllocated = policy.monthlyAllowance;
+      if (policy.leaveType === 'Casual Leave' && initialAllocated === 0) {
+        initialAllocated = employee.leaveBalance ?? 2;
+      } else if (policy.leaveType === 'WFH' && initialAllocated === 0) {
+        initialAllocated = employee.wfhBalance ?? 1;
+      } else if (policy.leaveType === 'Permission' && initialAllocated === 0) {
+        initialAllocated = employee.permissionHoursBalance ?? 3;
+      }
+
+      const newB = await LeaveBalance.findOneAndUpdate(
+        { organizationId, employeeId, leaveType: policy.leaveType },
+        {
+          $setOnInsert: {
+            organizationId,
+            employeeId,
+            leaveType: policy.leaveType,
+            allocated: initialAllocated,
+            balance: initialAllocated,
+            used: 0
+          }
+        },
+        { upsert: true, new: true, session }
+      );
+      if (newB) {
+        newBalances.push(newB);
+      }
+    }
+
+    return [...balances, ...newBalances];
+  }
+
+  /**
    * Atomically deduct days from leave balance.
    * Uses MongoDB findOneAndUpdate with $inc for race-condition safety.
    * Returns null if insufficient balance.
@@ -31,6 +90,9 @@ export class LeaveBalanceService {
     days: number,
     session?: mongoose.ClientSession
   ): Promise<BalanceUpdateResult | null> {
+    // Ensure all active policy balances are initialized
+    await this.ensureBalancesExist(organizationId, employeeId, session);
+
     // Use findOneAndUpdate with condition to prevent negative balances atomically
     const options: mongoose.QueryOptions = { new: false, session }; // 'new: false' = get BEFORE update
 

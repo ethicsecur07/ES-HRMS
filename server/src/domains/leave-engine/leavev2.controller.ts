@@ -273,7 +273,7 @@ export const getMyLeaveBalances = async (req: RBACRequest, res: Response, next: 
     }
 
     const [balances, policies] = await Promise.all([
-      LeaveBalance.find({ organizationId: orgId, employeeId: empId }),
+      LeaveBalanceService.ensureBalancesExist(orgId, empId),
       LeavePolicy.find({ organizationId: orgId, isActive: true }),
     ]);
 
@@ -312,7 +312,7 @@ export const getEmployeeLeaveBalances = async (req: RBACRequest, res: Response, 
       return;
     }
 
-    const balances = await LeaveBalance.find({ organizationId: orgId, employeeId: empId });
+    const balances = await LeaveBalanceService.ensureBalancesExist(orgId, empId);
     res.json({ balances, employeeId: empId });
   } catch (err) {
     next(err);

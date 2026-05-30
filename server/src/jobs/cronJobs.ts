@@ -33,8 +33,20 @@ export const initCronJobs = () => {
       });
 
       for (const att of unclosed) {
-        att.logoutTime = new Date(`${dateStr}T20:00:00.000Z`);
-        att.workingHours = 9;
+        const loginTime = new Date(att.loginTime);
+        const logoutTime = new Date(loginTime);
+        logoutTime.setHours(19, 0, 0, 0); // 7:00 PM local time
+        
+        let workingHours = parseFloat(((logoutTime.getTime() - loginTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
+        if (workingHours <= 0) {
+          logoutTime.setTime(loginTime.getTime() + 9 * 60 * 60 * 1000);
+          workingHours = 9;
+        }
+
+        att.logoutTime = logoutTime;
+        att.workingHours = workingHours;
+        att.isAutoCheckedOut = true;
+        att.pendingReportUpdate = true;
         await att.save();
       }
 

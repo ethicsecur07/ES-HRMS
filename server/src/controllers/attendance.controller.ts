@@ -80,10 +80,16 @@ export const checkIn = async (req: AuthRequest, res: Response): Promise<void> =>
         date: { $gte: cycleStart, $lte: cycleEnd }
       });
 
-      warning =
-        `⏰ Come fast! Late check-in recorded ` +
-        `(${lateCountThisCycle === 1 ? '1st' : `${lateCountThisCycle}th`} time this salary cycle ${cycleStart} – ${cycleEnd}). ` +
-        `Your next late check-in this cycle will be counted as absent — please apply for leave!`;
+      if (lateCountThisCycle === 1) {
+        warning =
+          `⏰ Late check-in recorded (1st time this salary cycle ${cycleStart} – ${cycleEnd}). ` +
+          `A 2nd late check-in this cycle will automatically raise and approve a Casual Leave for that day.`;
+      } else {
+        warning =
+          `⏰ Late check-in recorded (${lateCountThisCycle}${lateCountThisCycle === 2 ? 'nd' : 'th'} time this salary cycle ${cycleStart} – ${cycleEnd}). ` +
+          `A Casual Leave request has been automatically submitted and is pending HR approval. ` +
+          `If approved — counted as leave. If rejected — recorded as late.`;
+      }
     }
 
     res.status(201).json({

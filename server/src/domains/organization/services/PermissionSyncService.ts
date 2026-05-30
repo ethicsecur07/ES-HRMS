@@ -107,7 +107,6 @@ export class PermissionSyncService {
         'TASKS',
         'PAYROLL',
         'FINANCE',
-        'EMPLOYEE_LIFECYCLE',
         'ORG_STRUCTURE',
         'WORKFLOW',
         'ADVANCED_ATTENDANCE',

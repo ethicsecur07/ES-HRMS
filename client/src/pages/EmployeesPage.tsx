@@ -415,6 +415,12 @@ export const EmployeesPage: React.FC = () => {
       ),
     },
     {
+      header: 'Contact Number',
+      accessor: (row: Employee) => (
+        <span className="text-xs font-mono">{row.phone || 'N/A'}</span>
+      ),
+    },
+    {
       header: 'Status',
       accessor: (row: Employee) => (
         <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${

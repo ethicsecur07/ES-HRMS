@@ -324,6 +324,17 @@ export const AttendanceCheckIn: React.FC = () => {
     );
   }) ?? false;
 
+  const hasPendingAutoLeaveToday = myLeaves?.some((l) => {
+    const lEmpId = typeof l.employeeId === 'object' && l.employeeId !== null ? l.employeeId._id : l.employeeId;
+    return (
+      lEmpId === myEmpId &&
+      l.status === 'PENDING' &&
+      l.reason?.startsWith('Auto-applied: Late check-in') &&
+      localTodayStr >= l.startDate &&
+      localTodayStr <= l.endDate
+    );
+  }) ?? false;
+
   if (hasApprovedLeaveToday) {
     return (
       <Card className="relative overflow-hidden border-l-4 border-primary shadow-xl bg-card">
@@ -340,6 +351,28 @@ export const AttendanceCheckIn: React.FC = () => {
           <div className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 flex-shrink-0">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
             On Leave Duty-Free
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (hasPendingAutoLeaveToday) {
+    return (
+      <Card className="relative overflow-hidden border-l-4 border-yellow-500 shadow-xl bg-card">
+        <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+          <Clock className="w-36 h-36 text-yellow-500" />
+        </div>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10 p-2 border-l border-yellow-500/20">
+          <div className="space-y-2 text-left">
+            <h3 className="text-xl font-bold text-foreground">Late Check-in Blocked (Leave Pending)</h3>
+            <p className="text-xs text-muted-foreground">
+              This is your 2nd (or more) late check-in this salary cycle. A Casual Leave request has been automatically applied for today and is pending HR approval.
+            </p>
+          </div>
+          <div className="px-4 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 flex-shrink-0">
+            <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+            Approval Pending
           </div>
         </div>
       </Card>
@@ -541,7 +574,7 @@ export const AttendanceCheckIn: React.FC = () => {
                 <AlertOctagon className="w-4 h-4" /> RETROACTIVE REPORT REQUIRED
               </span>
               <p>
-                You forgot to check out on <strong className="font-mono">{pendingReportToSubmit.date}</strong>. The system has automatically resolved your checkout status and calculated exactly <strong>9 working hours</strong> for that date.
+                You forgot to check out on <strong className="font-mono">{pendingReportToSubmit.date}</strong> (Checked In: <strong className="font-mono">{new Date(pendingReportToSubmit.loginTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>). The system has automatically checked you out at <strong>7:00 PM</strong> (Working Hours: <strong>{pendingReportToSubmit.workingHours} hrs</strong>).
               </p>
               <p className="font-semibold mt-1">
                 You must submit your tasks and daily report for {pendingReportToSubmit.date} to unlock and use the HRMS application.
