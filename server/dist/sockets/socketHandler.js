@@ -12,7 +12,7 @@ const disconnectTimeouts = new Map();
 const getOnlineUserIdsByOrg = (orgId) => {
     const ids = [];
     for (const [userId, presence] of userPresence.entries()) {
-        if (presence.organizationId === orgId && presence.activeSockets.size > 0) {
+        if (presence.organizationId === orgId && presence.sockets.size > 0) {
             ids.push(userId);
         }
     }
@@ -24,11 +24,12 @@ const initSockets = (httpServer) => {
             origin: '*',
             methods: ['GET', 'POST'],
         },
+        // Keep-alive tuning: ping every 10 s, timeout after 20 s
         pingInterval: 10000,
-        pingTimeout: 5000,
+        pingTimeout: 20000,
     });
     ioInstance = io;
-    // Socket Authentication Middleware (Zero-Trust Session Validation)
+    // ── Authentication Middleware (Zero-Trust Session Validation) ──────────────
     io.use(async (socket, next) => {
         try {
             const token = socket.handshake.auth.token ||
@@ -53,13 +54,15 @@ const initSockets = (httpServer) => {
                 };
                 const targetUser = mockUsers[demoRole] || mockUsers.EMPLOYEE;
                 const { User } = await import('../models/User.js');
-                const dbUser = await User.findOne({ email: new RegExp('^' + targetUser.email + '$', 'i') });
+                const dbUser = await User.findOne({
+                    email: new RegExp('^' + targetUser.email + '$', 'i'),
+                });
                 if (dbUser) {
                     socket.user = {
                         id: dbUser.id,
                         role: dbUser.role,
                         email: dbUser.email,
-                        organizationId: dbUser.organizationId.toString()
+                        organizationId: dbUser.organizationId.toString(),
                     };
                     return next();
                 }
@@ -88,39 +91,34 @@ const initSockets = (httpServer) => {
     io.on('connection', (socket) => {
         const user = socket.user;
         logger_js_1.logger.info(`Socket connected: ${socket.id} (User: ${user?.email})`);
-        // ── Auto-join standard rooms ──────────────────────────────────────────
+        // ── Auto-join standard rooms ─────────────────────────────────────────────
         if (user) {
             socket.join(`org_${user.organizationId}`);
             socket.join(`user_${user.id}`);
             socket.join(`role_${user.role}`);
             socket.join(`org_${user.organizationId}_role_${user.role}`);
             logger_js_1.logger.info(`Socket ${socket.id} joined rooms: org_${user.organizationId}, user_${user.id}, role_${user.role}`);
-            // ── Online Presence Tracking ─────────────────────────────────────────
-            // Clear any pending offline grace-period timeout if they reconnect
+            // ── Presence: register this socket ──────────────────────────────────
+            // If there's a pending offline timer for this user, cancel it.
+            // This handles the page-refresh race condition gracefully.
             if (disconnectTimeouts.has(user.id)) {
                 clearTimeout(disconnectTimeouts.get(user.id));
                 disconnectTimeouts.delete(user.id);
+                logger_js_1.logger.info(`Reconnect within grace period for user ${user.email} — offline cancelled.`);
             }
             if (!userPresence.has(user.id)) {
                 userPresence.set(user.id, {
                     organizationId: user.organizationId,
-                    allSockets: new Set(),
-                    activeSockets: new Set()
+                    sockets: new Set(),
                 });
             }
-            const presence = userPresence.get(user.id);
-            presence.allSockets.add(socket.id);
-            // Default to active on connection
-            const wasOffline = presence.activeSockets.size === 0;
-            presence.activeSockets.add(socket.id);
-            if (wasOffline) {
-                // Broadcast to ALL org members (including self) that this user is online
-                io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
-            }
+            onlineUsers.get(user.id).socketIds.add(socket.id);
+            // Broadcast to ALL org members (including self) that this user is online
+            io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
             // Send the FULL current list of online users in this organization to only the newly connected socket
             socket.emit('online_users', getOnlineUserIdsByOrg(user.organizationId));
         }
-        // ── Group/Broadcast room join ──────────────────────────────────────────
+        // ── Group/Broadcast room join ────────────────────────────────────────────
         socket.on('join_room', (roomId) => {
             socket.join(roomId);
             logger_js_1.logger.info(`Socket ${socket.id} joined room: ${roomId}`);
@@ -130,15 +128,20 @@ const initSockets = (httpServer) => {
             socket.join(room);
             logger_js_1.logger.info(`Socket ${socket.id} joined project board room: ${room}`);
         });
-        // ── Legacy Notification Event ──────────────────────────────────────────
+        // ── Legacy Notification Event ────────────────────────────────────────────
+        // Fix: targetRole must use the `role_${role}` room format used when joining
         socket.on('send_notification', (data) => {
             if (user && data.organizationId && user.organizationId !== data.organizationId) {
                 logger_js_1.logger.warn(`Cross-tenant notification attempt blocked for user ${user.email}`);
                 return;
             }
-            io.to(data.targetRole).emit('receive_notification', data);
+            // data.targetRole should be a raw role like "ADMIN" — emit to the joined room
+            const targetRoom = data.targetRole?.startsWith('role_')
+                ? data.targetRole
+                : `role_${data.targetRole}`;
+            io.to(targetRoom).emit('receive_notification', data);
         });
-        // ── Typing Indicators ──────────────────────────────────────────────────
+        // ── Typing Indicators ────────────────────────────────────────────────────
         socket.on('typing_start', ({ receiverId }) => {
             if (!user)
                 return;
@@ -159,70 +162,61 @@ const initSockets = (httpServer) => {
                 io.to(`user_${receiverId}`).emit('user_stop_typing', { userId: user.id, receiverId });
             }
         });
-        // ── Active Presence events ──────────────────────────────────────────────
+        // ── Active/Inactive Presence (no-op for online dot, kept for API compat) ─
+        // These events are intentionally ignored for the online indicator.
+        // Online = connected socket. Inactive just means the tab is backgrounded.
         socket.on('user_active', () => {
+            // No-op: online status is derived from socket connectivity only
+        });
+        socket.on('user_inactive', () => {
+            // No-op: online status is derived from socket connectivity only
+        });
+        // ── Hard offline signal (fired on beforeunload / tab close) ─────────────
+        // Bypasses the 8-second grace period so other users see the offline dot
+        // immediately when someone actually closes their browser tab.
+        socket.on('user_offline_hard', () => {
             if (!user)
                 return;
+            const presence = userPresence.get(user.id);
+            if (!presence)
+                return;
+            presence.sockets.delete(socket.id);
+            // Cancel any existing grace-period timer
             if (disconnectTimeouts.has(user.id)) {
                 clearTimeout(disconnectTimeouts.get(user.id));
                 disconnectTimeouts.delete(user.id);
             }
-            if (!userPresence.has(user.id)) {
-                userPresence.set(user.id, {
-                    organizationId: user.organizationId,
-                    allSockets: new Set([socket.id]),
-                    activeSockets: new Set()
-                });
-            }
-            const presence = userPresence.get(user.id);
-            const wasOffline = presence.activeSockets.size === 0;
-            presence.activeSockets.add(socket.id);
-            if (wasOffline) {
-                io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
-                logger_js_1.logger.info(`User ${user.email} went online (active).`);
+            if (presence.sockets.size === 0) {
+                userPresence.delete(user.id);
+                io.to(`org_${user.organizationId}`).emit('user_offline', { userId: user.id });
+                logger_js_1.logger.info(`User ${user.email} forced OFFLINE via hard-close signal.`);
             }
         });
-        socket.on('user_inactive', () => {
+        // ── Disconnect ───────────────────────────────────────────────────────────
+        socket.on('disconnect', (reason) => {
+            logger_js_1.logger.info(`Socket disconnected: ${socket.id} (reason: ${reason})`);
             if (!user)
                 return;
             const presence = userPresence.get(user.id);
-            if (presence) {
-                presence.activeSockets.delete(socket.id);
-                if (presence.activeSockets.size === 0) {
-                    io.to(`org_${user.organizationId}`).emit('user_offline', { userId: user.id });
-                    logger_js_1.logger.info(`User ${user.email} went offline (inactive).`);
-                }
-            }
-        });
-        // ── Disconnect ──────────────────────────────────────────────────────────
-        socket.on('disconnect', () => {
-            logger_js_1.logger.info(`Socket disconnected: ${socket.id}`);
-            if (user) {
-                const presence = userPresence.get(user.id);
-                if (presence) {
-                    presence.allSockets.delete(socket.id);
-                    const wasActive = presence.activeSockets.has(socket.id);
-                    presence.activeSockets.delete(socket.id);
-                    // Only mark user as offline when ALL their active sockets disconnect
-                    if (presence.activeSockets.size === 0 && wasActive) {
-                        const timeout = setTimeout(() => {
-                            const currentPresence = userPresence.get(user.id);
-                            if (currentPresence && currentPresence.activeSockets.size === 0) {
-                                if (currentPresence.allSockets.size === 0) {
-                                    userPresence.delete(user.id);
-                                }
-                                io.to(`org_${user.organizationId}`).emit('user_offline', { userId: user.id });
-                                logger_js_1.logger.info(`User ${user.email} marked offline after disconnect grace period.`);
-                            }
-                            disconnectTimeouts.delete(user.id);
-                        }, 3000);
-                        disconnectTimeouts.set(user.id, timeout);
-                    }
-                    else if (presence.allSockets.size === 0) {
-                        // Clean up entry completely if no socket sessions remain at all
+            if (!presence)
+                return;
+            presence.sockets.delete(socket.id);
+            if (presence.sockets.size === 0) {
+                // All sockets gone — start the grace period before broadcasting offline.
+                // 8 seconds gives the browser enough time to reconnect on page refresh.
+                // If a new socket connects within this window, the timeout is cancelled above.
+                const timeout = setTimeout(() => {
+                    const currentPresence = userPresence.get(user.id);
+                    if (currentPresence && currentPresence.sockets.size === 0) {
+                        // Clean up presence entry
                         userPresence.delete(user.id);
+                        // Broadcast offline to the whole org
+                        io.to(`org_${user.organizationId}`).emit('user_offline', { userId: user.id });
+                        logger_js_1.logger.info(`User ${user.email} is now OFFLINE (grace period elapsed).`);
                     }
-                }
+                    disconnectTimeouts.delete(user.id);
+                }, 8000); // 8-second grace period
+                disconnectTimeouts.set(user.id, timeout);
             }
         });
     });

@@ -196,10 +196,10 @@ const submitPendingReport = async (req, res) => {
             employeeId,
             date: att.date,
             completedTasks,
-            inProgressTasks: inProgressTasks || '',
-            pendingTasks: pendingTasks || '',
+            inProgressTasks: inProgressTasks || 'None',
+            pendingTasks: pendingTasks || 'None',
             blockers: blockers || 'None',
-            tomorrowPlan: tomorrowPlan || '',
+            tomorrowPlan: tomorrowPlan || 'None',
             submittedAt: new Date()
         });
         // Update Attendance record

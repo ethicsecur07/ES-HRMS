@@ -60,3 +60,96 @@
     "completedProjectCount": 0
   }
 }
+{
+  "timestamp": "2026-05-30T07:44:42.622Z",
+  "msg": "Resolved employee profile",
+  "user": {
+    "id": "6a19413c42dc44db7c864fb5",
+    "role": "EMPLOYEE",
+    "email": "suseendrakumar@ethicsecur.co.in",
+    "organizationId": "605c72ef1f77bcf86cd79000",
+    "employeeId": "6a19413c42dc44db7c864fb3",
+    "sessionId": "6a1a9569e4b749a8574e9096",
+    "iat": 1780127081,
+    "exp": 1780127981
+  },
+  "employeeFound": true,
+  "employeeDetails": {
+    "id": "6a19413c42dc44db7c864fb3",
+    "fullName": "Suseendra kumar R",
+    "email": "suseendrakumar@ethicsecur.co.in",
+    "department": "Development"
+  }
+}
+{
+  "timestamp": "2026-05-30T07:44:42.708Z",
+  "msg": "Computed stats successfully",
+  "counts": {
+    "departmentProjectCount": 3,
+    "onboardProjectCount": 3,
+    "assignedProjectCount": 1,
+    "completedProjectCount": 0
+  }
+}
+{
+  "timestamp": "2026-05-30T07:51:45.584Z",
+  "msg": "Resolved employee profile",
+  "user": {
+    "id": "6a19413c42dc44db7c864fb5",
+    "role": "EMPLOYEE",
+    "email": "suseendrakumar@ethicsecur.co.in",
+    "organizationId": "605c72ef1f77bcf86cd79000",
+    "employeeId": "6a19413c42dc44db7c864fb3",
+    "sessionId": "6a1a9710c23c196fce511732",
+    "iat": 1780127504,
+    "exp": 1780128404
+  },
+  "employeeFound": true,
+  "employeeDetails": {
+    "id": "6a19413c42dc44db7c864fb3",
+    "fullName": "Suseendra kumar R",
+    "email": "suseendrakumar@ethicsecur.co.in",
+    "department": "Development"
+  }
+}
+{
+  "timestamp": "2026-05-30T07:51:45.680Z",
+  "msg": "Computed stats successfully",
+  "counts": {
+    "departmentProjectCount": 3,
+    "onboardProjectCount": 3,
+    "assignedProjectCount": 1,
+    "completedProjectCount": 0
+  }
+}
+{
+  "timestamp": "2026-05-30T08:42:28.731Z",
+  "msg": "Resolved employee profile",
+  "user": {
+    "id": "6a19413c42dc44db7c864fb5",
+    "role": "EMPLOYEE",
+    "email": "suseendrakumar@ethicsecur.co.in",
+    "organizationId": "605c72ef1f77bcf86cd79000",
+    "employeeId": "6a19413c42dc44db7c864fb3",
+    "sessionId": "6a1aa2f3d2f311aefad01b3e",
+    "iat": 1780130547,
+    "exp": 1780131447
+  },
+  "employeeFound": true,
+  "employeeDetails": {
+    "id": "6a19413c42dc44db7c864fb3",
+    "fullName": "Suseendra kumar R",
+    "email": "suseendrakumar@ethicsecur.co.in",
+    "department": "Development"
+  }
+}
+{
+  "timestamp": "2026-05-30T08:42:28.835Z",
+  "msg": "Computed stats successfully",
+  "counts": {
+    "departmentProjectCount": 3,
+    "onboardProjectCount": 3,
+    "assignedProjectCount": 1,
+    "completedProjectCount": 0
+  }
+}
