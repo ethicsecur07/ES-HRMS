@@ -26,8 +26,11 @@ const formatFileSize = (bytes?: number) => {
 };
 
 // ── Utility: group messages by date ──────────────────────────────────────────
-const formatDateLabel = (dateStr: string) => {
+const formatDateLabel = (dateStr: string | undefined | null): string => {
+  if (!dateStr) return 'Today';
   const d = new Date(dateStr);
+  // Guard against invalid date strings (e.g. undefined from optimistic updates)
+  if (isNaN(d.getTime())) return 'Today';
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -149,6 +152,10 @@ export const ChatPage: React.FC = () => {
           return exists ? old : [...old, msg];
         });
       }
+
+      // Always refresh the sidebar's recent conversations list so it reorders
+      // immediately when any message arrives — even for non-active chats.
+      qc.invalidateQueries({ queryKey: ['chat', 'recent'] });
     };
 
     const handleMessagesRead = ({ messageIds }: { messageIds: string[] }) => {
@@ -212,11 +219,14 @@ export const ChatPage: React.FC = () => {
   // Update lastMessageAt dynamically when messages are fetched/loaded
   useEffect(() => {
     if (selectedUser && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      const time = lastMsg.createdAt;
-      useNotificationStore.setState((s) => ({
-        lastMessageAt: { ...s.lastMessageAt, [selectedUser]: time }
-      }));
+      // Find the last message that actually has a createdAt (guard against
+      // undefined/malformed entries that can appear during cache mutations)
+      const lastMsg = [...messages].reverse().find(m => m?.createdAt);
+      if (lastMsg) {
+        useNotificationStore.setState((s) => ({
+          lastMessageAt: { ...s.lastMessageAt, [selectedUser]: lastMsg.createdAt }
+        }));
+      }
     }
   }, [messages, selectedUser]);
 
@@ -229,7 +239,8 @@ export const ChatPage: React.FC = () => {
       return;
     }
     const currentLength = messages.length;
-    const currentLastId = currentLength > 0 ? messages[currentLength - 1]._id : null;
+    const validMessages = messages.filter(m => m?._id);
+    const currentLastId = validMessages.length > 0 ? validMessages[validMessages.length - 1]._id : null;
     const userChanged = lastScrollUserRef.current !== selectedUser;
     const newMessages = currentLength > lastMessageCountRef.current || currentLastId !== lastMessageIdRef.current;
 
@@ -342,7 +353,7 @@ export const ChatPage: React.FC = () => {
     if (selectedUser?.startsWith('group_dept_')) return 'Department Channel';
     const emp = employees.find(e => e.userId === selectedUser);
     if (!emp) return '';
-    return isOnline(selectedUser || '') ? 'Online' : emp.designation;
+    return emp.designation;
   };
 
   const getTypingLabel = () => {
@@ -360,6 +371,9 @@ export const ChatPage: React.FC = () => {
   const groupedMessages = React.useMemo(() => {
     const groups: { date: string; msgs: typeof messages }[] = [];
     for (const msg of messages) {
+      // Guard: skip malformed messages that lack a createdAt (e.g. during
+      // optimistic cache updates before the server response arrives)
+      if (!msg?.createdAt) continue;
       const label = formatDateLabel(msg.createdAt);
       const last = groups[groups.length - 1];
       if (last && last.date === label) {
@@ -371,14 +385,7 @@ export const ChatPage: React.FC = () => {
     return groups;
   }, [messages]);
 
-  // ── Role badge color ──────────────────────────────────────────────────────
-  const getRoleBadgeClass = (role: string) => {
-    if (role === 'ADMIN') return 'bg-red-500/10 dark:bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20 dark:border-red-500/25';
-    if (role === 'HR') return 'bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 dark:border-indigo-500/25';
-    if (role === 'MANAGER') return 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 dark:border-amber-500/25';
-    if (role === 'TEAM_LEAD') return 'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 dark:border-emerald-500/25';
-    return 'bg-slate-500/10 dark:bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/15 dark:border-slate-500/20';
-  };
+
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-3 font-sans">
@@ -395,13 +402,13 @@ export const ChatPage: React.FC = () => {
         <div className="p-4 border-b border-border bg-card">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-extrabold text-base text-foreground tracking-tight">Messages</h2>
-            <div className="flex items-center gap-1.5">
+            {/* <div className="flex items-center gap-1.5">
               <span
                 className="w-2 h-2 rounded-full bg-primary animate-pulse"
                 style={{ boxShadow: '0 0 6px 2px hsl(var(--primary) / 0.3)' }}
               ></span>
-              <span className="text-[10px] text-muted-foreground font-semibold">{otherOnlineCount > 0 ? `${onlineUserIds.length} online` : 'online'}</span>
-            </div>
+              <span className="text-[10px] text-muted-foreground font-semibold">{otherOnlineCount > 0 ? `${otherOnlineCount} online` : 'online'}</span>
+            </div> */}
           </div>
 
           {/* Search */}
@@ -475,19 +482,17 @@ export const ChatPage: React.FC = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className={`text-xs truncate ${unread > 0 ? 'font-bold text-foreground' : 'font-semibold text-foreground/90'}`}>{emp.fullName}</span>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase shrink-0 ${getRoleBadgeClass((emp as any).role || '')}`}>
-                            {(emp as any).role || 'Staff'}
-                          </span>
+                          
                         </div>
-                        <div className="flex items-center justify-between text-[10px] mt-0.5 min-w-0">
+                        <div className="flex items-center justify-between text-[10px]  min-w-0">
                           <div className="truncate pr-2">
-                            {online
-                              ? <span className="text-primary font-semibold">● Online</span>
-                              : <span className="text-muted-foreground">{emp.designation}</span>
-                            }
+                           
+                              
+                               <span className="text-muted-foreground">{emp.designation}</span>
+                            
                           </div>
                           {unread > 0 && !isSelected && (
-                            <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-primary text-primary-foreground text-[9px] font-extrabold flex items-center justify-center shadow-lg shadow-primary/40 animate-pulse shrink-0">
+                            <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-primary text-primary-foreground text-[12px] font-extrabold flex items-center justify-center   ">
                               {unread > 99 ? '99+' : unread}
                             </span>
                           )}
@@ -642,9 +647,9 @@ export const ChatPage: React.FC = () => {
                       ? 'text-primary'
                       : 'text-muted-foreground'
                   }`}>
-                    {!selectedUser?.startsWith('group_') && selectedUser !== 'broadcast' && isOnline(selectedUser) && (
+                    {/* {!selectedUser?.startsWith('group_') && selectedUser !== 'broadcast' && isOnline(selectedUser) && (
                       <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
-                    )}
+                    )} */}
                     {getHeaderSubtitle()}
                   </p>
                 </div>
@@ -921,7 +926,7 @@ export const ChatPage: React.FC = () => {
             <div className="flex items-center gap-4 text-[11px] text-muted-foreground font-medium mt-2">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-primary"></div>
-                <span>{otherOnlineCount > 0 ? `${onlineUserIds.length} people online` : 'online'}</span>
+                <span>{otherOnlineCount > 0 ? `${otherOnlineCount} people online` : 'online'}</span>
               </div>
               <div className="w-1 h-1 rounded-full bg-border"></div>
               <div className="flex items-center gap-1.5">
