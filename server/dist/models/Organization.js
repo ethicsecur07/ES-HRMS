@@ -66,6 +66,7 @@ const organizationSchema = new mongoose_1.Schema({
         allowedIPs: { type: [String], default: ['127.0.0.1', '::1'] },
         adminEmail: { type: String },
         loginApprovalRoles: { type: [String], default: ['ADMIN'] },
+        visibleDepartments: { type: [String], default: ['Development', 'Digital Marketing', 'HR', 'BA', 'BDA'] },
     },
 }, { timestamps: true });
 exports.Organization = mongoose_1.default.model('Organization', organizationSchema);

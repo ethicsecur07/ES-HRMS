@@ -116,20 +116,7 @@ const verifyIP = async (req, res) => {
 };
 exports.verifyIP = verifyIP;
 const updateAttendance = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { loginTime, logoutTime, status } = req.body;
-        const { organizationId, email } = req.user || {};
-        if (!organizationId || !email) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const attendance = await AttendanceService_js_1.AttendanceService.updateAttendance(organizationId, id, email, loginTime, logoutTime, status);
-        res.status(200).json({ data: attendance });
-    }
-    catch (error) {
-        res.status(error.message === 'Attendance record not found' || error.message.includes('not found') ? 404 : 500).json({ message: error.message });
-    }
+    res.status(403).json({ message: 'Attendance editing is disabled.' });
 };
 exports.updateAttendance = updateAttendance;
 const getPendingReports = async (req, res) => {

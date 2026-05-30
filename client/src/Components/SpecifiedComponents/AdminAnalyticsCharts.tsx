@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatCurrency } from '../../utils/formatters';
 import { employeeApi } from '../../api_service/employeeApi';
+import { analyticsApi } from '../../api_service/analyticsApi';
 import { Card } from '../WrapperComponents/Card';
 import { Users, TrendingUp, DollarSign, FolderKanban, Building2 } from 'lucide-react';
 
@@ -20,8 +21,8 @@ interface AdminAnalyticsChartsProps {
 const resolveDeptLabel = (rawName: string): string => {
   const n = rawName.trim().toLowerCase();
 
-  // Development group: contains 'mern', 'development', or 'developer'
-  if (n.includes('mern') || n.includes('development') || n.includes('developer')) return 'Development';
+  // Development group: contains 'mern', 'development', or 'developer' (excluding business development)
+  if ((n.includes('mern') || n.includes('development') || n.includes('developer')) && !n.includes('business')) return 'Development';
 
   // Digital Marketing group: 'digital marketing' OR standalone 'marketing'
   if (n.includes('digital') || n === 'marketing') return 'Digital Marketing';
@@ -42,6 +43,16 @@ const DEPT_COLOR_MAP: Record<string, string> = {
   'Digital Marketing': '#ec4899',
   'BA':                '#f59e0b',
   'BDA':               '#10b981',
+  'HR':                '#8b5cf6',
+};
+
+const PRESET_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#3b82f6', '#f43f5e', '#a855f7', '#14b8a6'];
+
+const getDeptColor = (label: string, index: number) => {
+  const resolved = resolveDeptLabel(label);
+  if (DEPT_COLOR_MAP[resolved]) return DEPT_COLOR_MAP[resolved];
+  if (DEPT_COLOR_MAP[label]) return DEPT_COLOR_MAP[label];
+  return PRESET_COLORS[index % PRESET_COLORS.length];
 };
 
 
@@ -87,10 +98,10 @@ const CustomDeptTooltip = ({ active, payload }: any) => {
 };
 
 // ── Custom Attendance Tooltip ───────────────────────────────────────────
-const CustomAttendanceTooltip = ({ active, payload }: any) => {
+const CustomAttendanceTooltip = ({ active, payload, totalEmployees }: any) => {
   if (!active || !payload?.length) return null;
   
-  const total = payload.reduce((sum: number, entry: any) => sum + (entry.value || 0), 0);
+  const divisor = totalEmployees && totalEmployees > 0 ? totalEmployees : 1;
   
   return (
     <div
@@ -108,7 +119,7 @@ const CustomAttendanceTooltip = ({ active, payload }: any) => {
       </p>
       {payload.slice().reverse().map((entry: any) => {
         const val = entry.value || 0;
-        const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+        const pct = divisor > 0 ? Math.round((val / divisor) * 100) : 0;
         return (
           <div key={entry.name} className="flex items-center justify-between gap-4 font-semibold">
             <div className="flex items-center gap-2">
@@ -121,6 +132,10 @@ const CustomAttendanceTooltip = ({ active, payload }: any) => {
           </div>
         );
       })}
+      <div className="border-t border-border/60 pt-1.5 mt-1.5 flex items-center justify-between font-bold text-muted-foreground">
+        <span>Total Employees</span>
+        <span className="text-foreground">{divisor}</span>
+      </div>
     </div>
   );
 };
@@ -170,16 +185,30 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
     mergedDeptMap[label] = (mergedDeptMap[label] || 0) + 1;
   });
 
-  // Preferred display order — only show these 4 groups, nothing else
-  const PREFERRED_ORDER = ['Development', 'Digital Marketing', 'BA', 'BDA'];
+  const { data: orgSettings } = useQuery({
+    queryKey: ['companySettings'],
+    queryFn: analyticsApi.getSettings,
+  });
+
+  const PREFERRED_ORDER = orgSettings?.visibleDepartments || ['Development', 'Digital Marketing', 'HR', 'BA', 'BDA'];
 
   const departmentTrendData = PREFERRED_ORDER
-    .filter(label => label in mergedDeptMap)
-    .map(label => ({
-      name: label,
-      employeeCount: mergedDeptMap[label],
-      fill: DEPT_COLOR_MAP[label],
-    }));
+    .map((label, index) => {
+      const resolvedTarget = resolveDeptLabel(label);
+      let employeeCount = 0;
+      
+      Object.keys(mergedDeptMap).forEach(key => {
+        if (resolveDeptLabel(key) === resolvedTarget || key === label) {
+          employeeCount += mergedDeptMap[key];
+        }
+      });
+
+      return {
+        name: label,
+        employeeCount,
+        fill: getDeptColor(label, index),
+      };
+    });
 
   const totalDeptEmployees = departmentTrendData.reduce((s, d) => s + d.employeeCount, 0);
 
@@ -199,7 +228,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
         <Card className="border-l-4 border-l-primary flex items-center justify-between p-6 hover:shadow-md transition-shadow bg-card">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Total Employees</p>
-            <h3 className="text-3xl font-extrabold text-foreground">{stats.totalEmployees ?? 0}</h3>
+            <h3 className="text-3xl font-extrabold text-foreground">{totalDeptEmployees}</h3>
             <p className="text-xs text-primary font-bold mt-2 flex items-center gap-1">
               <TrendingUp className="w-3.5 h-3.5" /> Active Staff
             </p>
@@ -319,30 +348,6 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
             </div>
           )}
 
-
-          {/* Legend row with count badges */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {departmentTrendData.map((d) => (
-              <div
-                key={d.name}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold"
-                style={{
-                  borderColor: d.fill + '40',
-                  background: d.fill + '15',
-                  color: d.fill,
-                }}
-              >
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.fill }} />
-                {d.name}
-                <span
-                  className="ml-1 px-1.5 py-0.5 rounded-md text-white font-bold text-[10px] leading-tight"
-                  style={{ background: d.fill }}
-                >
-                  {d.employeeCount}
-                </span>
-              </div>
-            ))}
-          </div>
         </Card>
 
         {/* ── Attendance Overview ─────────────────────────────────────────── */}
@@ -372,7 +377,6 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
                 data={attendanceChartData}
                 margin={{ top: 10, right: 5, left: -25, bottom: 5 }}
                 barSize={12}
-                stackOffset="expand"
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
                 <XAxis
@@ -382,14 +386,17 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
                   tickLine={false}
                 />
                 <YAxis
-                  tickFormatter={(val) => `${Math.round(val * 100)}%`}
+                  tickFormatter={(val) => {
+                    const tot = totalDeptEmployees || 1;
+                    return `${Math.round((val / tot) * 100)}%`;
+                  }}
                   tick={{ fontSize: 11, fill: '#94a3b8' }}
                   axisLine={false}
                   tickLine={false}
-                  domain={[0, 1]}
+                  domain={[0, totalDeptEmployees || 1]}
                 />
                 <RechartsTooltip
-                  content={<CustomAttendanceTooltip />}
+                  content={<CustomAttendanceTooltip totalEmployees={totalDeptEmployees} />}
                   cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                 />
                 {/* 3nd present (bottom) */}

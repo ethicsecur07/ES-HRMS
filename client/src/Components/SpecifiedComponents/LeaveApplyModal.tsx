@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi } from '../../api_service/leaveApi';
 import { wfhApi } from '../../api_service/wfhApi';
 import { permissionApi } from '../../api_service/permissionApi';
+import { holidayCalendarApi } from '../../api_service/holidayCalendarApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { Modal } from '../WrapperComponents/Modal';
 import { Button } from '../WrapperComponents/Button';
 import { Input, Select, Textarea } from '../WrapperComponents/Input';
+import { formatDate } from '../../utils/formatters';
 import type { LeaveType } from '../../types';
 
 const baseSchema = z.object({
@@ -35,6 +37,13 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
 
+  const currentYear = new Date().getFullYear();
+  const { data: holidays = [] } = useQuery({
+    queryKey: ['holidays', currentYear],
+    queryFn: () => holidayCalendarApi.getAll(currentYear),
+    staleTime: 10 * 60 * 1000,
+  });
+
   const [selectedType, setSelectedType] = useState<LeaveType>('Casual Leave');
 
   const {
@@ -56,10 +65,16 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
     },
   });
 
+  const [holidayError, setHolidayError] = useState<string | null>(null);
+
   const watchType = watch('leaveType');
+  const watchStartDate = watch('startDate');
+  const watchEndDate = watch('endDate');
+
   React.useEffect(() => {
     setSelectedType(watchType as LeaveType);
-  }, [watchType]);
+    setHolidayError(null);
+  }, [watchType, watchStartDate, watchEndDate]);
 
   const applyMutation = useMutation({
     mutationFn: async (values: LeaveFormValues) => {
@@ -123,6 +138,30 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
   });
 
   const onSubmit = (values: LeaveFormValues) => {
+    // Check if the selected date or date range falls on a holiday
+    if (values.leaveType === 'Permission' || values.leaveType === 'WFH') {
+      const holiday = holidays.find(h => h.date === values.startDate);
+      if (holiday) {
+        setHolidayError(`You cannot request ${values.leaveType} on ${holiday.name} (${formatDate(holiday.date)}), which is a holiday.`);
+        return;
+      }
+    } else {
+      // For leaves, check each date in the range [startDate, endDate]
+      const rangeDates: string[] = [];
+      const curr = new Date(values.startDate);
+      const last = new Date(values.endDate);
+      while (curr <= last) {
+        rangeDates.push(curr.toISOString().split('T')[0]);
+        curr.setDate(curr.getDate() + 1);
+      }
+
+      const holiday = holidays.find(h => rangeDates.includes(h.date));
+      if (holiday) {
+        setHolidayError(`Your selected leave range includes ${holiday.name} (${formatDate(holiday.date)}), which is a holiday.`);
+        return;
+      }
+    }
+
     applyMutation.mutate(values);
   };
 
@@ -180,6 +219,13 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
           {...register('reason')}
           error={errors.reason?.message}
         />
+
+        {holidayError && (
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold space-y-1 mb-2 animate-in fade-in duration-200">
+            <p className="uppercase tracking-wider font-extrabold text-[10px]">Cannot Apply on Holiday</p>
+            <p className="font-semibold leading-relaxed">{holidayError}</p>
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-4 border-t border-border">
           <Button variant="outline" type="button" onClick={onClose}>

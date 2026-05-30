@@ -49,7 +49,7 @@ const getConversation = async (req, res) => {
                 }
             }
         }
-        res.status(200).json({ data: { messages } });
+        res.status(200).json({ success: true, data: { messages } });
     }
     catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -96,7 +96,7 @@ const sendMessage = async (req, res) => {
                 type: 'CHAT'
             });
         }
-        res.status(201).json({ data: message });
+        res.status(201).json({ success: true, data: message });
     }
     catch (error) {
         res.status(400).json({ success: false, message: error.message });
@@ -149,7 +149,7 @@ const sendFileMessage = async (req, res) => {
                 io.to(`user_${senderId}`).emit('receive_message', message);
             }
         }
-        res.status(201).json({ data: message });
+        res.status(201).json({ success: true, data: message });
     }
     catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -180,7 +180,7 @@ const markMessageRead = async (req, res) => {
                 readBy: userId,
             });
         }
-        res.status(200).json({ data: { message } });
+        res.status(200).json({ success: true, data: { message } });
     }
     catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -230,7 +230,7 @@ const getRecentConversations = async (req, res) => {
                 }
             }
         ]);
-        res.status(200).json({ recentConversations });
+        res.status(200).json({ success: true, data: { recentConversations } });
     }
     catch (error) {
         res.status(500).json({ success: false, message: error.message });

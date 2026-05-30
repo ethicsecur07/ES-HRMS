@@ -38,13 +38,15 @@ export const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermission();
   const isAdmin = user?.role === 'ADMIN';
+  const canViewSettings = hasPermission('SETTINGS', 'view');
+  const canEditSettings = hasPermission('SETTINGS', 'edit');
   const [activeSubTab, setActiveSubTab] = useState<'global' | 'sso'>('global');
 
   // --- SSO Configuration Queries & Mutations ---
   const { data: authProviders = [], isLoading: isAuthProvidersLoading } = useQuery({
     queryKey: ['authProviders'],
     queryFn: authV2Api.listProviders,
-    enabled: isAdmin && activeSubTab === 'sso',
+    enabled: canViewSettings && activeSubTab === 'sso',
   });
 
   const registerProviderMutation = useMutation({
@@ -340,7 +342,13 @@ export const SettingsPage: React.FC = () => {
   const { data: settings, isLoading: isSettingsLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: analyticsApi.getSettings,
-    enabled: isAdmin,
+    enabled: canViewSettings,
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments'],
+    queryFn: departmentApi.getAll,
+    enabled: canViewSettings,
   });
 
   const [companyName, setCompanyName] = useState('');
@@ -353,6 +361,7 @@ export const SettingsPage: React.FC = () => {
   const [newIP, setNewIP] = useState('');
   const [activeWorkdays, setActiveWorkdays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [loginApprovalRoles, setLoginApprovalRoles] = useState<string[]>(['ADMIN']);
+  const [visibleDepts, setVisibleDepts] = useState<string[]>([]);
 
   useEffect(() => {
     if (settings) {
@@ -367,6 +376,7 @@ export const SettingsPage: React.FC = () => {
         setActiveWorkdays(settings.activeWorkdays);
       }
       setLoginApprovalRoles(settings.loginApprovalRoles || ['ADMIN']);
+      setVisibleDepts(settings.visibleDepartments || ['Development', 'Digital Marketing', 'HR', 'BA', 'BDA']);
     }
   }, [settings]);
 
@@ -376,6 +386,7 @@ export const SettingsPage: React.FC = () => {
       // Invalidate both keys: 'settings' (used here) and 'companySettings' (used by PayrollSetupModal & AttendancePage)
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       queryClient.invalidateQueries({ queryKey: ['companySettings'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
       addToast('Settings Saved', 'Global settings updated successfully and policy updates broadcasted to all employees.', 'success');
     },
     onError: (err: any) => {
@@ -415,11 +426,12 @@ export const SettingsPage: React.FC = () => {
       officeWiFiIPs: officeIPs,
       activeWorkdays,
       loginApprovalRoles,
+      visibleDepartments: visibleDepts,
     });
   };
 
   const isLoading =
-    (isAdmin && isSettingsLoading) ||
+    (canViewSettings && isSettingsLoading) ||
     (activeSubTab === 'sso' && isAuthProvidersLoading);
 
   if (isLoading) {
@@ -446,7 +458,7 @@ export const SettingsPage: React.FC = () => {
 
       {/* Settings Navigation Tabs */}
       <div className="flex flex-wrap border-b border-border">
-        {isAdmin && (
+        {canViewSettings && (
           <>
             <button
               type="button"
@@ -514,13 +526,13 @@ export const SettingsPage: React.FC = () => {
 
 
       {/* Tab Panels */}
-      {activeSubTab === 'global' && isAdmin && (
+      {activeSubTab === 'global' && canViewSettings && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
           <Card className="space-y-6 border-l-4 border-l-primary shadow-md">
             <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">General Company Profile</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <Input label="Company Name *" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
-              <Input label="Admin Contact Email *" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
+              <Input label="Company Name *" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required disabled={!canEditSettings} />
+              <Input label="Admin Contact Email *" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required disabled={!canEditSettings} />
             </div>
           </Card>
 
@@ -542,9 +554,10 @@ export const SettingsPage: React.FC = () => {
                 <label key={day.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
                   <input 
                     type="checkbox" 
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary bg-background"
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
                     checked={activeWorkdays.includes(day.value)}
                     onChange={() => handleToggleWorkday(day.value)}
+                    disabled={!canEditSettings}
                   />
                   {day.label}
                 </label>
@@ -561,20 +574,24 @@ export const SettingsPage: React.FC = () => {
               Attendance check-ins are restricted to the IP addresses listed below. Logins from external networks will be flagged as remote and require an approved WFH override.
             </p>
 
-            <div className="flex items-center gap-3 max-w-md">
-              <Input placeholder="Add new IP address (e.g. 192.168.29.100)..." value={newIP} onChange={(e) => setNewIP(e.target.value)} />
-              <Button type="button" onClick={handleAddIP} className="flex-shrink-0 bg-foreground text-background hover:bg-foreground/90 shadow-md">
-                <Plus className="w-4 h-4 mr-1" /> Add IP
-              </Button>
-            </div>
+            {canEditSettings && (
+              <div className="flex items-center gap-3 max-w-md">
+                <Input placeholder="Add new IP address (e.g. 192.168.29.100)..." value={newIP} onChange={(e) => setNewIP(e.target.value)} />
+                <Button type="button" onClick={handleAddIP} className="flex-shrink-0 bg-foreground text-background hover:bg-foreground/90 shadow-md">
+                  <Plus className="w-4 h-4 mr-1" /> Add IP
+                </Button>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2 pt-2">
               {officeIPs.map((ip) => (
                 <div key={ip} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted border border-border text-xs font-mono font-bold text-foreground shadow-sm">
                   <span>{ip}</span>
-                  <button type="button" onClick={() => handleRemoveIP(ip)} className="text-primary hover:text-primary/80 transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {canEditSettings && (
+                    <button type="button" onClick={() => handleRemoveIP(ip)} className="text-primary hover:text-primary/80 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -583,10 +600,10 @@ export const SettingsPage: React.FC = () => {
           <Card className="space-y-6 border-l-4 border-l-muted-foreground shadow-md">
             <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Monthly Global Allowance Policies</h3>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-              <Input label="Casual Leave Limit (Days/Month) *" type="number" value={monthlyLeaveLimit} onChange={(e) => setMonthlyLeaveLimit(Number(e.target.value))} required />
-              <Input label="WFH Limit (Days/Month) *" type="number" value={monthlyWFHLimit} onChange={(e) => setMonthlyWFHLimit(Number(e.target.value))} required />
-              <Input label="Permission Limit (Hours/Month) *" type="number" value={monthlyPermissionHours} onChange={(e) => setMonthlyPermissionHours(Number(e.target.value))} required />
-              <Input label="Salary & Attendance Cycle Start Day (1-31) *" type="number" value={salaryCycleStartDay} onChange={(e) => setSalaryCycleStartDay(Number(e.target.value))} min={1} max={31} required />
+              <Input label="Casual Leave Limit (Days/Month) *" type="number" value={monthlyLeaveLimit} onChange={(e) => setMonthlyLeaveLimit(Number(e.target.value))} required disabled={!canEditSettings} />
+              <Input label="WFH Limit (Days/Month) *" type="number" value={monthlyWFHLimit} onChange={(e) => setMonthlyWFHLimit(Number(e.target.value))} required disabled={!canEditSettings} />
+              <Input label="Permission Limit (Hours/Month) *" type="number" value={monthlyPermissionHours} onChange={(e) => setMonthlyPermissionHours(Number(e.target.value))} required disabled={!canEditSettings} />
+              <Input label="Salary & Attendance Cycle Start Day (1-31) *" type="number" value={salaryCycleStartDay} onChange={(e) => setSalaryCycleStartDay(Number(e.target.value))} min={1} max={31} required disabled={!canEditSettings} />
             </div>
           </Card>
 
@@ -604,7 +621,7 @@ export const SettingsPage: React.FC = () => {
                 <label key={roleOption.value} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
                   <input 
                     type="checkbox" 
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
+                    className="w-4.5 h-4.5 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
                     checked={loginApprovalRoles.includes(roleOption.value)}
                     onChange={() => {
                       setLoginApprovalRoles(prev => 
@@ -613,6 +630,7 @@ export const SettingsPage: React.FC = () => {
                           : [...prev, roleOption.value]
                       );
                     }}
+                    disabled={!canEditSettings}
                   />
                   {roleOption.label}
                 </label>
@@ -620,18 +638,54 @@ export const SettingsPage: React.FC = () => {
             </div>
           </Card>
 
-          <div className="flex justify-end gap-4">
-            <Button type="submit" isLoading={updateSettingsMutation.isPending} size="lg" className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
-              <Save className="w-5 h-5 mr-2" />
-              SAVE ALL SETTINGS
-            </Button>
-          </div>
+          <Card className="space-y-6 border-l-4 border-l-indigo-500 shadow-md animate-in fade-in duration-300">
+            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Dashboard Department Visibility</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Select which departments will be visible in the "Department Employee Trends" bar chart on the main analytics dashboard. 
+              Unchecked departments will be hidden, and their counts will not be included in the total active employee count.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
+              {departments.map((dept) => {
+                const isChecked = visibleDepts.includes(dept.name);
+                return (
+                  <label key={dept._id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/60 hover:bg-muted/80 transition-colors cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-4.5 h-4.5 rounded border border-border text-primary focus:ring-primary bg-background cursor-pointer"
+                      checked={isChecked}
+                      onChange={() => {
+                        setVisibleDepts(prev =>
+                          prev.includes(dept.name)
+                            ? prev.filter(d => d !== dept.name)
+                            : [...prev, dept.name]
+                        );
+                      }}
+                      disabled={!canEditSettings}
+                    />
+                    <div>
+                      <span className="text-sm font-bold text-foreground">{dept.name}</span>
+                      <span className="block text-[10px] font-black uppercase text-muted-foreground mt-0.5">{dept.code}</span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </Card>
+
+          {canEditSettings && (
+            <div className="flex justify-end gap-4">
+              <Button type="submit" isLoading={updateSettingsMutation.isPending} size="lg" className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
+                <Save className="w-5 h-5 mr-2" />
+                SAVE ALL SETTINGS
+              </Button>
+            </div>
+          )}
         </form>
       )}
 
 
 
-      {activeSubTab === 'sso' && isAdmin && (
+      {activeSubTab === 'sso' && canViewSettings && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-card border border-border p-6 rounded-2xl shadow-sm">
             <div className="space-y-1">

@@ -2,13 +2,15 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { wfhApi } from '../../api_service/wfhApi';
+import { holidayCalendarApi } from '../../api_service/holidayCalendarApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { Modal } from '../WrapperComponents/Modal';
 import { Button } from '../WrapperComponents/Button';
 import { Input, Textarea } from '../WrapperComponents/Input';
+import { formatDate } from '../../utils/formatters';
 
 const wfhSchema = z.object({
   date: z.string().min(1, 'Date is required'),
@@ -28,10 +30,20 @@ export const WFHRequestModal: React.FC<WFHRequestModalProps> = ({ isOpen, onClos
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
 
+  const currentYear = new Date().getFullYear();
+  const { data: holidays = [] } = useQuery({
+    queryKey: ['holidays', currentYear],
+    queryFn: () => holidayCalendarApi.getAll(currentYear),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const [holidayError, setHolidayError] = React.useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<WFHFormValues>({
     resolver: zodResolver(wfhSchema),
@@ -41,6 +53,11 @@ export const WFHRequestModal: React.FC<WFHRequestModalProps> = ({ isOpen, onClos
       expectedTasks: '',
     },
   });
+
+  const watchDate = watch('date');
+  React.useEffect(() => {
+    setHolidayError(null);
+  }, [watchDate]);
 
   const applyMutation = useMutation({
     mutationFn: (values: WFHFormValues) =>
@@ -63,6 +80,11 @@ export const WFHRequestModal: React.FC<WFHRequestModalProps> = ({ isOpen, onClos
   });
 
   const onSubmit = (values: WFHFormValues) => {
+    const holiday = holidays.find(h => h.date === values.date);
+    if (holiday) {
+      setHolidayError(`You cannot request WFH on ${holiday.name} (${formatDate(holiday.date)}), which is a holiday.`);
+      return;
+    }
     applyMutation.mutate(values);
   };
 
@@ -97,6 +119,13 @@ export const WFHRequestModal: React.FC<WFHRequestModalProps> = ({ isOpen, onClos
           {...register('reason')}
           error={errors.reason?.message}
         />
+
+        {holidayError && (
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold space-y-1 mb-2 animate-in fade-in duration-200">
+            <p className="uppercase tracking-wider font-extrabold text-[10px]">Cannot Apply on Holiday</p>
+            <p className="font-semibold leading-relaxed">{holidayError}</p>
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-4 border-t border-border">
           <Button variant="outline" type="button" onClick={onClose}>

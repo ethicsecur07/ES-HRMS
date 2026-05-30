@@ -1,20 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { attendanceApi } from '../api_service/attendanceApi';
 import { employeeApi } from '../api_service/employeeApi';
 import { analyticsApi } from '../api_service/analyticsApi';
-import { axiosInstance } from '../api_service/axiosInstance';
 import { useAuthStore } from '../store/useAuthStore';
-import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
-import { Input, Select } from '../Components/WrapperComponents/Input';
+import { Input } from '../Components/WrapperComponents/Input';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
-import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Attendance } from '../types';
 import { exportAttendanceExcel } from '../utils/exportUtils';
 import { formatDate } from '../utils/formatters';
-import { CalendarCheck, Download, Wifi, Edit, AlertTriangle, Clock, Users, Laptop, Sun, Info, CalendarRange } from 'lucide-react';
+import { CalendarCheck, Download, Wifi, AlertTriangle, Clock, Users, Laptop, Sun, Info, CalendarRange } from 'lucide-react';
 import { holidayCalendarApi } from '../api_service/holidayCalendarApi';
 
 /** Mirrors PayrollPipeline.getCycleDates â€” computes start/end YYYY-MM-DD for the current cycle. */
@@ -69,17 +66,11 @@ function getCurrentCycleDates(startDay: number): { startStr: string; endStr: str
 
 export const AttendancePage: React.FC = () => {
   const { role } = useAuthStore();
-  const { addToast } = useNotificationStore();
-  const queryClient = useQueryClient();
 
   const [nameFilter, setNameFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
 
-  // Editing State
-  const [editingAttendance, setEditingAttendance] = useState<Attendance | null>(null);
-  const [loginTimeInput, setLoginTimeInput] = useState('');
-  const [logoutTimeInput, setLogoutTimeInput] = useState('');
-  const [statusInput, setStatusInput] = useState<Attendance['status']>('OFFICE');
+
 
   const { data: attendances, isLoading: attLoading } = useQuery({
     queryKey: ['attendances'],
@@ -141,62 +132,6 @@ export const AttendancePage: React.FC = () => {
       return matchName && matchDate;
     });
   }, [attendances, employees, nameFilter, dateFilter, cycleDates]);
-
-  const formatDt = (dtStr?: string) => {
-    if (!dtStr) return '';
-    try {
-      const d = new Date(dtStr);
-      const tzoffset = d.getTimezoneOffset() * 60000;
-      return new Date(d.getTime() - tzoffset).toISOString().slice(0, 16);
-    } catch {
-      return '';
-    }
-  };
-
-  const handleEditClick = (row: Attendance) => {
-    setEditingAttendance(row);
-    setLoginTimeInput(formatDt(row.loginTime));
-    setLogoutTimeInput(row.logoutTime ? formatDt(row.logoutTime) : '');
-    setStatusInput(row.status);
-  };
-
-  const updateMutation = useMutation({
-    mutationFn: (data: { id: string; loginTime?: string; logoutTime?: string; status?: string }) =>
-      attendanceApi.update(data.id, { loginTime: data.loginTime, logoutTime: data.logoutTime, status: data.status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendances'] });
-      addToast('Attendance Updated', 'Timestamps and status updated successfully.', 'success');
-      setEditingAttendance(null);
-    },
-    onError: (err: any) => {
-      addToast('Update Failed', err.message || 'Could not update attendance.', 'error');
-    },
-  });
-
-  const handleSaveEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingAttendance) return;
-    updateMutation.mutate({
-      id: editingAttendance._id,
-      loginTime: loginTimeInput ? new Date(loginTimeInput).toISOString() : undefined,
-      logoutTime: logoutTimeInput ? new Date(logoutTimeInput).toISOString() : undefined,
-      status: statusInput,
-    });
-  };
-
-  // Overtime approval mutation (Admin/HR only)
-  const approvOvertimeMutation = useMutation({
-    mutationFn: async (attendanceId: string) => {
-      await axiosInstance.post(`/attendance/overtime/approve/${attendanceId}`, { approved: true });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendances'] });
-      addToast('Overtime Approved', 'Overtime hours approved successfully.', 'success');
-    },
-    onError: (err: any) => {
-      addToast('Error', err.response?.data?.message || 'Could not approve overtime.', 'error');
-    },
-  });
 
   // Summary stats (Admin/HR today)
   const stats = useMemo(() => {
@@ -286,32 +221,6 @@ export const AttendancePage: React.FC = () => {
         </span>
       ),
     },
-    ...(role === 'ADMIN' || role === 'HR'
-      ? [
-          {
-            header: 'Actions',
-            accessor: (row: Attendance) => (
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleEditClick(row)}>
-                  <Edit className="w-4 h-4 mr-1" /> Edit
-                </Button>
-                {/* Overtime approval for records with pending overtime */}
-                {row.overtime && !row.overtime.isApproved && row.workingHours && row.workingHours > 8 && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => approvOvertimeMutation.mutate(row._id)}
-                    isLoading={approvOvertimeMutation.isPending}
-                    className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                  >
-                    âœ“ OT
-                  </Button>
-                )}
-              </div>
-            ),
-          },
-        ]
-      : []),
   ];
 
   if (attLoading || empLoading) {
@@ -478,48 +387,6 @@ export const AttendancePage: React.FC = () => {
         />
       </Card>
 
-      {/* Edit Attendance Modal */}
-      <Modal
-        isOpen={!!editingAttendance}
-        onClose={() => setEditingAttendance(null)}
-        title="Edit Attendance Record"
-        maxWidth="max-w-md"
-      >
-        <form onSubmit={handleSaveEdit} className="space-y-4 text-left">
-          <Input
-            label="Login Time *"
-            type="datetime-local"
-            value={loginTimeInput}
-            onChange={(e) => setLoginTimeInput(e.target.value)}
-            required
-          />
-          <Input
-            label="Logout Time"
-            type="datetime-local"
-            value={logoutTimeInput}
-            onChange={(e) => setLogoutTimeInput(e.target.value)}
-          />
-          <Select
-            label="Attendance Status *"
-            value={statusInput}
-            onChange={(e) => setStatusInput(e.target.value as any)}
-            options={[
-              { value: 'OFFICE', label: 'Office' },
-              { value: 'WFH', label: 'Work From Home' },
-              { value: 'HALF_DAY', label: 'Half Day' },
-              { value: 'LEAVE', label: 'On Leave' },
-            ]}
-          />
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" type="button" onClick={() => setEditingAttendance(null)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={updateMutation.isPending}>
-              Save Changes
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 };
