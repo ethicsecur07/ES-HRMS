@@ -229,7 +229,7 @@ export const EmployeeDetailsPage: React.FC = () => {
       header: 'Logout Time',
       accessor: (row: Attendance) => (
         <span className="font-mono text-xs">
-          {row.logoutTime ? new Date(row.logoutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In Progress'}
+          {row.status === 'LEAVE' ? '-' : row.logoutTime ? new Date(row.logoutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In Progress'}
         </span>
       ),
     },
@@ -259,7 +259,7 @@ export const EmployeeDetailsPage: React.FC = () => {
       header: 'Working Hours',
       accessor: (row: Attendance) => (
         <span className="text-xs font-mono font-bold text-primary">
-          {row.workingHours ? `${row.workingHours} hrs` : 'Calculating...'}
+          {row.status === 'LEAVE' ? '-' : row.workingHours ? `${row.workingHours} hrs` : 'Calculating...'}
         </span>
       ),
     },

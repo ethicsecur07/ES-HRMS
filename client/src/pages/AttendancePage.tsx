@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { attendanceApi } from '../api_service/attendanceApi';
 import { employeeApi } from '../api_service/employeeApi';
@@ -245,7 +245,7 @@ export const AttendancePage: React.FC = () => {
       header: 'Logout Time',
       accessor: (row: Attendance) => (
         <span className="font-mono text-xs">
-          {row.logoutTime ? new Date(row.logoutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In Progress'}
+          {row.status === 'LEAVE' ? '-' : row.logoutTime ? new Date(row.logoutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'In Progress'}
         </span>
       ),
     },
@@ -282,7 +282,7 @@ export const AttendancePage: React.FC = () => {
       header: 'Working Hours',
       accessor: (row: Attendance) => (
         <span className="text-xs font-mono font-bold text-primary">
-          {row.workingHours ? `${row.workingHours} hrs` : 'Calculating...'}
+          {row.status === 'LEAVE' ? '-' : row.workingHours ? `${row.workingHours} hrs` : 'Calculating...'}
         </span>
       ),
     },
