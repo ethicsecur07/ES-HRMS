@@ -41,6 +41,7 @@ import {
   getProjectAnalytics,
   getTeamWorkload,
   getDashboardSummary,
+  getEmployeeQuickStats,
 } from './projectAnalytics.controller.js';
 import { getEligibleEmployees } from './employeeEligibility.controller.js';
 import { rbacGuard } from '../../middlewares/rbacGuard.js';
@@ -56,6 +57,7 @@ router.post('/:projectId/invoice', authenticate as any, rbacGuard('PROJECTS', 'e
 
 // Project Analytics Dashboard Summaries
 router.get('/dashboard/summary', authenticate as any, rbacGuard('PROJECTS', 'view'), getDashboardSummary);
+router.get('/employee/quick-stats', authenticate as any, getEmployeeQuickStats);
 router.get('/:projectId/analytics', authenticate as any, rbacGuard('PROJECTS', 'view'), getProjectAnalytics);
 router.get('/:projectId/team-workload', authenticate as any, rbacGuard('PROJECTS', 'view'), getTeamWorkload);
 router.get('/:projectId/eligible-employees', authenticate as any, rbacGuard('PROJECTS', 'view'), getEligibleEmployees);

@@ -40,7 +40,8 @@ const branchSchema = new mongoose_1.Schema({
     organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     name: { type: String, required: true },
     code: { type: String, required: true, uppercase: true, trim: true },
-    location: { type: String, required: true },
+    address: { type: String },
+    timezone: { type: String },
     isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 branchSchema.index({ organizationId: 1, code: 1 }, { unique: true });

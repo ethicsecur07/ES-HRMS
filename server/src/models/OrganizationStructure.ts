@@ -6,7 +6,8 @@ export interface IBranch extends Document {
   organizationId: mongoose.Types.ObjectId;
   name: string;
   code: string;
-  location: string;
+  address?: string;
+  timezone?: string;
   isActive: boolean;
 }
 
@@ -15,7 +16,8 @@ const branchSchema = new Schema<IBranch>(
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     name: { type: String, required: true },
     code: { type: String, required: true, uppercase: true, trim: true },
-    location: { type: String, required: true },
+    address: { type: String },
+    timezone: { type: String },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

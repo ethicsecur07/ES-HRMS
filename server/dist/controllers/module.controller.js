@@ -7,6 +7,7 @@ exports.getModuleRoutes = exports.getEnabledModules = void 0;
 const Module_js_1 = require("../models/Module.js");
 const ModuleRoute_js_1 = require("../models/ModuleRoute.js");
 const OrganizationModule_js_1 = require("../models/OrganizationModule.js");
+const Permission_js_1 = require("../models/Permission.js");
 const mongoose_1 = __importDefault(require("mongoose"));
 // Hardcoded fallback data in case database is empty or seeding is needed
 const DEFAULT_MODULE_CODES = [
@@ -18,7 +19,6 @@ const DEFAULT_MODULE_CODES = [
     'TASKS',
     'PAYROLL',
     'FINANCE',
-    'EMPLOYEE_LIFECYCLE',
     'ORG_STRUCTURE',
     'WORKFLOW',
     'ADVANCED_ATTENDANCE',
@@ -41,7 +41,6 @@ const DEFAULT_MODULES = [
     { name: 'Task & Daily Reports', code: 'TASKS', version: '1.0.0', isActive: true },
     { name: 'Payroll & Compensation', code: 'PAYROLL', version: '1.0.0', isActive: true },
     { name: 'Finance & ERP Accounts', code: 'FINANCE', version: '1.0.0', isActive: true },
-    { name: 'Employee Lifecycle Tracking', code: 'EMPLOYEE_LIFECYCLE', version: '1.0.0', isActive: true },
     { name: 'Organization Structure', code: 'ORG_STRUCTURE', version: '1.0.0', isActive: true },
     { name: 'Workflow Approval Engine', code: 'WORKFLOW', version: '1.0.0', isActive: true },
     { name: 'Advanced Attendance Engine', code: 'ADVANCED_ATTENDANCE', version: '1.0.0', isActive: true },
@@ -63,7 +62,6 @@ const DEFAULT_ROUTES = [
     { moduleCode: 'TASKS', routePath: '/task-reports', displayName: 'Task & Daily Reports', order: 5 },
     { moduleCode: 'PAYROLL', routePath: '/payroll', displayName: 'Payroll', order: 6 },
     { moduleCode: 'FINANCE', routePath: '/finance', displayName: 'Finance & Maintenance', order: 7 },
-    { moduleCode: 'EMPLOYEE_LIFECYCLE', routePath: '/lifecycle', displayName: 'Employee Lifecycle', order: 8 },
     { moduleCode: 'ORG_STRUCTURE', routePath: '/organization', displayName: 'Organization Structure', order: 9 },
     { moduleCode: 'REPORTS', routePath: '/reports', displayName: 'Reports & Analytics', order: 10 },
     { moduleCode: 'AUDIT_LOGS', routePath: '/audit-logs', displayName: 'Audit Logs', order: 11 },
@@ -77,6 +75,11 @@ const DEFAULT_ROUTES = [
 ];
 // Helper to ensure core Modules and ModuleRoutes exist in database
 const ensureCoreModulesAndRoutes = async () => {
+    // Clean up any obsolete/removed core modules, routes, and permissions from database
+    await Module_js_1.Module.deleteMany({ code: 'EMPLOYEE_LIFECYCLE' });
+    await ModuleRoute_js_1.ModuleRoute.deleteMany({ moduleCode: 'EMPLOYEE_LIFECYCLE' });
+    await OrganizationModule_js_1.OrganizationModule.deleteMany({ moduleCode: 'EMPLOYEE_LIFECYCLE' });
+    await Permission_js_1.Permission.deleteMany({ module: 'EMPLOYEE_LIFECYCLE' });
     for (const m of DEFAULT_MODULES) {
         await Module_js_1.Module.updateOne({ code: m.code }, { $set: m }, { upsert: true });
     }

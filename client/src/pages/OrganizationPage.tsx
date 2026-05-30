@@ -1,26 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '../api_service/organizationApi';
 import type { Branch, Division, BusinessUnit, CostCenter } from '../api_service/organizationApi';
-import { employeeApi } from '../api_service/employeeApi';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input } from '../Components/WrapperComponents/Input';
 import { Modal } from '../Components/WrapperComponents/Modal';
-import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import { 
-  Network, 
   MapPin, 
   Layers, 
   Briefcase, 
   DollarSign, 
-  GitMerge, 
   PlusCircle, 
   Edit, 
-  Trash2, 
-  UserPlus, 
-  ChevronRight
+  Trash2
 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 
@@ -29,12 +23,10 @@ export const OrganizationPage: React.FC = () => {
   const { addToast } = useNotificationStore();
 
   // Navigation tabs
-  const [activeView, setActiveView] = useState<'ENTITIES' | 'HIERARCHY'>('ENTITIES');
   const [entityTab, setEntityTab] = useState<'BRANCH' | 'DIVISION' | 'BUSINESS_UNIT' | 'COST_CENTER'>('BRANCH');
 
   // Modal states
   const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
-  const [isHierarchyModalOpen, setIsHierarchyModalOpen] = useState(false);
   
   // Editing state
   const [editingEntity, setEditingEntity] = useState<{ id: string; type: typeof entityTab } | null>(null);
@@ -57,21 +49,10 @@ export const OrganizationPage: React.FC = () => {
   const [ccCode, setCcCode] = useState('');
   const [ccBudget, setCcBudget] = useState(0);
 
-  // Form states - Hierarchy
-  const [hierarchyEmployeeId, setHierarchyEmployeeId] = useState('');
-  const [hierarchyManagerId, setHierarchyManagerId] = useState('');
-  const [hierarchyHRBPId, setHierarchyHRBPId] = useState('');
-  const [hierarchyMatrixId1, setHierarchyMatrixId1] = useState('');
-
   // Queries
   const { data: orgData, isLoading: isOrgLoading } = useQuery({
     queryKey: ['orgStructure'],
     queryFn: () => organizationApi.getStructure(),
-  });
-
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => employeeApi.getAll().then(res => res.employees),
   });
 
   // Structural Mutations
@@ -199,20 +180,6 @@ export const OrganizationPage: React.FC = () => {
     onError: (err: any) => addToast('Error', err.message || 'Action failed.', 'error')
   });
 
-  // Reporting Hierarchy Mutation
-  const saveHierarchyMutation = useMutation({
-    mutationFn: (data: any) => organizationApi.saveHierarchy(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orgStructure'] });
-      addToast('Reporting Matrix Saved', 'Dotted/Direct manager reporting nodes updated.', 'success');
-      setIsHierarchyModalOpen(false);
-      resetHierarchyForm();
-    },
-    onError: (err: any) => {
-      addToast('Setup Failed', err.response?.data?.message || err.message || 'Setup failed.', 'error');
-    }
-  });
-
   const resetEntityForm = () => {
     setEditingEntity(null);
     setBranchName('');
@@ -227,13 +194,6 @@ export const OrganizationPage: React.FC = () => {
     setCcName('');
     setCcCode('');
     setCcBudget(0);
-  };
-
-  const resetHierarchyForm = () => {
-    setHierarchyEmployeeId('');
-    setHierarchyManagerId('');
-    setHierarchyHRBPId('');
-    setHierarchyMatrixId1('');
   };
 
   const handleEditEntity = (entity: any, type: typeof entityTab) => {
@@ -296,127 +256,7 @@ export const OrganizationPage: React.FC = () => {
     }
   };
 
-  const handleHierarchySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hierarchyEmployeeId) {
-      addToast('Validation Error', 'Select an employee first.', 'error');
-      return;
-    }
-    const matrix = [];
-    if (hierarchyMatrixId1) matrix.push(hierarchyMatrixId1);
-    
-    saveHierarchyMutation.mutate({
-      employeeId: hierarchyEmployeeId,
-      primaryManagerId: hierarchyManagerId || undefined,
-      matrixManagers: matrix,
-      hrBPId: hierarchyHRBPId || undefined
-    });
-  };
 
-  // Reporting Hierarchy view rows data
-  const hierarchyRows = useMemo(() => {
-    if (!employees) return [];
-    
-    // For each employee, look up their reporting hierarchy in orgData?.reporting
-    return employees.map(emp => {
-      const repInfo = orgData?.reporting?.find(r => {
-        const repEmpId = typeof r.employeeId === 'object' ? r.employeeId?._id : r.employeeId;
-        return repEmpId === emp._id;
-      });
-
-      return {
-        employee: emp,
-        primaryManager: repInfo?.primaryManagerId,
-        matrixManager: repInfo?.matrixManagers?.[0],
-        hrbp: repInfo?.hrBPId,
-        rawReporting: repInfo
-      };
-    });
-  }, [employees, orgData]);
-
-  const hierarchyColumns = [
-    {
-      header: 'Employee Staff',
-      accessor: (row: any) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-            {row.employee.fullName.charAt(0)}
-          </div>
-          <div>
-            <p className="font-bold text-xs text-foreground">{row.employee.fullName}</p>
-            <p className="text-[10px] text-muted-foreground font-mono">
-              {row.employee.employeeCode && !row.employee.employeeCode.startsWith('TEMP-EMP-') ? `${row.employee.employeeCode} | ` : ''}
-              {row.employee.designation}
-            </p>
-          </div>
-        </div>
-      )
-    },
-    {
-      header: 'Direct Reporting Line Manager',
-      accessor: (row: any) => (
-        row.primaryManager ? (
-          <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <ChevronRight className="w-3.5 h-3.5 text-emerald-500" />
-            <div>
-              <p className="font-bold text-[11px]">{row.primaryManager.firstName} {row.primaryManager.lastName}</p>
-              <p className="text-[9px] text-muted-foreground font-medium uppercase">{row.primaryManager.designation}</p>
-            </div>
-          </div>
-        ) : (
-          <span className="text-[10px] text-muted-foreground italic font-medium">None (Reporting CEO)</span>
-        )
-      )
-    },
-    {
-      header: 'Dotted Line Manager (Matrix)',
-      accessor: (row: any) => (
-        row.matrixManager ? (
-          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <GitMerge className="w-3.5 h-3.5 text-sky-500" />
-            <div>
-              <p className="font-bold text-[11px] text-foreground">{row.matrixManager.firstName} {row.matrixManager.lastName}</p>
-              <p className="text-[9px] text-muted-foreground uppercase">{row.matrixManager.designation}</p>
-            </div>
-          </div>
-        ) : (
-          <span className="text-[10px] text-muted-foreground italic">None</span>
-        )
-      )
-    },
-    {
-      header: 'HR BP Partner',
-      accessor: (row: any) => (
-        row.hrbp ? (
-          <span className="px-2 py-0.5 rounded bg-muted text-[10px] font-bold text-foreground border border-border">
-            {row.hrbp.firstName} {row.hrbp.lastName}
-          </span>
-        ) : (
-          <span className="text-[10px] text-muted-foreground italic">Unassigned</span>
-        )
-      )
-    },
-    {
-      header: 'Actions',
-      accessor: (row: any) => (
-        <Button 
-          size="sm" 
-          variant="outline" 
-          onClick={() => {
-            setHierarchyEmployeeId(row.employee._id);
-            setHierarchyManagerId(row.primaryManager?._id || '');
-            setHierarchyHRBPId(row.hrbp?._id || '');
-            setHierarchyMatrixId1(row.matrixManager?._id || '');
-            setIsHierarchyModalOpen(true);
-          }}
-          className="flex items-center gap-1 text-[11px] font-bold"
-        >
-          <Edit className="w-3.5 h-3.5" />
-          MANAGE LINES
-        </Button>
-      )
-    }
-  ];
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
@@ -424,50 +264,22 @@ export const OrganizationPage: React.FC = () => {
       {/* Banner */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border shadow-sm backdrop-blur-md">
         <div>
-          <h2 className="text-2xl font-bold text-foreground tracking-tight">Organization & reporting structures</h2>
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">Organization Structure</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Configure enterprise physical divisions, structural branches, business entities, cost centers, and visual direct/dotted line hierarchies.
+            Configure enterprise physical divisions, structural branches, business entities, and cost centers.
           </p>
         </div>
         
         <div className="flex gap-2">
-          {activeView === 'ENTITIES' ? (
-            <Button onClick={() => setIsEntityModalOpen(true)} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
-              <PlusCircle className="w-4 h-4 mr-1.5" />
-              ADD {entityTab.replace('_', ' ')}
-            </Button>
-          ) : (
-            <Button onClick={() => setIsHierarchyModalOpen(true)} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
-              <UserPlus className="w-4 h-4 mr-1.5" />
-              ASSIGN MANAGER
-            </Button>
-          )}
+          <Button onClick={() => setIsEntityModalOpen(true)} className="bg-primary text-white font-bold tracking-wider shadow-lg shadow-primary/20">
+            <PlusCircle className="w-4 h-4 mr-1.5" />
+            ADD {entityTab.replace('_', ' ')}
+          </Button>
         </div>
       </div>
 
-      {/* Primary view tabs */}
-      <div className="flex border-b border-border gap-2">
-        <button
-          onClick={() => setActiveView('ENTITIES')}
-          className={`py-3 px-4 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-            activeView === 'ENTITIES' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Corporate Entities (Branches, CC)
-        </button>
-        <button
-          onClick={() => setActiveView('HIERARCHY')}
-          className={`py-3 px-4 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-            activeView === 'HIERARCHY' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Reporting Matrix (CEO/Managers)
-        </button>
-      </div>
-
       {/* ENTITIES SUBVIEW */}
-      {activeView === 'ENTITIES' && (
-        <div className="space-y-6">
+      <div className="space-y-6">
           {/* Sub-tabs for structural categories */}
           <div className="flex bg-muted/60 p-1.5 rounded-xl border border-border max-w-lg gap-1">
             {(['BRANCH', 'DIVISION', 'BUSINESS_UNIT', 'COST_CENTER'] as const).map(tab => (
@@ -589,31 +401,6 @@ export const OrganizationPage: React.FC = () => {
             </div>
           )}
         </div>
-      )}
-
-      {/* HIERARCHY SUBVIEW */}
-      {activeView === 'HIERARCHY' && (
-        <Card className="p-6 border-border bg-card shadow-sm space-y-4">
-          <div className="flex justify-between items-center pb-4 border-b border-border/60">
-            <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5">
-              <Network className="w-4.5 h-4.5 text-primary" />
-              Enterprise Reporting Line Grid
-            </h3>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase bg-muted px-2 py-1 rounded">
-              Direct & dotted reporting lines
-            </span>
-          </div>
-
-          {isOrgLoading ? (
-            <div className="animate-pulse h-40 bg-muted/10 border-border" />
-          ) : (
-            <TableWrapper
-              columns={hierarchyColumns}
-              data={hierarchyRows}
-            />
-          )}
-        </Card>
-      )}
 
       {/* ENTITY CREATE/EDIT MODAL */}
       <Modal isOpen={isEntityModalOpen} onClose={() => setIsEntityModalOpen(false)} title={editingEntity ? `Edit ${entityTab.replace('_', ' ')}` : `Create ${entityTab.replace('_', ' ')}`} maxWidth="max-w-md">
@@ -693,90 +480,7 @@ export const OrganizationPage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* HIERARCHY MODAL */}
-      <Modal isOpen={isHierarchyModalOpen} onClose={() => setIsHierarchyModalOpen(false)} title="Manage Reporting Structure" maxWidth="max-w-md">
-        <form onSubmit={handleHierarchySubmit} className="space-y-4 px-4 pb-4">
-          
-          {/* Employee display */}
-          <div className="flex flex-col">
-            <label className="text-xs font-bold text-foreground mb-1">Employee Staff *</label>
-            <select
-              required
-              disabled={!!hierarchyEmployeeId}
-              value={hierarchyEmployeeId}
-              onChange={(e) => setHierarchyEmployeeId(e.target.value)}
-              className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-75"
-            >
-              <option value="">-- Choose Employee --</option>
-              {employees?.map(emp => (
-                <option key={emp._id} value={emp._id}>
-                  {emp.fullName} {emp.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') ? `(${emp.employeeCode})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
 
-          {/* Primary Manager */}
-          <div className="flex flex-col">
-            <label className="text-xs font-bold text-foreground mb-1 font-semibold flex items-center gap-1 text-emerald-500">
-              <ChevronRight className="w-3.5 h-3.5" />
-              Primary Reporting Line Manager
-            </label>
-            <select
-              value={hierarchyManagerId}
-              onChange={(e) => setHierarchyManagerId(e.target.value)}
-              className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-            >
-              <option value="">None (Reports to CEO)</option>
-              {employees?.filter(e => e._id !== hierarchyEmployeeId).map(emp => (
-                <option key={emp._id} value={emp._id}>{emp.fullName} ({emp.designation})</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Dotted Line Manager */}
-          <div className="flex flex-col">
-            <label className="text-xs font-bold text-foreground mb-1 flex items-center gap-1 text-sky-500">
-              <GitMerge className="w-3.5 h-3.5" />
-              Dotted Line Manager (Matrix)
-            </label>
-            <select
-              value={hierarchyMatrixId1}
-              onChange={(e) => setHierarchyMatrixId1(e.target.value)}
-              className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-            >
-              <option value="">None</option>
-              {employees?.filter(e => e._id !== hierarchyEmployeeId).map(emp => (
-                <option key={emp._id} value={emp._id}>{emp.fullName} ({emp.designation})</option>
-              ))}
-            </select>
-          </div>
-
-          {/* HR BP */}
-          <div className="flex flex-col">
-            <label className="text-xs font-bold text-foreground mb-1">Assigned HR Business Partner (HRBP)</label>
-            <select
-              value={hierarchyHRBPId}
-              onChange={(e) => setHierarchyHRBPId(e.target.value)}
-              className="w-full h-10 px-3 border border-border rounded-lg bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-            >
-              <option value="">Unassigned</option>
-              {employees?.filter(e => ((e.department as string) === 'HR' || e.designation.includes('HR')) && e._id !== hierarchyEmployeeId).map(emp => (
-                <option key={emp._id} value={emp._id}>{emp.fullName} ({emp.designation})</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" type="button" onClick={() => setIsHierarchyModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={saveHierarchyMutation.isPending}>
-              Commit Line Matrix
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
     </div>
   );

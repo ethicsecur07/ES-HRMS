@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
-import { selfServiceApi, type ReimbursementClaim, type TaxDeclaration, type AttendanceCorrectionRequest } from '../api_service/selfServiceApi';
+import { selfServiceApi, type ReimbursementClaim, type AttendanceCorrectionRequest } from '../api_service/selfServiceApi';
 import { employeeApi } from '../api_service/employeeApi';
 import { authApi } from '../api_service/authApi';
 import { Card } from '../Components/WrapperComponents/Card';
@@ -13,7 +13,6 @@ import { Modal } from '../Components/WrapperComponents/Modal';
 import { formatDate } from '../utils/formatters';
 import {
   Receipt,
-  FileSpreadsheet,
   CalendarDays,
   Plus,
   Upload,
@@ -29,8 +28,8 @@ export const SelfServicePage: React.FC = () => {
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
 
-  // Tab State: 'reimbursement' | 'tax' | 'attendance'
-  const [activeTab, setActiveTab] = useState<'reimbursement' | 'tax' | 'attendance'>('reimbursement');
+  // Tab State: 'reimbursement' | 'attendance'
+  const [activeTab, setActiveTab] = useState<'reimbursement' | 'attendance'>('reimbursement');
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -41,9 +40,8 @@ export const SelfServicePage: React.FC = () => {
 
   // Modal states
   const [showReimbModal, setShowReimbModal] = useState(false);
-  const [showTaxModal, setShowTaxModal] = useState(false);
   const [showAttModal, setShowAttModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState<{ id: string; type: 'reimbursement' | 'tax' | 'attendance'; approve: boolean } | null>(null);
+  const [showApproveModal, setShowApproveModal] = useState<{ id: string; type: 'reimbursement' | 'attendance'; approve: boolean } | null>(null);
 
   // File uploading states
   const [isUploading, setIsUploading] = useState(false);
@@ -55,15 +53,6 @@ export const SelfServicePage: React.FC = () => {
     category: 'TRAVEL' as ReimbursementClaim['category'],
     description: '',
     receiptUrl: '',
-    employeeId: '',
-  });
-
-  // Form States - Tax Declaration
-  const [taxForm, setTaxForm] = useState({
-    financialYear: '2025-2026',
-    declarationSection: '80C' as TaxDeclaration['declarationSection'],
-    declaredAmount: '',
-    proofUrl: '',
     employeeId: '',
   });
 
@@ -94,13 +83,6 @@ export const SelfServicePage: React.FC = () => {
     }),
   });
 
-  const { data: taxDeclarations, isLoading: taxLoading } = useQuery({
-    queryKey: ['taxDeclarations', empFilter],
-    queryFn: () => selfServiceApi.getTaxDeclarations({
-      employeeId: role === 'EMPLOYEE' ? undefined : empFilter || undefined
-    }),
-  });
-
   const { data: attendanceCorrections, isLoading: attLoading } = useQuery({
     queryKey: ['attendanceCorrections', empFilter, statusFilter],
     queryFn: () => selfServiceApi.getAttendanceCorrections({
@@ -110,16 +92,12 @@ export const SelfServicePage: React.FC = () => {
   });
 
   // Helper to handle general file uploading
-  const handleFileUpload = async (file: File, type: 'reimb' | 'tax') => {
+  const handleFileUpload = async (file: File) => {
     setIsUploading(true);
     try {
       const url = await authApi.uploadImage(file);
       addToast('File Uploaded Successfully', 'The file has been uploaded to secure server storage.', 'success');
-      if (type === 'reimb') {
-        setReimbForm(prev => ({ ...prev, receiptUrl: url }));
-      } else {
-        setTaxForm(prev => ({ ...prev, proofUrl: url }));
-      }
+      setReimbForm(prev => ({ ...prev, receiptUrl: url }));
     } catch (err: any) {
       addToast('Upload Failed', err.message || 'Could not upload file.', 'error');
     } finally {
@@ -175,25 +153,6 @@ export const SelfServicePage: React.FC = () => {
     }
   });
 
-  const createTaxMutation = useMutation({
-    mutationFn: selfServiceApi.createTaxDeclaration,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['taxDeclarations'] });
-      addToast('Declaration Filed', 'Your tax declaration has been recorded.', 'success');
-      setShowTaxModal(false);
-      setTaxForm({
-        financialYear: '2025-2026',
-        declarationSection: '80C',
-        declaredAmount: '',
-        proofUrl: '',
-        employeeId: '',
-      });
-    },
-    onError: (err: any) => {
-      addToast('Submission Failed', err.message || 'Could not save declaration.', 'error');
-    }
-  });
-
   const createAttMutation = useMutation({
     mutationFn: selfServiceApi.createAttendanceCorrection,
     onSuccess: () => {
@@ -228,20 +187,6 @@ export const SelfServicePage: React.FC = () => {
     }
   });
 
-  const approveTaxMutation = useMutation({
-    mutationFn: ({ id, status, rejectionReason }: { id: string; status: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
-      selfServiceApi.approveTaxDeclaration(id, status, rejectionReason),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['taxDeclarations'] });
-      addToast('Action Completed', 'Tax declaration status updated successfully.', 'success');
-      setShowApproveModal(null);
-      setRejectionReason('');
-    },
-    onError: (err: any) => {
-      addToast('Action Failed', err.message || 'Could not update declaration status.', 'error');
-    }
-  });
-
   const approveAttMutation = useMutation({
     mutationFn: ({ id, status, rejectionReason }: { id: string; status: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
       selfServiceApi.approveAttendanceCorrection(id, status, rejectionReason),
@@ -265,8 +210,6 @@ export const SelfServicePage: React.FC = () => {
 
     if (type === 'reimbursement') {
       approveReimbMutation.mutate({ id, status, rejectionReason });
-    } else if (type === 'tax') {
-      approveTaxMutation.mutate({ id, status, rejectionReason });
     } else if (type === 'attendance') {
       approveAttMutation.mutate({ id, status, rejectionReason });
     }
@@ -352,68 +295,7 @@ export const SelfServicePage: React.FC = () => {
         }])
   ];
 
-  // Table Columns - Tax Declaration
-  const taxColumns = [
-    ...(isHRAdmin
-      ? [{
-          header: 'Employee',
-          accessor: (row: TaxDeclaration) => {
-            const emp = typeof row.employeeId === 'object' ? row.employeeId : null;
-            return (
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-xs text-foreground block">{emp?.fullName || 'Employee'}</span>
-                {emp?.employeeCode && !emp.employeeCode.startsWith('TEMP-EMP-') && (
-                  <span className="text-[10px] text-muted-foreground font-mono">({emp.employeeCode})</span>
-                )}
-              </div>
-            );
-          }
-        }]
-      : []),
-    { header: 'FY', accessor: (row: TaxDeclaration) => <span className="font-mono text-xs">{row.financialYear}</span> },
-    { header: 'Section', accessor: (row: TaxDeclaration) => <span className="font-bold text-xs">{row.declarationSection}</span> },
-    { header: 'Declared Amount', accessor: (row: TaxDeclaration) => <span className="font-bold font-mono text-xs text-primary">${row.declaredAmount.toLocaleString()}</span> },
-    {
-      header: 'Proof',
-      accessor: (row: TaxDeclaration) =>
-        row.proofUrl ? (
-          <a href={row.proofUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline text-xs flex items-center gap-1">
-            <Eye className="w-3.5 h-3.5" /> View Proof
-          </a>
-        ) : (
-          <span className="text-muted-foreground text-xs italic">No document</span>
-        )
-    },
-    { header: 'Status', accessor: (row: TaxDeclaration) => getStatusBadge(row.status) },
-    ...(isHRAdmin
-      ? [{
-          header: 'Actions',
-          accessor: (row: TaxDeclaration) =>
-            row.status === 'PENDING' ? (
-              <div className="flex items-center gap-1.5">
-                <Button size="sm" variant="outline" className="px-2.5 py-1 text-[11px] h-auto border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10" onClick={() => setShowApproveModal({ id: row._id, type: 'tax', approve: true })}>
-                  Approve
-                </Button>
-                <Button size="sm" variant="outline" className="px-2.5 py-1 text-[11px] h-auto border-rose-500/30 text-rose-500 hover:bg-rose-500/10" onClick={() => setShowApproveModal({ id: row._id, type: 'tax', approve: false })}>
-                  Reject
-                </Button>
-              </div>
-            ) : row.status === 'REJECTED' && row.rejectionReason ? (
-              <span className="text-[10px] text-rose-400 italic truncate max-w-[120px] block" title={row.rejectionReason}>Reason: {row.rejectionReason}</span>
-            ) : (
-              <span className="text-[10px] text-muted-foreground italic">Processed</span>
-            )
-        }]
-      : [{
-          header: 'Rejection Details',
-          accessor: (row: TaxDeclaration) =>
-            row.status === 'REJECTED' && row.rejectionReason ? (
-              <span className="text-xs text-rose-400 italic">{row.rejectionReason}</span>
-            ) : (
-              <span className="text-xs text-muted-foreground italic">-</span>
-            )
-        }])
-  ];
+
 
   // Table Columns - Attendance Correction
   const attColumns = [
@@ -498,11 +380,6 @@ export const SelfServicePage: React.FC = () => {
               <Plus className="w-4 h-4" /> New Claim
             </Button>
           )}
-          {activeTab === 'tax' && (
-            <Button onClick={() => setShowTaxModal(true)} className="flex items-center gap-1.5 shadow-lg">
-              <Plus className="w-4 h-4" /> New Declaration
-            </Button>
-          )}
           {activeTab === 'attendance' && (
             <Button onClick={() => setShowAttModal(true)} className="flex items-center gap-1.5 shadow-lg">
               <Plus className="w-4 h-4" /> Request Correction
@@ -523,17 +400,6 @@ export const SelfServicePage: React.FC = () => {
         >
           <Receipt className="w-4 h-4" />
           Reimbursements
-        </button>
-        <button
-          onClick={() => { setActiveTab('tax'); setStatusFilter(''); }}
-          className={`flex items-center gap-2 px-5 py-3 border-b-2 font-semibold text-sm transition-all duration-200 ${
-            activeTab === 'tax'
-              ? 'border-primary text-primary bg-primary/5'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4" />
-          Tax Declarations
         </button>
         <button
           onClick={() => { setActiveTab('attendance'); setStatusFilter(''); }}
@@ -568,26 +434,23 @@ export const SelfServicePage: React.FC = () => {
               </select>
             </div>
             
-            {activeTab !== 'tax' && (
-              <div className="w-full sm:w-64">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  <option value="">Filter by status (Show All)...</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="APPROVED">Approved</option>
-                  <option value="REJECTED">Rejected</option>
-                </select>
-              </div>
-            )}
+            <div className="w-full sm:w-64">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <option value="">Filter by status (Show All)...</option>
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </div>
           </div>
         )}
 
         {/* Display loading cards */}
         {((activeTab === 'reimbursement' && reimbLoading) ||
-          (activeTab === 'tax' && taxLoading) ||
           (activeTab === 'attendance' && attLoading)) ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -599,12 +462,6 @@ export const SelfServicePage: React.FC = () => {
               <TableWrapper
                 columns={reimbColumns}
                 data={reimbursements || []}
-              />
-            )}
-            {activeTab === 'tax' && (
-              <TableWrapper
-                columns={taxColumns}
-                data={taxDeclarations || []}
               />
             )}
             {activeTab === 'attendance' && (
@@ -711,7 +568,7 @@ export const SelfServicePage: React.FC = () => {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file, 'reimb');
+                    if (file) handleFileUpload(file);
                   }}
                   disabled={isUploading}
                 />
@@ -748,111 +605,7 @@ export const SelfServicePage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Modal - New Tax Declaration */}
-      <Modal
-        isOpen={showTaxModal}
-        onClose={() => setShowTaxModal(false)}
-        title="File Tax Investment Declaration"
-        maxWidth="max-w-md"
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createTaxMutation.mutate({
-              financialYear: taxForm.financialYear,
-              declarationSection: taxForm.declarationSection,
-              declaredAmount: parseFloat(taxForm.declaredAmount),
-              proofUrl: taxForm.proofUrl || undefined,
-              employeeId: isHRAdmin ? taxForm.employeeId || undefined : undefined
-            });
-          }}
-          className="space-y-4"
-        >
-          {isHRAdmin && (
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground uppercase">Target Employee *</label>
-              <select
-                value={taxForm.employeeId}
-                onChange={(e) => setTaxForm(p => ({ ...p, employeeId: e.target.value }))}
-                className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-                required
-              >
-                <option value="">Select Employee...</option>
-                {employees?.map((emp) => (
-                  <option key={emp._id} value={emp._id}>{emp.fullName}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Financial Year *"
-              value={taxForm.financialYear}
-              onChange={(e) => setTaxForm(p => ({ ...p, financialYear: e.target.value }))}
-              options={[
-                { value: '2024-2025', label: '2024 - 2025' },
-                { value: '2025-2026', label: '2025 - 2026' },
-                { value: '2026-2027', label: '2026 - 2027' },
-              ]}
-            />
-            <Select
-              label="Declaration Section *"
-              value={taxForm.declarationSection}
-              onChange={(e) => setTaxForm(p => ({ ...p, declarationSection: e.target.value as any }))}
-              options={[
-                { value: '80C', label: 'Section 80C' },
-                { value: '80D', label: 'Section 80D (Medical)' },
-                { value: 'HRA', label: 'House Rent Allowance' },
-                { value: 'SECTION_24', label: 'Section 24 (Interest)' },
-                { value: 'OTHER', label: 'Other Sections' },
-              ]}
-            />
-          </div>
-
-          <Input
-            label="Declared Amount ($) *"
-            type="number"
-            placeholder="0"
-            value={taxForm.declaredAmount}
-            onChange={(e) => setTaxForm(p => ({ ...p, declaredAmount: e.target.value }))}
-            required
-          />
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-muted-foreground uppercase block">Proof Document *</label>
-            <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border hover:bg-muted text-xs font-medium cursor-pointer transition-colors w-max">
-              <Upload className="w-4 h-4 text-muted-foreground" />
-              <span>{isUploading ? 'Uploading...' : taxForm.proofUrl ? 'Change Document' : 'Upload Proof PDF/Image'}</span>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileUpload(file, 'tax');
-                }}
-                disabled={isUploading}
-              />
-            </label>
-
-            {taxForm.proofUrl && (
-              <p className="text-[10px] text-emerald-500 font-medium truncate">
-                Attached: {taxForm.proofUrl}
-              </p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" type="button" onClick={() => setShowTaxModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={createTaxMutation.isPending} disabled={isUploading || !taxForm.proofUrl}>
-              File Declaration
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Modal - New Attendance Correction */}
       <Modal
@@ -986,7 +739,7 @@ export const SelfServicePage: React.FC = () => {
             <Button
               type="submit"
               className={showApproveModal?.approve ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}
-              isLoading={approveReimbMutation.isPending || approveTaxMutation.isPending || approveAttMutation.isPending}
+              isLoading={approveReimbMutation.isPending || approveAttMutation.isPending}
             >
               {showApproveModal?.approve ? 'Yes, Approve' : 'Submit Rejection'}
             </Button>

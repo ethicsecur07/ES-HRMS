@@ -8,6 +8,7 @@
 
 import mongoose from 'mongoose';
 import { Leave } from '../../../models/Leave.js';
+import { Attendance } from '../../../models/Attendance.js';
 import { Employee } from '../../../models/Employee.js';
 import { LeavePolicyEngine } from '../policies/LeavePolicyEngine.js';
 import { LeaveBalanceService } from './LeaveBalanceService.js';
@@ -258,6 +259,30 @@ export class LeaveService {
       leave.approvedBy = new mongoose.Types.ObjectId(approverId);
       await leave.save({ session });
 
+      // If this was an auto-applied late check-in leave, update/create the attendance record with LEAVE status
+      if (leave.reason?.startsWith('Auto-applied: Late check-in')) {
+        await Attendance.findOneAndUpdate(
+          {
+            organizationId: leave.organizationId,
+            employeeId: leave.employeeId,
+            date: leave.startDate,
+          },
+          {
+            $set: {
+              status: 'LEAVE',
+              isLate: false, // Approved leave means they are not penalized for late check-in
+              overrideReason: 'Late check-in – Casual Leave approved by HR',
+            },
+            $setOnInsert: {
+              loginTime: leave.appliedAt || new Date(),
+              ipAddress: '127.0.0.1',
+              deviceInfo: 'SYSTEM - AUTO LEAVE',
+            }
+          },
+          { upsert: true, new: true, session }
+        );
+      }
+
       await session.commitTransaction();
 
       await createAuditLog(
@@ -300,6 +325,48 @@ export class LeaveService {
     leave.approvedBy = new mongoose.Types.ObjectId(approverId);
     leave.rejectionReason = rejectionReason;
     await leave.save();
+
+    // If this was an auto-applied late check-in leave, create/upsert an attendance record with LATE status
+    if (leave.reason?.startsWith('Auto-applied: Late check-in')) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const leaveDateStr = leave.startDate;
+      
+      const loginTime = leave.appliedAt || new Date();
+      let logoutTime: Date | undefined = undefined;
+      let workingHours: number | undefined = undefined;
+
+      if (leaveDateStr < todayStr) {
+        logoutTime = new Date(loginTime);
+        logoutTime.setHours(19, 0, 0, 0);
+        workingHours = parseFloat(((logoutTime.getTime() - loginTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
+        if (workingHours <= 0) {
+          logoutTime.setTime(loginTime.getTime() + 9 * 60 * 60 * 1000);
+          workingHours = 9;
+        }
+      }
+
+      await Attendance.findOneAndUpdate(
+        {
+          organizationId: leave.organizationId,
+          employeeId: leave.employeeId,
+          date: leaveDateStr,
+        },
+        {
+          $set: {
+            status: 'OFFICE',
+            isLate: true,
+            overrideReason: 'Late check-in – Casual Leave rejected by HR',
+            loginTime,
+            ...(logoutTime ? { logoutTime, workingHours } : {}),
+          },
+          $setOnInsert: {
+            ipAddress: '127.0.0.1',
+            deviceInfo: 'SYSTEM - AUTO REJECT LATE',
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
 
     await createAuditLog(
       'LEAVE_REJECTED',

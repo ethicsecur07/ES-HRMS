@@ -19,6 +19,7 @@ const User_js_1 = require("../../models/User.js");
 const LeaveAccrualService_js_1 = require("./services/LeaveAccrualService.js");
 const LeaveAnalyticsService_js_1 = require("./services/LeaveAnalyticsService.js");
 const LeavePolicyEngine_js_1 = require("./policies/LeavePolicyEngine.js");
+const LeaveBalanceService_js_1 = require("./services/LeaveBalanceService.js");
 const auditLog_service_js_1 = require("../../services/auditLog.service.js");
 /**
  * GET /api/v2/leave/summary
@@ -237,7 +238,7 @@ const getMyLeaveBalances = async (req, res, next) => {
             return;
         }
         const [balances, policies] = await Promise.all([
-            LeaveBalance_js_1.LeaveBalance.find({ organizationId: orgId, employeeId: empId }),
+            LeaveBalanceService_js_1.LeaveBalanceService.ensureBalancesExist(orgId, empId),
             LeavePolicy_js_1.LeavePolicy.find({ organizationId: orgId, isActive: true }),
         ]);
         // Enrich each balance with policy data for the frontend
@@ -273,7 +274,7 @@ const getEmployeeLeaveBalances = async (req, res, next) => {
             res.status(401).json({ message: 'Unauthorized.' });
             return;
         }
-        const balances = await LeaveBalance_js_1.LeaveBalance.find({ organizationId: orgId, employeeId: empId });
+        const balances = await LeaveBalanceService_js_1.LeaveBalanceService.ensureBalancesExist(orgId, empId);
         res.json({ balances, employeeId: empId });
     }
     catch (err) {

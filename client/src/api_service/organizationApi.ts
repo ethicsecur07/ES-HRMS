@@ -33,20 +33,12 @@ export interface CostCenter {
   isActive: boolean;
 }
 
-export interface ReportingHierarchy {
-  _id: string;
-  employeeId: any; // populated employee
-  primaryManagerId?: any; // populated employee
-  matrixManagers: any[]; // populated employees
-  hrBPId?: any; // populated employee
-}
 
 export interface OrgStructureData {
   branches: Branch[];
   divisions: Division[];
   businessUnits: BusinessUnit[];
   costCenters: CostCenter[];
-  reporting: ReportingHierarchy[];
 }
 
 export const organizationApi = {
@@ -110,15 +102,5 @@ export const organizationApi = {
     const res = await axiosInstance.delete<{ message: string }>(`/organization/cost-center/${id}`);
     return res.data;
   },
-
-  // Reporting Hierarchy
-  saveHierarchy: async (data: {
-    employeeId: string;
-    primaryManagerId?: string;
-    matrixManagers?: string[];
-    hrBPId?: string;
-  }) => {
-    const res = await axiosInstance.post<ReportingHierarchy>('/organization/hierarchy', data);
-    return res.data;
-  },
 };
+

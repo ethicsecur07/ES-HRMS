@@ -38,6 +38,10 @@ export const projectApi = {
     const res = await axiosInstance.get(`${BASE_URL}/dashboard/summary`);
     return res.data;
   },
+  getEmployeeQuickStats: async () => {
+    const res = await axiosInstance.get(`${BASE_URL}/employee/quick-stats`);
+    return res.data;
+  },
   getEligibleEmployees: async (projectId: string) => {
     const res = await axiosInstance.get(`${BASE_URL}/${projectId}/eligible-employees`);
     return res.data;
