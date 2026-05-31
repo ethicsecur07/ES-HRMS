@@ -12,6 +12,7 @@ import { documentApi } from '../api_service/documentApi';
 import { axiosInstance } from '../api_service/axiosInstance';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { ProfileSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Select } from '../Components/WrapperComponents/Input';
@@ -81,11 +82,7 @@ export const EmployeeDetailsPage: React.FC = () => {
   });
 
   if (empLoading || leavesLoading || wfhLoading || permsLoading || tasksLoading || attLoading || docsLoading) {
-    return (
-      <Card className="animate-pulse h-96 bg-muted/20">
-        <div />
-      </Card>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!employee) {

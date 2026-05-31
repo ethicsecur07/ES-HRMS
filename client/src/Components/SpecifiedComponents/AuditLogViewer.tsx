@@ -6,6 +6,8 @@ import { TableWrapper } from '../WrapperComponents/TableWrapper';
 import type { AuditLog } from '../../types';
 import { ShieldCheck } from 'lucide-react';
 
+import { TableSkeleton } from '../WrapperComponents/Skeleton';
+
 export const AuditLogViewer: React.FC = () => {
   const { data: auditLogs, isLoading } = useQuery({
     queryKey: ['auditLogs'],
@@ -52,11 +54,7 @@ export const AuditLogViewer: React.FC = () => {
   ];
 
   if (isLoading) {
-    return (
-      <Card className="animate-pulse h-64 bg-muted/20">
-        <div />
-      </Card>
-    );
+    return <TableSkeleton />;
   }
 
   return (

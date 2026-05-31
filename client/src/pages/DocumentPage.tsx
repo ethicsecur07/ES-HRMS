@@ -7,6 +7,7 @@ import { employeeApi } from '../api_service/employeeApi';
 import { payrollApi } from '../api_service/payrollApi';
 import { assetApi } from '../api_service/assetApi';
 import { authApi } from '../api_service/authApi';
+import { TableSkeleton, CardGridSkeleton, Skeleton } from '../Components/WrapperComponents/Skeleton';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input } from '../Components/WrapperComponents/Input';
@@ -54,7 +55,7 @@ export const DocumentPage: React.FC = () => {
   const [newDocName, setNewDocName] = useState('');
 
   // 1. Fetch Employees (for Sidebar)
-  const { data: employeesData } = useQuery({
+  const { data: employeesData, isLoading: isEmployeesLoading } = useQuery({
     queryKey: ['employees-sidebar'],
     queryFn: () => employeeApi.getAll({ limit: 1000 }),
     enabled: isHRAdmin,
@@ -77,7 +78,7 @@ export const DocumentPage: React.FC = () => {
   }, [employees, selectedEmpId]);
 
   // Fetch active employee details if viewing as self (since employees list is only for HRAdmin)
-  const { data: myEmployeeDetails } = useQuery({
+  const { data: myEmployeeDetails, isLoading: isMyEmpLoading } = useQuery({
     queryKey: ['employee-self-details', user?.employeeId],
     queryFn: () => employeeApi.getById(user?.employeeId as string),
     enabled: !isHRAdmin && !!user?.employeeId,
@@ -199,6 +200,10 @@ export const DocumentPage: React.FC = () => {
     { value: 'ASSET', label: 'Assigned Assets' },
     { value: 'OTHER', label: 'Other Uploads' },
   ];
+
+  if ((isHRAdmin && isEmployeesLoading) || (!isHRAdmin && isMyEmpLoading)) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
@@ -327,9 +332,17 @@ export const DocumentPage: React.FC = () => {
                       </div>
 
                       {isDocsLoading ? (
-                        <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center">
-                          <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
-                          <span className="text-xs uppercase font-bold tracking-wider">Loading Files...</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {[1, 2, 3, 4].map(n => (
+                            <div key={n} className="p-4 border border-border bg-card rounded-xl space-y-3">
+                              <Skeleton className="h-4 w-3/4" />
+                              <Skeleton className="h-3 w-1/2" />
+                              <div className="flex gap-2 pt-2 border-t border-border/40">
+                                <Skeleton className="h-8 flex-1" />
+                                <Skeleton className="h-8 w-10" />
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : filteredDocs.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl bg-muted/10">
@@ -444,9 +457,17 @@ export const DocumentPage: React.FC = () => {
                 {activeTab === 'PAYSLIP' && (
                   <div className="space-y-4 animate-in fade-in duration-200">
                     {isPayrollLoading ? (
-                      <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center">
-                        <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
-                        <span className="text-xs uppercase font-bold tracking-wider">Loading payroll data...</span>
+                      <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
+                        {[1, 2, 3, 4].map(n => (
+                          <div key={n} className="p-4 flex justify-between items-center bg-card">
+                            <Skeleton className="h-4.5 w-1/6" />
+                            <Skeleton className="h-4 w-1/12" />
+                            <Skeleton className="h-4 w-1/12" />
+                            <Skeleton className="h-4 w-1/12" />
+                            <Skeleton className="h-5 w-12 rounded-full" />
+                            <Skeleton className="h-8 w-24" />
+                          </div>
+                        ))}
                       </div>
                     ) : employeePayslips.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl bg-muted/10">
@@ -511,9 +532,20 @@ export const DocumentPage: React.FC = () => {
                 {activeTab === 'ASSET' && (
                   <div className="space-y-4 animate-in fade-in duration-200">
                     {isAssetsLoading ? (
-                      <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center">
-                        <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
-                        <span className="text-xs uppercase font-bold tracking-wider">Loading assigned assets...</span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {[1, 2, 3].map(n => (
+                          <div key={n} className="p-4 border border-border bg-card rounded-xl space-y-3">
+                            <div className="flex justify-between items-start gap-2">
+                              <Skeleton className="h-5 w-24" />
+                              <Skeleton className="h-4 w-12 rounded" />
+                            </div>
+                            <Skeleton className="h-3 w-16" />
+                            <div className="pt-2.5 border-t border-border/40 flex justify-between items-center">
+                              <Skeleton className="h-3.5 w-20" />
+                              <Skeleton className="h-4 w-10 rounded-full" />
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : employeeAssets.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl bg-muted/10">

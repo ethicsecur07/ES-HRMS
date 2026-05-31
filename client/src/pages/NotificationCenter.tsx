@@ -5,10 +5,12 @@ import { Button } from '../Components/WrapperComponents/Button';
 import { Bell, Check, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '../utils/formatters';
+import { NotificationSkeleton } from '../Components/WrapperComponents/Skeleton';
 
 export const NotificationCenter: React.FC = () => {
   const { notifications, markAsRead, markAllAsRead, clearNotifications, fetchNotifications } = useNotificationStore();
   const [filter, setFilter] = useState<string>('ALL');
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   const handleNotificationClick = (n: any) => {
@@ -32,10 +34,24 @@ export const NotificationCenter: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchNotifications();
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        await fetchNotifications();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
   }, [fetchNotifications]);
 
   const filtered = filter === 'ALL' ? notifications : notifications.filter(n => n.type === filter);
+
+  if (isLoading) {
+    return <NotificationSkeleton />;
+  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">

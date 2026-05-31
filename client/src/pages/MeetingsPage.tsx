@@ -6,6 +6,7 @@ import { usePermission } from '../hooks/usePermission';
 import { useAuthStore } from '../store/useAuthStore';
 import { ScheduleMeetingModal } from '../Components/SpecifiedComponents/ScheduleMeetingModal';
 import { Button } from '../Components/WrapperComponents/Button';
+import { CardGridSkeleton } from '../Components/WrapperComponents/Skeleton';
 import {
   Video,
   Calendar,
@@ -142,12 +143,7 @@ export const MeetingsPage: React.FC = () => {
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'HR';
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-xs font-semibold uppercase tracking-wider">Loading Meetings...</p>
-      </div>
-    );
+    return <CardGridSkeleton />;
   }
 
   return (

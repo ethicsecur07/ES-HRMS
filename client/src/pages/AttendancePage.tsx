@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { attendanceApi } from '../api_service/attendanceApi';
 import { employeeApi } from '../api_service/employeeApi';
@@ -224,11 +225,7 @@ export const AttendancePage: React.FC = () => {
   ];
 
   if (attLoading || empLoading) {
-    return (
-      <Card className="animate-pulse h-96 bg-muted/20">
-        <div />
-      </Card>
-    );
+    return <TableSkeleton />;
   }
 
   return (

@@ -17,6 +17,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
+import { OrgChartSkeleton } from '../Components/WrapperComponents/Skeleton';
 
 export const OrganizationPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -257,6 +258,10 @@ export const OrganizationPage: React.FC = () => {
   };
 
 
+
+  if (isOrgLoading) {
+    return <OrgChartSkeleton />;
+  }
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">
