@@ -9,7 +9,7 @@ export const createEmployeeSchema = z.object({
     department: z.string().min(2),
     designation: z.string().min(2),
     joiningDate: z.string(),
-    salary: z.number().min(1000),
+    salary: z.number().min(0),
     address: z.string().min(5),
     password: z.string().optional(),
     profileImage: z.string().optional(),
@@ -36,6 +36,8 @@ export const createEmployeeSchema = z.object({
       panNumber: z.string().optional(),
       taxRegime: z.enum(['OLD', 'NEW', '']).optional(),
     }).optional(),
+    candidateId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid candidate ID').optional(),
+    leadId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid lead ID').optional(),
   }),
 });
 
@@ -48,7 +50,7 @@ export const updateEmployeeSchema = z.object({
     department: z.string().min(2).optional(),
     designation: z.string().min(2).optional(),
     joiningDate: z.string().optional(),
-    salary: z.number().min(1000).optional(),
+    salary: z.number().min(0).optional(),
     address: z.string().min(5).optional(),
     profileImage: z.string().optional(),
     emergencyContact: z.object({

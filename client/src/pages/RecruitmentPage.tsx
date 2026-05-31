@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { recruitmentApi } from '../api_service/recruitmentApi';
-import type { Candidate, RecruitmentStage } from '../types';
+import { departmentApi } from '../api_service/departmentApi';
+import { designationApi } from '../api_service/designationApi';
+import { employeeApi } from '../api_service/employeeApi';
+import type { Candidate, RecruitmentStage, StageEvaluation } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Button } from '../Components/WrapperComponents/Button';
@@ -23,6 +26,7 @@ import {
   Phone, 
   Briefcase,
   FileText,
+  FileCheck,
   Trash2,
   Edit3,
   Star,
@@ -76,6 +80,61 @@ export const RecruitmentPage: React.FC = () => {
   const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [interviewCandidate, setInterviewCandidate] = useState<Candidate | null>(null);
 
+  // Hired Onboarding State
+  const [showHiredModal, setShowHiredModal] = useState(false);
+  const [hiredCandidate, setHiredCandidate] = useState<Candidate | null>(null);
+  const [isOnboardingSubmit, setIsOnboardingSubmit] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState('');
+  const [hiredFormData, setHiredFormData] = useState({
+    employeeCode: '',
+    fullName: '',
+    email: '',
+    phone: '',
+    password: 'EthicSec@2026',
+    departmentId: '',
+    designationId: '',
+    joiningDate: new Date().toISOString().split('T')[0],
+    salary: 25000,
+    address: '2nd Floor, NV Arcade Building, Salem - 636004',
+    emergencyName: 'Emergency Contact',
+    emergencyRel: 'Guardian',
+    emergencyPhone: '+919876543210'
+  });
+
+  // Load dynamic Departments & Designations
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments_recruitment'],
+    queryFn: departmentApi.getAll,
+  });
+
+  const { data: designations = [] } = useQuery({
+    queryKey: ['designations_recruitment'],
+    queryFn: () => designationApi.getAll(),
+  });
+
+  // Load employees for lead assignment (TEAM_LEAD + MANAGER + HR roles)
+  const { data: allEmployeesData } = useQuery({
+    queryKey: ['employees_leads_recruitment'],
+    queryFn: () => employeeApi.getAll({ isActive: true, limit: 200 }),
+    enabled: showHiredModal,
+  });
+  const allEmployees = allEmployeesData?.employees || [];
+
+  const leadOptions = useMemo(() => {
+    const leads = allEmployees.filter((emp: any) => 
+      (emp.role === 'TEAM_LEAD' || emp.role === 'MANAGER' || emp.role === 'HR') && emp.isActive
+    );
+    return [...leads].sort((a, b) => {
+      const aDeptId = typeof a.departmentId === 'object' && a.departmentId !== null ? a.departmentId._id : a.departmentId;
+      const bDeptId = typeof b.departmentId === 'object' && b.departmentId !== null ? b.departmentId._id : b.departmentId;
+      const aInDept = aDeptId === hiredFormData.departmentId;
+      const bInDept = bDeptId === hiredFormData.departmentId;
+      if (aInDept && !bInDept) return -1;
+      if (!aInDept && bInDept) return 1;
+      return a.fullName.localeCompare(b.fullName);
+    });
+  }, [allEmployees, hiredFormData.departmentId]);
+
   // Per-column "Show More" expansion state
   const [columnExpanded, setColumnExpanded] = useState<Record<string, boolean>>({});
   const CARDS_PER_COLUMN = 5;
@@ -89,7 +148,8 @@ export const RecruitmentPage: React.FC = () => {
     email: '',
     phone: '',
     appliedRole: '',
-    resumeUrl: ''
+    resumeUrl: '',
+    marksheetUrl: ''
   });
 
   const [editFormData, setEditFormData] = useState({
@@ -98,7 +158,8 @@ export const RecruitmentPage: React.FC = () => {
     email: '',
     phone: '',
     appliedRole: '',
-    resumeUrl: ''
+    resumeUrl: '',
+    marksheetUrl: ''
   });
 
   const { data: candidates = [], isLoading } = useQuery({
@@ -111,7 +172,7 @@ export const RecruitmentPage: React.FC = () => {
     queryFn: recruitmentApi.getDefaultTemplate
   });
 
-  const globalRoundsNeeded = templateData?.template?.roundsNeeded || STAGES;
+  const globalRoundsNeeded: RecruitmentStage[] = templateData?.template?.roundsNeeded || STAGES;
 
   const updateTemplateMutation = useMutation({
     mutationFn: recruitmentApi.updateDefaultTemplate,
@@ -128,7 +189,7 @@ export const RecruitmentPage: React.FC = () => {
   const handleToggleStage = (stage: RecruitmentStage) => {
     let newRounds: RecruitmentStage[];
     if (globalRoundsNeeded.includes(stage)) {
-      newRounds = globalRoundsNeeded.filter(r => r !== stage);
+      newRounds = globalRoundsNeeded.filter((r: RecruitmentStage) => r !== stage);
     } else {
       // Re-insert at original position among STAGES
       newRounds = STAGES.filter(r => r === stage || globalRoundsNeeded.includes(r));
@@ -165,7 +226,7 @@ export const RecruitmentPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       addToast('Candidate Added', 'New candidate added to the pipeline.', 'success');
       setShowAddModal(false);
-      setFormData({ firstName: '', lastName: '', email: '', phone: '', appliedRole: '', resumeUrl: '' });
+      setFormData({ firstName: '', lastName: '', email: '', phone: '', appliedRole: '', resumeUrl: '', marksheetUrl: '' });
     },
     onError: (error: any) => {
       const errMsg = error?.response?.data?.message || error.message || 'Could not add candidate.';
@@ -263,6 +324,15 @@ export const RecruitmentPage: React.FC = () => {
       }
       return;
     }
+
+    if (newStage === 'HIRED') {
+      const cand = candidates.find(c => c._id === draggableId);
+      if (cand) {
+        handleOpenOnboard(cand);
+      }
+      updateStageMutation.mutate({ id: draggableId, stage: newStage });
+      return;
+    }
     
     // Optimistic update
     queryClient.setQueryData<Candidate[]>(['candidates'], (old) => {
@@ -290,7 +360,7 @@ export const RecruitmentPage: React.FC = () => {
     c.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  const candidatesByStage = globalRoundsNeeded.reduce((acc, stage) => {
+  const candidatesByStage = globalRoundsNeeded.reduce((acc: Record<string, Candidate[]>, stage: RecruitmentStage) => {
     acc[stage] = filteredCandidates.filter(c => c.stage === stage);
     return acc;
   }, {} as Record<string, Candidate[]>);
@@ -304,6 +374,203 @@ export const RecruitmentPage: React.FC = () => {
     e.preventDefault();
     if (!editCandidate) return;
     updateMutation.mutate({ id: editCandidate._id, data: editFormData });
+  };
+
+  // Onboarding Helpers for Hired Candidates
+  const filteredHiredDesignations = useMemo(() => {
+    if (!hiredFormData.departmentId) return [];
+    return designations.filter((d: any) => {
+      const deptId = typeof d.departmentId === 'object' && d.departmentId !== null
+        ? d.departmentId._id
+        : d.departmentId;
+      return deptId === hiredFormData.departmentId && d.isActive;
+    });
+  }, [hiredFormData.departmentId, designations]);
+
+  const handleOpenOnboard = async (cand: Candidate) => {
+    setHiredCandidate(cand);
+    let nextCode = `EMP-${Date.now().toString().slice(-4)}`;
+    try {
+      const code = await employeeApi.getNextEmployeeCode();
+      if (code) nextCode = code;
+    } catch (err) {
+      // fallback
+    }
+
+    // Smart pre-select based on offer letter appliedRole
+    let matchedDeptId = '';
+    let matchedDesigId = '';
+
+    if (cand.appliedRole) {
+      const match = designations.find((d: any) => 
+        d.name.toLowerCase().trim() === cand.appliedRole.toLowerCase().trim()
+      );
+      if (match) {
+        matchedDesigId = match._id;
+        matchedDeptId = typeof match.departmentId === 'object' && match.departmentId !== null
+          ? (match.departmentId as any)._id
+          : (match.departmentId as string) || '';
+      } else {
+        const partialMatch = designations.find((d: any) => 
+          d.name.toLowerCase().includes(cand.appliedRole.toLowerCase()) ||
+          cand.appliedRole.toLowerCase().includes(d.name.toLowerCase())
+        );
+        if (partialMatch) {
+          matchedDesigId = partialMatch._id;
+          matchedDeptId = typeof partialMatch.departmentId === 'object' && partialMatch.departmentId !== null
+            ? (partialMatch.departmentId as any)._id
+            : (partialMatch.departmentId as string) || '';
+        }
+      }
+    }
+
+    // Intern stipend and code logic: if applied role or matched designation has "intern" keyword, default salary to 0 and prefix code with INT-
+    const matchedDesig = designations.find((d: any) => d._id === matchedDesigId);
+    const isIntern = (cand.appliedRole && cand.appliedRole.toLowerCase().includes('intern')) ||
+                     (matchedDesig && matchedDesig.name.toLowerCase().includes('intern'));
+    const defaultSalary = isIntern ? 0 : (cand.offerDetails?.salaryOffered || 25000);
+
+    let finalCode = nextCode;
+    if (isIntern) {
+      if (finalCode.includes('-')) {
+        finalCode = `INT-${finalCode.split('-')[1]}`;
+      } else {
+        finalCode = `INT-${finalCode}`;
+      }
+    }
+
+    setHiredFormData({
+      employeeCode: finalCode,
+      fullName: `${cand.firstName} ${cand.lastName}`,
+      email: cand.email,
+      phone: cand.phone,
+      password: 'EthicSec@2026',
+      departmentId: matchedDeptId,
+      designationId: matchedDesigId,
+      joiningDate: new Date().toISOString().split('T')[0],
+      salary: defaultSalary,
+      address: '2nd Floor, NV Arcade Building, Salem - 636004',
+      emergencyName: 'Emergency Contact',
+      emergencyRel: 'Guardian',
+      emergencyPhone: '+919876543210'
+    });
+    setSelectedLeadId('');
+    setShowHiredModal(true);
+  };
+
+  const handleHiredDeptChange = (deptId: string) => {
+    const filtered = designations.filter((d: any) => {
+      const dId = typeof d.departmentId === 'object' && d.departmentId !== null ? d.departmentId._id : d.departmentId;
+      return dId === deptId && d.isActive;
+    });
+    const desigId = filtered.length > 0 ? filtered[0]._id : '';
+    const desig = designations.find((d: any) => d._id === desigId);
+    const isIntern = desig?.name.toLowerCase().includes('intern');
+
+    setHiredFormData(p => {
+      let code = p.employeeCode;
+      if (isIntern) {
+        code = code.replace(/^(EMP|TEMP-EMP|TEMP)-/, 'INT-');
+        if (!code.startsWith('INT-')) code = `INT-${code}`;
+      } else {
+        code = code.replace(/^INT-/, 'EMP-');
+        if (!code.startsWith('EMP-')) code = `EMP-${code}`;
+      }
+      return {
+        ...p,
+        departmentId: deptId,
+        designationId: desigId,
+        employeeCode: code,
+        salary: isIntern ? 0 : (hiredCandidate?.offerDetails?.salaryOffered || 25000)
+      };
+    });
+  };
+
+  const handleHiredDesignationChange = (desigId: string) => {
+    const desig = designations.find((d: any) => d._id === desigId);
+    const isIntern = desig?.name.toLowerCase().includes('intern');
+    setHiredFormData(p => {
+      let code = p.employeeCode;
+      if (isIntern) {
+        code = code.replace(/^(EMP|TEMP-EMP|TEMP)-/, 'INT-');
+        if (!code.startsWith('INT-')) code = `INT-${code}`;
+      } else {
+        code = code.replace(/^INT-/, 'EMP-');
+        if (!code.startsWith('EMP-')) code = `EMP-${code}`;
+      }
+      return {
+        ...p,
+        designationId: desigId,
+        employeeCode: code,
+        salary: isIntern ? 0 : (hiredCandidate?.offerDetails?.salaryOffered || 25000)
+      };
+    });
+  };
+
+  const handleOnboardingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hiredFormData.departmentId || !hiredFormData.designationId) {
+      addToast('Selection Missing', 'Please select a valid Department and Designation.', 'error');
+      return;
+    }
+
+    setIsOnboardingSubmit(true);
+    try {
+      const targetDept = departments.find((d: any) => d._id === hiredFormData.departmentId);
+      const targetDesig = designations.find((d: any) => d._id === hiredFormData.designationId);
+
+      const payload: any = {
+        employeeCode: hiredFormData.employeeCode,
+        fullName: hiredFormData.fullName,
+        email: hiredFormData.email,
+        password: hiredFormData.password,
+        phone: hiredFormData.phone,
+        department: targetDept?.name || 'Developers',
+        designation: targetDesig?.name || 'Staff',
+        departmentId: hiredFormData.departmentId,
+        designationId: hiredFormData.designationId,
+        joiningDate: hiredFormData.joiningDate,
+        profileImage: hiredCandidate?.resumeUrl || '',
+        salary: Number(hiredFormData.salary),
+        address: hiredFormData.address,
+        emergencyContact: {
+          name: hiredFormData.emergencyName,
+          relationship: hiredFormData.emergencyRel,
+          phone: hiredFormData.emergencyPhone,
+        },
+        bankDetails: {
+          bankName: '',
+          accountName: '',
+          accountNumber: '',
+          ifscCode: '',
+          branchName: '',
+        },
+        taxDetails: {
+          panNumber: '',
+          taxRegime: '' as "" | "OLD" | "NEW",
+        },
+        ...(hiredCandidate?._id ? { candidateId: hiredCandidate._id } : {}),
+        ...(selectedLeadId ? { leadId: selectedLeadId } : {}),
+      };
+
+      const resData = await employeeApi.create(payload);
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      
+      const pwd = resData?.generatedPassword || hiredFormData.password;
+      addToast(
+        'System Account Created', 
+        `General employee credentials provisioned! Email: ${payload.email} | Password: ${pwd}`, 
+        'success'
+      );
+      setShowHiredModal(false);
+      setHiredCandidate(null);
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = error.response?.data?.message || error.message || 'Failed to onboard candidate.';
+      addToast('Onboarding Failed', errMsg, 'error');
+    } finally {
+      setIsOnboardingSubmit(false);
+    }
   };
 
   if (isLoading) {
@@ -360,7 +627,7 @@ export const RecruitmentPage: React.FC = () => {
           Enable or disable specific rounds globally. Candidates will dynamically adapt their progress ratios, metrics, and timeline dots based on these global settings.
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          {globalRoundsNeeded.map((stg) => {
+          {globalRoundsNeeded.map((stg: RecruitmentStage) => {
             if (stg === 'NEW' || stg === 'HIRED') return null;
             const isBuiltin = STAGES.includes(stg as RecruitmentStage);
             const isChecked = true; // Already in active rounds means checked
@@ -378,7 +645,7 @@ export const RecruitmentPage: React.FC = () => {
                       handleToggleStage(stg as RecruitmentStage);
                     } else {
                       // Remove custom round
-                      updateTemplateMutation.mutate({ roundsNeeded: globalRoundsNeeded.filter(r => r !== stg) as RecruitmentStage[] });
+                      updateTemplateMutation.mutate({ roundsNeeded: globalRoundsNeeded.filter((r: RecruitmentStage) => r !== stg) as RecruitmentStage[] });
                     }
                   }}
                   className="w-4 h-4 rounded text-primary focus:ring-primary border-border bg-background cursor-pointer accent-primary"
@@ -432,10 +699,10 @@ export const RecruitmentPage: React.FC = () => {
       <div className="flex-1 overflow-x-auto overflow-y-hidden">
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="flex h-full gap-4 pb-4 min-w-max">
-            {globalRoundsNeeded.map((stage) => {
-              const stageColor = STAGE_COLORS[stage as RecruitmentStage] || 'border-slate-500/20 bg-slate-500/10 text-slate-500';
-              const stageLabel = STAGE_LABELS[stage as RecruitmentStage] || stage.replace(/_/g, ' ');
-              const stageCandidates = candidatesByStage[stage] || [];
+            {globalRoundsNeeded.map((stage: RecruitmentStage) => {
+              const stageColor = STAGE_COLORS[stage] || 'border-slate-500/20 bg-slate-500/10 text-slate-500';
+              const stageLabel = STAGE_LABELS[stage] || stage.replace(/_/g, ' ');
+              const stageCandidates: Candidate[] = candidatesByStage[stage] || [];
               const isExpanded = columnExpanded[stage] || false;
               const visibleCandidates = isExpanded ? stageCandidates : stageCandidates.slice(0, CARDS_PER_COLUMN);
               const hiddenCount = stageCandidates.length - CARDS_PER_COLUMN;
@@ -458,7 +725,7 @@ export const RecruitmentPage: React.FC = () => {
                         snapshot.isDraggingOver ? 'bg-primary/5 border border-primary/20' : 'bg-muted/30 border border-transparent'
                       }`}
                     >
-                      {visibleCandidates.map((candidate, index) => (
+                      {visibleCandidates.map((candidate: Candidate, index: number) => (
                         <Draggable key={candidate._id} draggableId={candidate._id} index={index} isDragDisabled={!hasPermission('RECRUITMENT', 'edit')}>
                           {(provided, snapshot) => (
                             <div
@@ -499,7 +766,8 @@ export const RecruitmentPage: React.FC = () => {
                                                 email: candidate.email,
                                                 phone: candidate.phone,
                                                 appliedRole: candidate.appliedRole,
-                                                resumeUrl: candidate.resumeUrl || ''
+                                                resumeUrl: candidate.resumeUrl || '',
+                                                marksheetUrl: candidate.marksheetUrl || ''
                                               });
                                               setShowEditModal(true);
                                             }}
@@ -573,12 +841,12 @@ export const RecruitmentPage: React.FC = () => {
                               {/* Evaluations & Step Pipeline Progress */}
                               {(() => {
                                 const activeRoundsList = globalRoundsNeeded;
-                                const totalCompletedStages = candidate.evaluations?.filter(e => e.completed && activeRoundsList.includes(e.stage)).length || 0;
+                                const totalCompletedStages = candidate.evaluations?.filter((e: StageEvaluation) => e.completed && activeRoundsList.includes(e.stage)).length || 0;
 
                                 // Calculate average ratings
                                 let totalRatingsSum = 0;
                                 let ratingsCount = 0;
-                                candidate.evaluations?.forEach(e => {
+                                candidate.evaluations?.forEach((e: StageEvaluation) => {
                                   if (e.completed && activeRoundsList.includes(e.stage)) {
                                     if (e.ratingTechnical) { totalRatingsSum += e.ratingTechnical; ratingsCount++; }
                                     if (e.ratingCommunication) { totalRatingsSum += e.ratingCommunication; ratingsCount++; }
@@ -603,8 +871,8 @@ export const RecruitmentPage: React.FC = () => {
 
                                     {/* Stage progress timeline dots */}
                                     <div className="flex items-center gap-1 mt-0.5">
-                                      {globalRoundsNeeded.map((stg) => {
-                                        const isStgCompleted = !!candidate.evaluations?.find(e => e.stage === stg && e.completed) || 
+                                      {globalRoundsNeeded.map((stg: RecruitmentStage) => {
+                                        const isStgCompleted = !!candidate.evaluations?.find((e: StageEvaluation) => e.stage === stg && e.completed) || 
                                           (globalRoundsNeeded.indexOf(candidate.stage) > globalRoundsNeeded.indexOf(stg));
                                         const isCurrent = candidate.stage === stg;
                                         const stgLabel = STAGE_LABELS[stg as RecruitmentStage] || stg.replace(/_/g, ' ');
@@ -664,9 +932,33 @@ export const RecruitmentPage: React.FC = () => {
                                       <Mail className="w-3 h-3" /> Offer Letter
                                     </button>
                                   )}
+                                  {candidate.stage === 'HIRED' && (
+                                    candidate.accountCreated ? (
+                                      <button 
+                                        onClick={() => handleOpenOnboard(candidate)}
+                                        className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:underline border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded cursor-pointer"
+                                        title="View Onboarded Account Details"
+                                      >
+                                        <FileCheck className="w-3 h-3" /> Account Created
+                                      </button>
+                                    ) : (
+                                      <button 
+                                        onClick={() => handleOpenOnboard(candidate)}
+                                        className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 hover:underline border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 rounded cursor-pointer"
+                                        title="Create Employee System Account"
+                                      >
+                                        <Users className="w-3 h-3" /> Onboard Employee
+                                      </button>
+                                    )
+                                  )}
                                   {candidate.resumeUrl && (
                                     <a href={candidate.resumeUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] font-bold text-primary hover:underline">
                                       <FileText className="w-3 h-3" /> Resume
+                                    </a>
+                                  )}
+                                  {candidate.marksheetUrl && (
+                                    <a href={candidate.marksheetUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 hover:underline border border-indigo-500/20 bg-indigo-500/10 px-1.5 py-0.5 rounded cursor-pointer" title="View Candidate Marksheet">
+                                      <FileCheck className="w-3 h-3" /> Marksheet
                                     </a>
                                   )}
                                 </div>
@@ -757,6 +1049,13 @@ export const RecruitmentPage: React.FC = () => {
             onChange={(e) => setFormData(p => ({ ...p, resumeUrl: e.target.value }))}
           />
 
+          <Input
+            label="Marksheet URL (Optional)"
+            placeholder="https://..."
+            value={formData.marksheetUrl}
+            onChange={(e) => setFormData(p => ({ ...p, marksheetUrl: e.target.value }))}
+          />
+
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button variant="outline" type="button" onClick={() => setShowAddModal(false)}>
               Cancel
@@ -822,6 +1121,14 @@ export const RecruitmentPage: React.FC = () => {
             className="text-left"
           />
 
+          <Input
+            label="Marksheet URL (Optional)"
+            placeholder="https://..."
+            value={editFormData.marksheetUrl}
+            onChange={(e) => setEditFormData(p => ({ ...p, marksheetUrl: e.target.value }))}
+            className="text-left"
+          />
+
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button variant="outline" type="button" onClick={() => { setShowEditModal(false); setEditCandidate(null); }}>
               Cancel
@@ -854,6 +1161,233 @@ export const RecruitmentPage: React.FC = () => {
         candidateEmail={interviewCandidate?.email}
         candidateRole={interviewCandidate?.appliedRole}
       />
+
+      <Modal
+        isOpen={showHiredModal}
+        onClose={() => { setShowHiredModal(false); setHiredCandidate(null); }}
+        title={hiredCandidate?.accountCreated ? "Onboarded Employee Account Details" : "Onboard Hired Candidate to Company"}
+        maxWidth="max-w-2xl"
+      >
+        {hiredCandidate?.accountCreated ? (
+          <div className="space-y-6 py-4 px-2 text-left">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 flex items-start gap-4">
+              <div className="w-10 h-10 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center justify-center text-emerald-600 flex-shrink-0 animate-pulse">
+                <FileCheck className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-300">System Account Already Provisioned</h4>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                  This candidate has already been onboarded into the general employee database. Their system credentials and department permissions are active. Duplicate account creation is disabled.
+                </p>
+              </div>
+            </div>
+
+            <div className="border border-border rounded-xl p-5 bg-muted/20 space-y-4 shadow-sm">
+              <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Onboarding Details</h5>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-xs">
+                <div>
+                  <span className="text-muted-foreground block mb-0.5">Candidate Name</span>
+                  <span className="font-bold text-foreground text-sm">{hiredCandidate.firstName} {hiredCandidate.lastName}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block mb-0.5">Work Email Address</span>
+                  <span className="font-bold text-foreground font-mono text-sm">{hiredCandidate.email}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block mb-0.5">Applied Role / Position</span>
+                  <span className="font-bold text-foreground text-sm">{hiredCandidate.appliedRole}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block mb-0.5">Phone Number</span>
+                  <span className="font-bold text-foreground font-mono text-sm">{hiredCandidate.phone}</span>
+                </div>
+                {hiredCandidate.assignedLeadId && (
+                  <div className="col-span-2 border-t border-border/50 pt-3">
+                    <span className="text-muted-foreground block mb-0.5">Assigned Team Lead / Manager</span>
+                    <span className="font-bold text-primary flex items-center gap-1.5 text-sm">
+                      <Users className="w-4 h-4" />
+                      {allEmployees.find(e => e._id === hiredCandidate.assignedLeadId)?.fullName || 'Assigned Lead / Manager'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-border">
+              <Button variant="outline" type="button" onClick={() => { setShowHiredModal(false); setHiredCandidate(null); }}>
+                Close Details
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleOnboardingSubmit} className="space-y-4 px-2 text-left">
+            <p className="text-xs text-muted-foreground">
+              Onboard this hired candidate into the general employee database. This will auto-provision their system access credentials for email login, attendance checkins, dashboard analytics, separate projects, and meetings.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Full Name *"
+                value={hiredFormData.fullName}
+                onChange={(e) => setHiredFormData(p => ({ ...p, fullName: e.target.value }))}
+                required
+              />
+              <Input
+                label="Employee Code *"
+                value={hiredFormData.employeeCode}
+                onChange={(e) => setHiredFormData(p => ({ ...p, employeeCode: e.target.value }))}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Work Email Address *"
+                type="email"
+                value={hiredFormData.email}
+                onChange={(e) => setHiredFormData(p => ({ ...p, email: e.target.value }))}
+                required
+              />
+              <Input
+                label="Phone Number *"
+                value={hiredFormData.phone}
+                onChange={(e) => setHiredFormData(p => ({ ...p, phone: e.target.value }))}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Login Password *"
+                type="text"
+                value={hiredFormData.password}
+                onChange={(e) => setHiredFormData(p => ({ ...p, password: e.target.value }))}
+                required
+              />
+              <Input
+                label="Monthly Base Salary (INR) *"
+                type="number"
+                value={hiredFormData.salary}
+                onChange={(e) => setHiredFormData(p => ({ ...p, salary: Number(e.target.value) }))}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department *</label>
+                <select
+                  value={hiredFormData.departmentId}
+                  onChange={(e) => handleHiredDeptChange(e.target.value)}
+                  className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-2 transition-colors"
+                  required
+                >
+                  <option value="" disabled>Select Department</option>
+                  {departments.map((dept: any) => (
+                    <option key={dept._id} value={dept._id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Designation *</label>
+                <select
+                  value={hiredFormData.designationId}
+                  onChange={(e) => handleHiredDesignationChange(e.target.value)}
+                  className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-2 transition-colors disabled:opacity-50"
+                  disabled={!hiredFormData.departmentId}
+                  required
+                >
+                  <option value="" disabled>Select Designation</option>
+                  {filteredHiredDesignations.map((desig: any) => (
+                    <option key={desig._id} value={desig._id}>
+                      {desig.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Assign Team Lead Dropdown */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                Assign Team Lead / Manager
+              </label>
+              <select
+                value={selectedLeadId}
+                onChange={(e) => setSelectedLeadId(e.target.value)}
+                className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-2 transition-colors"
+              >
+                <option value="">Select Team Lead / Manager (Optional)</option>
+                {leadOptions.map((emp: any) => {
+                  const empDeptName = typeof emp.departmentId === 'object' && emp.departmentId !== null
+                    ? emp.departmentId.name
+                    : emp.department;
+                  const isSameDept = (typeof emp.departmentId === 'object' && emp.departmentId !== null ? emp.departmentId._id : emp.departmentId) === hiredFormData.departmentId;
+                  
+                  return (
+                    <option key={emp._id} value={emp._id}>
+                      {emp.fullName} - {emp.role?.replace('_', ' ') || 'Employee'} ({empDeptName}){isSameDept ? ' (Same Department)' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Assigning a Team Lead will automatically set them as the primary manager to approve/scoping assignments.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Hire/Joining Date *"
+                type="date"
+                value={hiredFormData.joiningDate}
+                onChange={(e) => setHiredFormData(p => ({ ...p, joiningDate: e.target.value }))}
+                required
+              />
+              <Input
+                label="Emergency Contact Name *"
+                value={hiredFormData.emergencyName}
+                onChange={(e) => setHiredFormData(p => ({ ...p, emergencyName: e.target.value }))}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Emergency Contact Relation *"
+                value={hiredFormData.emergencyRel}
+                onChange={(e) => setHiredFormData(p => ({ ...p, emergencyRel: e.target.value }))}
+                required
+              />
+              <Input
+                label="Emergency Contact Phone *"
+                value={hiredFormData.emergencyPhone}
+                onChange={(e) => setHiredFormData(p => ({ ...p, emergencyPhone: e.target.value }))}
+                required
+              />
+            </div>
+
+            <Input
+              label="Residential Address *"
+              value={hiredFormData.address}
+              onChange={(e) => setHiredFormData(p => ({ ...p, address: e.target.value }))}
+              required
+            />
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button variant="outline" type="button" onClick={() => { setShowHiredModal(false); setHiredCandidate(null); }}>
+                Cancel
+              </Button>
+              <Button type="submit" isLoading={isOnboardingSubmit} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-md">
+                Create System Account
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

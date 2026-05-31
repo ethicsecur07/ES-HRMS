@@ -343,6 +343,18 @@ export const OfferLetterModal: React.FC<OfferLetterModalProps> = ({ isOpen, onCl
                   </div>
                 ) : (
                   <>
+                    {candidate?.offerDetails?.offerLetterUrl && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl p-3.5 mb-4 flex items-start gap-2.5 text-xs font-semibold">
+                        <span className="text-sm">⚠️</span>
+                        <div>
+                          <p className="font-bold">Offer Letter Already Sent</p>
+                          <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80 mt-0.5 leading-normal">
+                            An offer letter has already been sent to this candidate. You may customize parameters and send it again if terms have changed.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Mode Toggle */}
                     <div className="flex border border-border rounded-xl p-1 bg-muted/20 shrink-0 mb-4">
                       <button

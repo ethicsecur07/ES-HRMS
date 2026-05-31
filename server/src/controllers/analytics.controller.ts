@@ -14,6 +14,10 @@ import { AuthRequest } from '../types/index.js';
 import { User } from '../models/User.js';
 import { notificationService } from '../services/notification.service.js';
 import { LeaveAnalyticsService } from '../domains/leave-engine/services/LeaveAnalyticsService.js';
+import { Announcement } from '../models/Announcement.js';
+import { Meeting } from '../models/Meeting.js';
+import { WFHRequest } from '../models/WFHRequest.js';
+import { PermissionRequest } from '../models/PermissionRequest.js';
 
 
 const countTasks = (text?: string): number => {
@@ -445,6 +449,129 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
     }
 
     res.status(200).json({ message: 'Settings updated successfully', settings: req.body });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * GET /api/analytics/announcements-actions
+ * Unified endpoint for announcements, today's meetings, tasks, projects, and pending approvals.
+ */
+export const getAnnouncementsAndActions = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authReq = req as AuthRequest;
+    const orgId = authReq.user?.organizationId;
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing' });
+      return;
+    }
+
+    const role = authReq.user?.role;
+    const userId = authReq.user?.id;
+    const userEmail = authReq.user?.email?.toLowerCase();
+
+    // 1. Fetch latest 20 announcements in organization (both types: ANNOUNCEMENT and POLICY_CHANGE)
+    const announcements = await Announcement.find({ organizationId: orgId })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    // 2. Fetch today's meetings (start date matching today, user is organizer or attendee)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const meetingsToday = await Meeting.find({
+      organizationId: orgId,
+      startDateTime: { $gte: startOfToday, $lte: endOfToday },
+      status: { $ne: 'CANCELLED' },
+      $or: [
+        { organizer: userEmail },
+        { 'attendees.email': userEmail },
+      ],
+    }).sort({ startDateTime: 1 });
+
+    // Find Employee associated with user
+    const userObj = await User.findById(userId);
+    let empId = userObj?.employeeId;
+    if (!empId && userEmail) {
+      const emp = await Employee.findOne({ email: userEmail, organizationId: orgId });
+      empId = emp?._id;
+    }
+
+    // Initialize arrays
+    let pendingLeaves: any[] = [];
+    let pendingWFH: any[] = [];
+    let pendingPermissions: any[] = [];
+    let myLeaves: any[] = [];
+    let myWFH: any[] = [];
+    let myPermissions: any[] = [];
+    let myProjects: any[] = [];
+    let myTasks: any[] = [];
+
+    // 3. Role-based Actions: HR, MANAGER, and ADMIN get pending approvals queue
+    if (role === 'HR' || role === 'ADMIN' || role === 'MANAGER') {
+      pendingLeaves = await Leave.find({ organizationId: orgId, status: 'PENDING' })
+        .populate('employeeId', 'fullName employeeCode department profileImage')
+        .sort({ createdAt: -1 });
+
+      pendingWFH = await WFHRequest.find({ organizationId: orgId, status: 'PENDING' })
+        .populate('employeeId', 'fullName employeeCode department profileImage')
+        .sort({ createdAt: -1 });
+
+      pendingPermissions = await PermissionRequest.find({ organizationId: orgId, approvalStatus: 'PENDING' })
+        .populate('employeeId', 'fullName employeeCode department profileImage')
+        .sort({ createdAt: -1 });
+    }
+
+    // 4. Employee Applied Requests & Work (Tasks/Projects)
+    if (empId) {
+      // Applied requests (Leaves, WFH, Permissions)
+      myLeaves = await Leave.find({ organizationId: orgId, employeeId: empId })
+        .sort({ createdAt: -1 })
+        .limit(10);
+
+      myWFH = await WFHRequest.find({ organizationId: orgId, employeeId: empId })
+        .sort({ createdAt: -1 })
+        .limit(10);
+
+      myPermissions = await PermissionRequest.find({ organizationId: orgId, employeeId: empId })
+        .sort({ createdAt: -1 })
+        .limit(10);
+
+      // Active Projects containing this employee
+      myProjects = await Project.find({
+        organizationId: orgId,
+        $or: [
+          { teamMemberIds: empId },
+          { allocatedManagerId: userId },
+          { teamLeadId: userId }
+        ]
+      }).sort({ updatedAt: -1 });
+
+      // Active Tasks assigned to this employee
+      myTasks = await Task.find({
+        organizationId: orgId,
+        assignedTo: empId,
+        status: { $ne: 'COMPLETED' },
+      })
+        .populate('projectId', 'name')
+        .sort({ dueDate: 1 });
+    }
+
+    res.status(200).json({
+      announcements,
+      meetingsToday,
+      pendingLeaves,
+      pendingWFH,
+      pendingPermissions,
+      myLeaves,
+      myWFH,
+      myPermissions,
+      myProjects,
+      myTasks,
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

@@ -62,7 +62,31 @@ export const createProject = async (req: RBACRequest, res: Response, next: NextF
 
 export const getProjects = async (req: RBACRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const projects = await Project.find({ organizationId: req.user?.organizationId })
+    const organizationId = req.user?.organizationId;
+    const role = req.user?.role;
+    const employeeId = (req.user as any)?.employeeId;
+
+    let query: any = { organizationId };
+
+    if (role === 'EMPLOYEE' && employeeId) {
+      const employee = await Employee.findById(employeeId);
+      if (employee) {
+        // Detect if the employee is an Intern
+        const isIntern = /intern/i.test(employee.designation || '') || /intern/i.test(employee.department || '');
+        if (isIntern) {
+          query.$or = [
+            { teamMemberIds: employeeId },
+            { projectType: { $regex: /intern/i } }
+          ];
+        } else {
+          query.teamMemberIds = employeeId;
+        }
+      } else {
+        query.teamMemberIds = employeeId;
+      }
+    }
+
+    const projects = await Project.find(query)
       .populate('allocatedManagerId', 'name email')
       .sort({ createdAt: -1 });
     res.json({ projects });

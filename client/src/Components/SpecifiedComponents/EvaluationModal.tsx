@@ -14,7 +14,9 @@ import {
   UserCheck, 
   Loader2,
   Calendar,
-  Layers
+  Layers,
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 
 interface EvaluationModalProps {
@@ -47,17 +49,17 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
     enabled: isOpen && !!candidate
   });
 
-  const roundsNeeded = templateData?.template?.roundsNeeded || STAGES;
+  const roundsNeeded: RecruitmentStage[] = templateData?.template?.roundsNeeded || STAGES;
   
   // Local state to store evaluations array temporarily before saving
   const [evaluations, setEvaluations] = useState<Record<RecruitmentStage, StageEvaluation>>({
-    NEW: { stage: 'NEW', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-    SCREENING: { stage: 'SCREENING', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-    INTERVIEW: { stage: 'INTERVIEW', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-    TECHNICAL: { stage: 'TECHNICAL', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-    HR: { stage: 'HR', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-    OFFER: { stage: 'OFFER', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-    HIRED: { stage: 'HIRED', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
+    NEW: { stage: 'NEW', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+    SCREENING: { stage: 'SCREENING', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+    INTERVIEW: { stage: 'INTERVIEW', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+    TECHNICAL: { stage: 'TECHNICAL', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+    HR: { stage: 'HR', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+    OFFER: { stage: 'OFFER', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+    HIRED: { stage: 'HIRED', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
   });
 
   // Load candidate's evaluations when modal opens, candidate changes, or roundsNeeded changes
@@ -71,13 +73,13 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
       }
 
       const initialEvaluations: Record<RecruitmentStage, StageEvaluation> = {
-        NEW: { stage: 'NEW', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-        SCREENING: { stage: 'SCREENING', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-        INTERVIEW: { stage: 'INTERVIEW', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-        TECHNICAL: { stage: 'TECHNICAL', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-        HR: { stage: 'HR', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-        OFFER: { stage: 'OFFER', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
-        HIRED: { stage: 'HIRED', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '' },
+        NEW: { stage: 'NEW', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+        SCREENING: { stage: 'SCREENING', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+        INTERVIEW: { stage: 'INTERVIEW', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+        TECHNICAL: { stage: 'TECHNICAL', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+        HR: { stage: 'HR', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+        OFFER: { stage: 'OFFER', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
+        HIRED: { stage: 'HIRED', completed: false, comments: '', ratingCommunication: 0, ratingTechnical: 0, toolsExperiences: '', documentVerified: false },
       };
 
       // Merge saved evaluations from DB
@@ -91,7 +93,8 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
               comments: evalItem.comments || '',
               toolsExperiences: evalItem.toolsExperiences || '',
               completed: !!evalItem.completed,
-              completedAt: evalItem.completedAt || undefined
+              completedAt: evalItem.completedAt || undefined,
+              documentVerified: !!evalItem.documentVerified
             };
           }
         });
@@ -197,6 +200,51 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
       maxWidth="max-w-4xl"
     >
       <div className="flex flex-col h-[70vh]">
+        {/* Horizontal Stage Progress Tracker Bar */}
+        <div className="shrink-0 flex items-center justify-between bg-muted/10 border border-border p-3.5 rounded-xl mb-4 text-xs font-bold select-none overflow-x-auto gap-2">
+          {STAGES.map((stg, idx) => {
+            const isCompleted = !!evaluations[stg]?.completed || (STAGES.indexOf(candidate.stage) > STAGES.indexOf(stg));
+            const isCurrent = candidate.stage === stg;
+            const isSelected = selectedStage === stg;
+            
+            let bgClass = 'bg-muted/30 border-border/50 text-muted-foreground';
+            let dotClass = 'bg-muted-foreground/30';
+            
+            if (isCompleted) {
+              bgClass = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400';
+              dotClass = 'bg-emerald-500';
+            } else if (isCurrent) {
+              bgClass = 'bg-primary/10 border-primary/30 text-primary';
+              dotClass = 'bg-primary';
+            }
+
+            if (isSelected) {
+              bgClass += ' ring-2 ring-primary/40 ring-offset-2 dark:ring-offset-card';
+            }
+
+            return (
+              <React.Fragment key={stg}>
+                <button
+                  type="button"
+                  onClick={() => roundsNeeded.includes(stg) && setSelectedStage(stg)}
+                  disabled={!roundsNeeded.includes(stg)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${bgClass}`}
+                  title={`${STAGE_LABELS[stg]}${!roundsNeeded.includes(stg) ? ' (Not in pipeline)' : ' - Click to review'}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${dotClass} ${isCurrent ? 'animate-pulse' : ''}`} />
+                  <span>{STAGE_LABELS[stg]}</span>
+                </button>
+
+                {idx < STAGES.length - 1 && (
+                  <span className="text-muted-foreground/30 font-light text-sm select-none font-mono">
+                    ➔
+                  </span>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+
         {/* Candidate Summary Header */}
         <div className="shrink-0 flex items-center justify-between bg-muted/20 border border-border p-4 rounded-xl mb-4 text-left">
           <div>
@@ -360,18 +408,94 @@ export const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClos
 
               {/* Conditional Comments/BG Notes Textarea */}
               {selectedStage === 'SCREENING' ? (
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                    <UserCheck className="w-3.5 h-3.5 text-primary animate-pulse" />
-                    Background Verification & Screening Notes
-                  </label>
-                  <textarea
-                    rows={6}
-                    placeholder="Enter background verification details, references check feedback, and screening compliance notes..."
-                    value={currentEval.comments || ''}
-                    onChange={(e) => handleFieldChange('comments', e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary leading-relaxed shadow-sm transition-all"
-                  />
+                <div className="space-y-5 text-left">
+                  {/* Marksheet document verification banner */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                      <FileText className="w-3.5 h-3.5 text-primary" />
+                      Academic Marksheet Verification
+                    </label>
+                    {candidate.marksheetUrl ? (
+                      <div className="p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/30 flex flex-col gap-3.5 shadow-sm transition-all duration-300">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-bold text-foreground tracking-tight">
+                                Candidate's Marksheet Document
+                              </h5>
+                              <p className="text-xs text-muted-foreground/80 mt-0.5">
+                                Uploaded and ready for educational screening and compliance check
+                              </p>
+                            </div>
+                          </div>
+                          <a
+                            href={candidate.marksheetUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-500 hover:text-indigo-600 bg-indigo-500/10 hover:bg-indigo-500/20 px-4 py-2 rounded-xl border border-indigo-500/20 hover:border-indigo-500/30 shadow-sm cursor-pointer transition-all duration-200"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" /> View Marksheet
+                          </a>
+                        </div>
+                        
+                        {/* Checkbox to confirm document verification */}
+                        <div className="pt-3 border-t border-indigo-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <label className="flex items-center gap-2.5 text-xs font-bold text-foreground cursor-pointer select-none group">
+                            <input
+                              type="checkbox"
+                              checked={!!currentEval.documentVerified}
+                              onChange={(e) => handleFieldChange('documentVerified', e.target.checked)}
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-500/30 bg-background cursor-pointer accent-indigo-500"
+                            />
+                            <span className="group-hover:text-indigo-600 transition-colors">
+                              I confirm that I have viewed and verified this candidate's marksheet document
+                            </span>
+                          </label>
+                          {currentEval.documentVerified && (
+                            <span className="text-[10px] font-extrabold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10" /> Document Verified
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl border border-dashed border-border/80 bg-muted/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm text-left">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-muted/40 text-muted-foreground/60 rounded-xl">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h5 className="text-sm font-bold text-muted-foreground/90 tracking-tight">
+                              No Marksheet URL Attached
+                            </h5>
+                            <p className="text-xs text-muted-foreground/60 mt-0.5">
+                              No marksheet document has been submitted or uploaded for this candidate yet.
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 border border-border/50 bg-background/50 px-2.5 py-1 rounded-lg">
+                          Pending Upload
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                      <UserCheck className="w-3.5 h-3.5 text-primary animate-pulse" />
+                      Background Verification & Screening Notes
+                    </label>
+                    <textarea
+                      rows={6}
+                      placeholder="Enter background verification details, references check feedback, and screening compliance notes..."
+                      value={currentEval.comments || ''}
+                      onChange={(e) => handleFieldChange('comments', e.target.value)}
+                      className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary leading-relaxed shadow-sm transition-all"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-1.5 text-left">

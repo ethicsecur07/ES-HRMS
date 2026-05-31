@@ -7,6 +7,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.togglePolicyStatus = exports.updatePolicy = exports.createPolicy = exports.getAllPolicies = void 0;
 const LeavePolicy_js_1 = require("../models/LeavePolicy.js");
+const User_js_1 = require("../models/User.js");
+const Announcement_js_1 = require("../models/Announcement.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const logger_js_1 = require("../utils/logger.js");
 const VALID_LEAVE_TYPES = [
@@ -79,6 +81,21 @@ const createPolicy = async (req, res) => {
             isActive: true,
         });
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_POLICY_CREATED', req.user.email, 'LEAVE_POLICY', policy.id, `Created ${leaveType} policy (${monthlyAllowance} days/month)`, orgId);
+        try {
+            const creator = await User_js_1.User.findById(req.user.id);
+            await Announcement_js_1.Announcement.create({
+                organizationId: orgId,
+                title: `New Leave Policy: ${leaveType}`,
+                content: `A new leave policy has been configured for ${leaveType} with a monthly allowance of ${monthlyAllowance} days. Applicable to: ${applicableGender || 'All'}.`,
+                type: 'POLICY_CHANGE',
+                createdBy: req.user.id,
+                createdByName: creator?.name || req.user.email,
+                createdByRole: req.user.role,
+            });
+        }
+        catch (annError) {
+            logger_js_1.logger.error('[leavePolicy] announcement creation failed in createPolicy', { error: annError.message });
+        }
         res.status(201).json({ policy, message: 'Leave policy created successfully.' });
     }
     catch (error) {
@@ -136,6 +153,21 @@ const updatePolicy = async (req, res) => {
         }
         await policy.save();
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_POLICY_UPDATED', req.user.email, 'LEAVE_POLICY', policy.id, `Updated ${policy.leaveType} policy`, orgId);
+        try {
+            const creator = await User_js_1.User.findById(req.user.id);
+            await Announcement_js_1.Announcement.create({
+                organizationId: orgId,
+                title: `Leave Policy Updated: ${policy.leaveType}`,
+                content: `The leave policy for ${policy.leaveType} has been updated. The monthly allowance is now set to ${policy.monthlyAllowance} days.`,
+                type: 'POLICY_CHANGE',
+                createdBy: req.user.id,
+                createdByName: creator?.name || req.user.email,
+                createdByRole: req.user.role,
+            });
+        }
+        catch (annError) {
+            logger_js_1.logger.error('[leavePolicy] announcement creation failed in updatePolicy', { error: annError.message });
+        }
         res.status(200).json({ policy, message: 'Leave policy updated successfully.' });
     }
     catch (error) {
@@ -164,6 +196,21 @@ const togglePolicyStatus = async (req, res) => {
         policy.isActive = !policy.isActive;
         await policy.save();
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_POLICY_TOGGLE', req.user.email, 'LEAVE_POLICY', policy.id, `${policy.leaveType} policy set to ${policy.isActive ? 'ACTIVE' : 'INACTIVE'}`, orgId);
+        try {
+            const creator = await User_js_1.User.findById(req.user.id);
+            await Announcement_js_1.Announcement.create({
+                organizationId: orgId,
+                title: `Leave Policy status changed: ${policy.leaveType}`,
+                content: `The leave policy for ${policy.leaveType} has been ${policy.isActive ? 'activated' : 'deactivated'} by management.`,
+                type: 'POLICY_CHANGE',
+                createdBy: req.user.id,
+                createdByName: creator?.name || req.user.email,
+                createdByRole: req.user.role,
+            });
+        }
+        catch (annError) {
+            logger_js_1.logger.error('[leavePolicy] announcement creation failed in togglePolicyStatus', { error: annError.message });
+        }
         res.status(200).json({
             policy,
             message: `${policy.leaveType} policy is now ${policy.isActive ? 'active' : 'inactive'}.`,

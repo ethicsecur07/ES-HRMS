@@ -6,9 +6,23 @@ const logger_js_1 = require("../utils/logger.js");
 const jwt_js_1 = require("../utils/jwt.js");
 const UserSession_js_1 = require("../models/UserSession.js");
 let ioInstance = null;
-// User presence status: userId -> { organizationId, allSockets: Set, activeSockets: Set }
+/**
+ * Online Presence – simplified model:
+ *  - A user is ONLINE  ↔ they have ≥ 1 connected socket.
+ *  - A user is OFFLINE ↔ ALL their sockets have disconnected AND the 8-second
+ *    reconnect grace period has elapsed.
+ *
+ * We intentionally do NOT use "active/inactive" signals for the online dot.
+ * That would cause false-offline events every time someone alt-tabs or opens
+ * DevTools.  The `user_active` / `user_inactive` socket events are kept only
+ * as no-ops so existing clients don't break, but they no longer affect the
+ * online indicator.
+ */
+// userId → { organizationId, sockets: Set<socketId> }
 const userPresence = new Map();
+// userId → reconnect grace-period timer
 const disconnectTimeouts = new Map();
+/** Return all userIds in an org that currently have ≥ 1 socket connected */
 const getOnlineUserIdsByOrg = (orgId) => {
     const ids = [];
     for (const [userId, presence] of userPresence.entries()) {
@@ -112,10 +126,15 @@ const initSockets = (httpServer) => {
                     sockets: new Set(),
                 });
             }
-            onlineUsers.get(user.id).socketIds.add(socket.id);
-            // Broadcast to ALL org members (including self) that this user is online
-            io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
-            // Send the FULL current list of online users in this organization to only the newly connected socket
+            const presence = userPresence.get(user.id);
+            const wasOffline = presence.sockets.size === 0;
+            presence.sockets.add(socket.id);
+            if (wasOffline) {
+                // Broadcast to ALL org members that this user is now online
+                io.to(`org_${user.organizationId}`).emit('user_online', { userId: user.id });
+                logger_js_1.logger.info(`User ${user.email} is now ONLINE (socket: ${socket.id}).`);
+            }
+            // Send the full current online list to ONLY the newly connected socket
             socket.emit('online_users', getOnlineUserIdsByOrg(user.organizationId));
         }
         // ── Group/Broadcast room join ────────────────────────────────────────────

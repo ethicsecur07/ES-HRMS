@@ -40,6 +40,7 @@ import expenseRoutes from './routes/expense.routes.js';
 import projectRoutes from './domains/project-management/project.routes.js';
 import recruitmentRoutes from './domains/recruitment/recruitment.routes.js';
 import applicantRoutes from './routes/applicant.routes.js';
+import announcementRoutes from './routes/announcement.routes.js';
 import chatRoutes from './domains/chat/chat.routes.js';
 import notificationRoutes from './domains/notification/notification.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
@@ -127,6 +128,7 @@ app.use('/metrics', metricsMiddleware);
   app.use('/api/designations', designationRoutes);
   app.use('/api/holiday-calendar', holidayCalendarRoutes);
   app.use('/api/leave-policies', leavePolicyRoutes);
+  app.use('/api/announcements', announcementRoutes);
 
   // Healthcheck Route
   app.get('/health', (req, res) => {

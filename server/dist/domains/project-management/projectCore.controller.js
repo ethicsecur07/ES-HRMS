@@ -51,7 +51,30 @@ const createProject = async (req, res, next) => {
 exports.createProject = createProject;
 const getProjects = async (req, res, next) => {
     try {
-        const projects = await Project_js_1.Project.find({ organizationId: req.user?.organizationId })
+        const organizationId = req.user?.organizationId;
+        const role = req.user?.role;
+        const employeeId = req.user?.employeeId;
+        let query = { organizationId };
+        if (role === 'EMPLOYEE' && employeeId) {
+            const employee = await Employee_js_1.Employee.findById(employeeId);
+            if (employee) {
+                // Detect if the employee is an Intern
+                const isIntern = /intern/i.test(employee.designation || '') || /intern/i.test(employee.department || '');
+                if (isIntern) {
+                    query.$or = [
+                        { teamMemberIds: employeeId },
+                        { projectType: { $regex: /intern/i } }
+                    ];
+                }
+                else {
+                    query.teamMemberIds = employeeId;
+                }
+            }
+            else {
+                query.teamMemberIds = employeeId;
+            }
+        }
+        const projects = await Project_js_1.Project.find(query)
             .populate('allocatedManagerId', 'name email')
             .sort({ createdAt: -1 });
         res.json({ projects });

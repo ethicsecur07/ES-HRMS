@@ -7,6 +7,7 @@ exports.EmployeeService = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const Employee_js_1 = require("../models/Employee.js");
 const User_js_1 = require("../models/User.js");
+const Candidate_js_1 = require("../models/Candidate.js");
 const PasswordService_js_1 = require("../domains/auth-engine/services/PasswordService.js");
 const auditLog_service_js_1 = require("./auditLog.service.js");
 const Department_js_1 = require("../models/Department.js");
@@ -17,7 +18,7 @@ class EmployeeService {
     /**
      * Onboards a new employee, creates their system User account, and hashes their password atomically.
      */
-    static async createEmployee(employeeData, password, orgId, emailForAudit) {
+    static async createEmployee(employeeData, password, orgId, emailForAudit, candidateId, leadId) {
         const session = await mongoose_1.default.startSession();
         session.startTransaction();
         try {
@@ -62,10 +63,27 @@ class EmployeeService {
                     role: 'EMPLOYEE',
                     employeeId: employee._id,
                     isActive: true,
-                    isLoginApproved: false,
+                    isLoginApproved: true,
                 }], { session });
+            // Apply lead assignment as primaryManagerId if provided
+            if (leadId && mongoose_1.default.isValidObjectId(leadId)) {
+                employee.primaryManagerId = new mongoose_1.default.Types.ObjectId(leadId);
+                await employee.save({ session });
+            }
             await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_CREATE', emailForAudit, 'EMPLOYEE', employee.employeeCode, `Onboarded employee ${employee.fullName} and provisioned credentials.`, orgId);
             await session.commitTransaction();
+            // Mark candidate as accountCreated (outside the transaction, best effort)
+            if (candidateId && mongoose_1.default.isValidObjectId(candidateId)) {
+                try {
+                    await Candidate_js_1.Candidate.findByIdAndUpdate(candidateId, {
+                        accountCreated: true,
+                        ...(leadId && mongoose_1.default.isValidObjectId(leadId) ? { assignedLeadId: new mongoose_1.default.Types.ObjectId(leadId) } : {})
+                    });
+                }
+                catch (_) {
+                    // non-critical, log only
+                }
+            }
             return { employee, generatedPassword: defaultPassword };
         }
         catch (error) {

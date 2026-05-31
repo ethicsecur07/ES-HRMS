@@ -8,6 +8,7 @@ export interface IStageEvaluation {
   toolsExperiences?: string;
   completed?: boolean;
   completedAt?: Date;
+  documentVerified?: boolean;
 }
 
 export interface ICandidate extends Document {
@@ -16,6 +17,7 @@ export interface ICandidate extends Document {
   email: string;
   phone: string;
   resumeUrl?: string;
+  marksheetUrl?: string;
   appliedRole: string;
   stage: 'NEW' | 'SCREENING' | 'INTERVIEW' | 'TECHNICAL' | 'HR' | 'OFFER' | 'HIRED';
   interviewSchedule?: {
@@ -32,6 +34,8 @@ export interface ICandidate extends Document {
   };
   notes?: string;
   evaluations?: IStageEvaluation[];
+  accountCreated?: boolean;
+  assignedLeadId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +47,7 @@ const CandidateSchema = new Schema<ICandidate>(
     email: { type: String, required: true, unique: true },
     phone: { type: String, required: true },
     resumeUrl: { type: String },
+    marksheetUrl: { type: String },
     appliedRole: { type: String, required: true },
     stage: {
       type: String,
@@ -62,6 +67,8 @@ const CandidateSchema = new Schema<ICandidate>(
       status: { type: String, enum: ['PENDING', 'ACCEPTED', 'REJECTED'], default: 'PENDING' }
     },
     notes: { type: String },
+    accountCreated: { type: Boolean, default: false },
+    assignedLeadId: { type: Schema.Types.ObjectId, ref: 'Employee', default: null },
     evaluations: [
       {
         stage: { type: String, required: true },
@@ -70,7 +77,8 @@ const CandidateSchema = new Schema<ICandidate>(
         ratingTechnical: { type: Number, min: 0, max: 5 },
         toolsExperiences: { type: String },
         completed: { type: Boolean, default: false },
-        completedAt: { type: Date }
+        completedAt: { type: Date },
+        documentVerified: { type: Boolean, default: false }
       }
     ]
   },
