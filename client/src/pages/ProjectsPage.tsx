@@ -7,6 +7,7 @@ import { Modal } from '../Components/WrapperComponents/Modal';
 import { Input, Select, Textarea } from '../Components/WrapperComponents/Input';
 import { Button } from '../Components/WrapperComponents/Button';
 import { usePermission } from '../hooks/usePermission';
+import { CardGridSkeleton } from '../Components/WrapperComponents/Skeleton';
 
 export const ProjectsPage = () => {
   const { hasPermission } = usePermission();
@@ -14,6 +15,7 @@ export const ProjectsPage = () => {
   const [employees, setEmployees] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   // Form states
@@ -73,17 +75,22 @@ export const ProjectsPage = () => {
   };
 
   useEffect(() => {
-    fetchProjects();
-
-    const fetchEmployees = async () => {
+    const fetchData = async () => {
+      setIsLoading(true);
       try {
-        const data = await employeeApi.getAll();
-        setEmployees(data.employees || []);
+        const [projData, empData] = await Promise.all([
+          projectApi.getProjects(),
+          employeeApi.getAll()
+        ]);
+        setProjects(projData.projects || []);
+        setEmployees(empData.employees || []);
       } catch (error) {
-        console.error('Failed to fetch employees', error);
+        console.error('Failed to load projects data', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchEmployees();
+    fetchData();
   }, []);
 
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -129,6 +136,10 @@ export const ProjectsPage = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return <CardGridSkeleton />;
+  }
 
   return (
     <div className="p-6 space-y-6 text-left animate-in fade-in duration-300">

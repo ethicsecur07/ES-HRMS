@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -574,12 +575,7 @@ export const RecruitmentPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-xs font-semibold uppercase tracking-wider">Loading Pipeline...</p>
-      </div>
-    );
+    return <TableSkeleton />;
   }
 
   return (

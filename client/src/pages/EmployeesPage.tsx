@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -469,11 +470,7 @@ export const EmployeesPage: React.FC = () => {
   });
 
   if (isLoading) {
-    return (
-      <Card className="animate-pulse h-96 bg-muted/20 flex items-center justify-center">
-        <div className="text-muted-foreground">Loading employee directory...</div>
-      </Card>
-    );
+    return <TableSkeleton />;
   }
 
   return (

@@ -7,6 +7,7 @@ import { Button } from '../Components/WrapperComponents/Button';
 import { Settings, ShieldCheck, Users, Save, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
+import { SettingsSkeleton } from '../Components/WrapperComponents/Skeleton';
 
 
 const ACTIONS_LIST: (keyof PermissionActions)[] = ['view', 'create', 'edit', 'delete', 'approve', 'assign', 'export'];
@@ -235,7 +236,9 @@ export const PermissionPage: React.FC = () => {
     updateMatrixMutation.mutate(updates);
   };
 
-
+  if (isMatrixLoading) {
+    return <SettingsSkeleton />;
+  }
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">

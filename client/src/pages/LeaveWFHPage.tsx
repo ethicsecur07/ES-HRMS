@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
@@ -324,11 +325,7 @@ export const LeaveWFHPage: React.FC = () => {
   ];
 
   if (leavesLoading || wfhLoading || permsLoading) {
-    return (
-      <Card className="animate-pulse h-96 bg-muted/20">
-        <div />
-      </Card>
-    );
+    return <TableSkeleton />;
   }
 
 

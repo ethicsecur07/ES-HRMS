@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DashboardSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
@@ -86,16 +87,7 @@ export const DashboardPage: React.FC = () => {
   ];
 
   if (statsLoading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <Card className="h-40 bg-muted/20">
-          <div />
-        </Card>
-        <Card className="h-96 bg-muted/20">
-          <div />
-        </Card>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (

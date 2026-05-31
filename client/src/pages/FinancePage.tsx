@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../api_service/financeApi';
 import { useAuthStore } from '../store/useAuthStore';
@@ -75,6 +76,10 @@ export const FinancePage: React.FC = () => {
 
   const summary = data?.summary || { totalAllocated: 0, totalSpent: 0, remainingBalance: 0 };
   const records = data?.records || [];
+
+  if (isLoading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">

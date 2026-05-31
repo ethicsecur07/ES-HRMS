@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roleApi, type RoleData } from '../api_service/roleApi';
 import { employeeApi } from '../api_service/employeeApi';
@@ -273,6 +274,10 @@ export const RoleManagementPage: React.FC = () => {
     const parentId = r.parentRoleId && typeof r.parentRoleId === 'object' ? (r.parentRoleId as any)._id : r.parentRoleId;
     return !parentId || !roles.some(parent => parent._id === parentId);
   });
+
+  if (isLoading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="space-y-6 text-left animate-in fade-in duration-300">

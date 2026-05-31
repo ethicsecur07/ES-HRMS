@@ -46,31 +46,31 @@ type TabType = 'details' | 'checklist' | 'comments' | 'activity' | 'review';
 
 // ─── Priority / Status config ─────────────────────────────────────
 const PRIORITY_CONFIG = {
-  CRITICAL: { label: 'Critical', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/30', dot: 'bg-red-500' },
-  HIGH:     { label: 'High',     color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/30', dot: 'bg-orange-500' },
-  MEDIUM:   { label: 'Medium',   color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/30',   dot: 'bg-amber-400' },
-  LOW:      { label: 'Low',      color: 'text-slate-400',  bg: 'bg-slate-500/10 border-slate-500/30',   dot: 'bg-slate-400' },
+  CRITICAL: { label: 'Critical', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10 border-red-500/20 dark:border-red-500/30', dot: 'bg-red-500' },
+  HIGH:     { label: 'High',     color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20 dark:border-orange-500/30', dot: 'bg-orange-500' },
+  MEDIUM:   { label: 'Medium',   color: 'text-amber-600 dark:text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/20 dark:border-amber-500/30',   dot: 'bg-amber-500 dark:bg-amber-400' },
+  LOW:      { label: 'Low',      color: 'text-muted-foreground',  bg: 'bg-muted border-border',   dot: 'bg-muted-foreground' },
 };
 
 const STATUS_CONFIG = {
-  TODO:        { label: 'To Do',       color: 'text-slate-400',  bg: 'bg-slate-500/10 border-slate-500/30'  },
-  IN_PROGRESS: { label: 'In Progress', color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/30'    },
-  REVIEW:      { label: 'In Review',   color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/30'},
-  COMPLETED:   { label: 'Completed',   color: 'text-emerald-400',bg: 'bg-emerald-500/10 border-emerald-500/30'},
+  TODO:        { label: 'To Do',       color: 'text-muted-foreground',  bg: 'bg-muted border-border'  },
+  IN_PROGRESS: { label: 'In Progress', color: 'text-blue-600 dark:text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/20 dark:border-blue-500/30'    },
+  REVIEW:      { label: 'In Review',   color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20 dark:border-purple-500/30'},
+  COMPLETED:   { label: 'Completed',   color: 'text-emerald-600 dark:text-emerald-400',bg: 'bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/30'},
 };
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
-  CREATED:              <Plus className="w-3.5 h-3.5 text-emerald-400" />,
-  ASSIGNED:             <User className="w-3.5 h-3.5 text-blue-400" />,
-  STATUS_CHANGED:       <ChevronRight className="w-3.5 h-3.5 text-indigo-400" />,
-  SUBMITTED_FOR_REVIEW: <Send className="w-3.5 h-3.5 text-purple-400" />,
-  REVIEW_APPROVED:      <ThumbsUp className="w-3.5 h-3.5 text-emerald-400" />,
-  REWORK_REQUESTED:     <RotateCcw className="w-3.5 h-3.5 text-red-400" />,
-  COMMENTED:            <MessageSquare className="w-3.5 h-3.5 text-slate-400" />,
-  UPDATED:              <Clock className="w-3.5 h-3.5 text-slate-400" />,
-  DEADLINE_UPDATED:     <Calendar className="w-3.5 h-3.5 text-amber-400" />,
-  PRIORITY_CHANGED:     <Flag className="w-3.5 h-3.5 text-orange-400" />,
-  ATTACHMENT_ADDED:     <Paperclip className="w-3.5 h-3.5 text-slate-400" />,
+  CREATED:              <Plus className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />,
+  ASSIGNED:             <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />,
+  STATUS_CHANGED:       <ChevronRight className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />,
+  SUBMITTED_FOR_REVIEW: <Send className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />,
+  REVIEW_APPROVED:      <ThumbsUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />,
+  REWORK_REQUESTED:     <RotateCcw className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />,
+  COMMENTED:            <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />,
+  UPDATED:              <Clock className="w-3.5 h-3.5 text-muted-foreground" />,
+  DEADLINE_UPDATED:     <Calendar className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />,
+  PRIORITY_CHANGED:     <Flag className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />,
+  ATTACHMENT_ADDED:     <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />,
 };
 
 // ─── Main Component ───────────────────────────────────────────────
@@ -281,10 +281,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="relative z-10 flex flex-col bg-[#0f1117]/85 backdrop-blur-xl border-l border-white/10 w-full max-w-2xl h-full shadow-2xl overflow-hidden">
+      <div className="relative z-10 flex flex-col bg-card/95 backdrop-blur-xl border-l border-border w-full max-w-2xl h-full shadow-2xl overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-white/10">
+        <div className="flex items-start justify-between p-5 border-b border-border">
           <div className="flex-1 pr-4">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${priConfig.bg} ${priConfig.color}`}>
@@ -295,20 +295,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 {statConfig.label}
               </span>
               {(task.reworkCount ?? 0) > 0 && (
-                <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border bg-red-500/10 border-red-500/30 text-red-400 flex items-center gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border bg-red-500/10 border-red-500/20 dark:border-red-500/30 text-red-600 dark:text-red-400 flex items-center gap-1">
                   <RotateCcw className="w-3 h-3" /> Rework ×{task.reworkCount}
                 </span>
               )}
             </div>
-            <h2 className="text-lg font-bold text-white leading-snug">{task.title}</h2>
+            <h2 className="text-lg font-bold text-foreground leading-snug">{task.title}</h2>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0">
+          <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-white/10 overflow-x-auto">
+        <div className="flex border-b border-border overflow-x-auto">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -316,13 +316,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               className={`flex items-center gap-1.5 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-400 hover:text-white hover:bg-white/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               {tab.icon}
               {tab.label}
               {tab.badge !== undefined && tab.badge > 0 && (
-                <span className="ml-0.5 bg-white/10 text-slate-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                <span className="ml-0.5 bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border">
                   {tab.badge}
                 </span>
               )}
@@ -338,13 +338,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <div className="space-y-5">
               {/* Task Title Edit */}
               {canEdit && (
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Task Title</p>
+                <div className="bg-muted/40 rounded-xl p-4 border border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-1">Task Title</p>
                   <input
                     type="text"
                     value={editTitle}
                     onChange={e => setEditTitle(e.target.value)}
-                    className="w-full bg-transparent text-sm text-white font-semibold outline-none border-b border-white/10 focus:border-primary/50 pb-1"
+                    className="w-full bg-transparent text-sm text-foreground font-semibold outline-none border-b border-border focus:border-primary pb-1"
                     placeholder="Task Title"
                   />
                 </div>
@@ -352,39 +352,47 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 {/* Assigned To */}
-                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Assigned To</p>
+                <div className="bg-muted/40 rounded-xl p-3 border border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-1">Assigned To</p>
                   {canEdit ? (
                     <select value={editAssignedTo} onChange={e => setEditAssignedTo(e.target.value)}
-                      className="w-full bg-transparent text-sm text-white outline-none">
-                      <option value="">Unassigned</option>
-                      {teamMembers.map(m => <option key={m._id} value={m._id}>{m.fullName}</option>)}
+                      className="w-full bg-transparent text-sm text-foreground outline-none dark:bg-card bg-background [color-scheme:light_dark]">
+                      <option value="" className="dark:bg-card bg-background text-foreground">Unassigned</option>
+                      {teamMembers.map(m => (
+                        <option key={m._id} value={m._id} className="dark:bg-card bg-background text-foreground">
+                          {m.fullName}
+                        </option>
+                      ))}
                     </select>
                   ) : (
-                    <p className="text-sm text-white font-medium">{task.assignedTo?.fullName || 'Unassigned'}</p>
+                    <p className="text-sm text-foreground font-medium">{task.assignedTo?.fullName || 'Unassigned'}</p>
                   )}
                 </div>
 
                 {/* Due Date */}
-                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Due Date</p>
+                <div className="bg-muted/40 rounded-xl p-3 border border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-1">Due Date</p>
                   {canEdit ? (
                     <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)}
-                      className="w-full bg-transparent text-sm text-white outline-none" />
+                      className="w-full bg-transparent text-sm text-foreground outline-none [color-scheme:light_dark]" />
                   ) : (
-                    <p className="text-sm text-white font-medium">
+                    <p className="text-sm text-foreground font-medium">
                       {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}
                     </p>
                   )}
                 </div>
 
                 {/* Priority */}
-                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Priority</p>
+                <div className="bg-muted/40 rounded-xl p-3 border border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-1">Priority</p>
                   {canEdit ? (
                     <select value={editPriority} onChange={e => setEditPriority(e.target.value)}
-                      className="w-full bg-transparent text-sm text-white outline-none">
-                      {['LOW','MEDIUM','HIGH','CRITICAL'].map(p => <option key={p} value={p}>{p}</option>)}
+                      className="w-full bg-transparent text-sm text-foreground outline-none dark:bg-card bg-background [color-scheme:light_dark]">
+                      {['LOW','MEDIUM','HIGH','CRITICAL'].map(p => (
+                        <option key={p} value={p} className="dark:bg-card bg-background text-foreground">
+                          {p}
+                        </option>
+                      ))}
                     </select>
                   ) : (
                     <p className={`text-sm font-semibold ${priConfig.color}`}>{task.priority}</p>
@@ -392,16 +400,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
 
                 {/* Sprint */}
-                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Sprint</p>
+                <div className="bg-muted/40 rounded-xl p-3 border border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-1">Sprint</p>
                   {canEdit ? (
                     <select value={editSprintId} onChange={e => setEditSprintId(e.target.value)}
-                      className="w-full bg-transparent text-sm text-white outline-none">
-                      <option value="">Backlog</option>
-                      {sprints.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                      className="w-full bg-transparent text-sm text-foreground outline-none dark:bg-card bg-background [color-scheme:light_dark]">
+                      <option value="" className="dark:bg-card bg-background text-foreground">Backlog</option>
+                      {sprints.map(s => (
+                        <option key={s._id} value={s._id} className="dark:bg-card bg-background text-foreground">
+                          {s.name}
+                        </option>
+                      ))}
                     </select>
                   ) : (
-                    <p className="text-sm text-white font-medium">
+                    <p className="text-sm text-foreground font-medium">
                       {sprints.find(s => s._id === task.sprintId)?.name || 'Backlog'}
                     </p>
                   )}
@@ -409,27 +421,27 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </div>
 
               {/* Description */}
-              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Description</p>
+              <div className="bg-muted/40 rounded-xl p-4 border border-border">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-2">Description</p>
                 {canEdit ? (
                   <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)}
-                    className="w-full bg-transparent text-sm text-slate-200 outline-none resize-none min-h-[80px] placeholder:text-slate-600"
+                    className="w-full bg-transparent text-sm text-foreground outline-none resize-none min-h-[80px] placeholder:text-muted-foreground/50"
                     placeholder="Add a description..." />
                 ) : (
-                  <p className="text-sm text-slate-300 leading-relaxed">{task.description || 'No description.'}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{task.description || 'No description.'}</p>
                 )}
               </div>
 
               {/* Tags */}
-              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-3">Tags</p>
+              <div className="bg-muted/40 rounded-xl p-4 border border-border">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-3">Tags</p>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {editTags.map((tag, i) => (
                     <span key={i} className="flex items-center gap-1 bg-primary/10 text-primary border border-primary/30 px-2 py-0.5 rounded-full text-xs font-medium">
                       <Tag className="w-3 h-3" />{tag}
                       {canEdit && (
                         <button onClick={() => setEditTags(editTags.filter((_, idx) => idx !== i))}
-                          className="hover:text-red-400 ml-0.5">
+                          className="hover:text-red-500 dark:hover:text-red-400 ml-0.5">
                           <X className="w-2.5 h-2.5" />
                         </button>
                       )}
@@ -440,21 +452,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   <input value={newTag} onChange={e => setNewTag(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && newTag.trim()) { setEditTags([...editTags, newTag.trim()]); setNewTag(''); } }}
                     placeholder="Add tag & press Enter"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-primary/50" />
+                    className="w-full bg-muted/40 border border-border rounded-lg px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary" />
                 )}
               </div>
 
               {/* Rework history */}
               {(task.reworkComments?.length ?? 0) > 0 && (
                 <div className="bg-red-500/5 rounded-xl p-4 border border-red-500/20">
-                  <p className="text-[10px] uppercase tracking-wider text-red-400 mb-3 flex items-center gap-1.5">
+                  <p className="text-[10px] uppercase tracking-wider text-red-500 dark:text-red-400 mb-3 flex items-center gap-1.5">
                     <RotateCcw className="w-3.5 h-3.5" /> Rework History ({task.reworkComments!.length})
                   </p>
                   <div className="space-y-3">
                     {task.reworkComments!.map((rc, i) => (
-                      <div key={i} className="bg-white/5 rounded-lg p-3 border border-red-500/10">
-                        <p className="text-sm text-slate-200">{rc.comment}</p>
-                        <p className="text-[10px] text-slate-500 mt-1">{rc.byName} · {new Date(rc.at).toLocaleString()}</p>
+                      <div key={i} className="bg-card rounded-lg p-3 border border-border">
+                        <p className="text-sm text-foreground">{rc.comment}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">{rc.byName} · {new Date(rc.at).toLocaleString()}</p>
                       </div>
                     ))}
                   </div>
@@ -465,7 +477,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               {canEdit && (
                 <div className="flex justify-between items-center pt-2">
                   <button onClick={handleDeleteTask}
-                    className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors border border-transparent hover:border-red-500/20">
+                    className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors border border-transparent hover:border-red-500/20">
                     <Trash2 className="w-3.5 h-3.5" /> Delete Task
                   </button>
                   <button onClick={handleSaveDetails} disabled={isSaving}
@@ -483,7 +495,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <div className="space-y-4">
               {editChecklist.length > 0 && (
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                     <div className="h-full bg-primary rounded-full transition-all duration-500"
                       style={{ width: `${checklistProgress}%` }} />
                   </div>
@@ -494,7 +506,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               )}
               <div className="space-y-2">
                 {editChecklist.map((item, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/10 group">
+                  <div key={i} className="flex items-center gap-3 bg-muted/40 rounded-xl px-4 py-3 border border-border group">
                     <button
                       onClick={async () => {
                         const updated = editChecklist.map((c, idx) => idx === i ? { ...c, done: !c.done } : c);
@@ -505,10 +517,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                           onTaskUpdated(data.task);
                         } catch (e) { console.error(e); }
                       }}
-                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${item.done ? 'bg-primary border-primary' : 'border-slate-500 hover:border-primary'}`}>
+                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${item.done ? 'bg-primary border-primary' : 'border-muted-foreground hover:border-primary'}`}>
                       {item.done && <Check className="w-3 h-3 text-white" />}
                     </button>
-                    <span className={`flex-1 text-sm ${item.done ? 'line-through text-slate-500' : 'text-slate-200'}`}>{item.label}</span>
+                    <span className={`flex-1 text-sm ${item.done ? 'line-through text-muted-foreground/60' : 'text-foreground'}`}>{item.label}</span>
                     {canEdit && (
                       <button onClick={async () => {
                         const updated = editChecklist.filter((_, idx) => idx !== i);
@@ -519,7 +531,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                           onTaskUpdated(data.task);
                         } catch (e) { console.error(e); }
                       }}
-                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all">
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-all">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     )}
@@ -542,7 +554,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       }
                     }}
                     placeholder="Add checklist item & press Enter..."
-                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-primary/50 placeholder:text-slate-600" />
+                    className="flex-1 bg-muted/40 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50" />
                   <button
                     onClick={async () => {
                       if (newChecklistItem.trim()) {
@@ -570,32 +582,32 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               {isCommentsLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-primary animate-spin" /></div>
               ) : comments.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">No comments yet. Start the conversation.</div>
+                <div className="text-center py-8 text-muted-foreground text-sm">No comments yet. Start the conversation.</div>
               ) : (
                 <div className="space-y-3">
                   {comments.map((c: any) => (
-                    <div key={c._id} className={`rounded-xl p-4 border ${c.isReworkNote ? 'bg-red-500/5 border-red-500/20' : 'bg-white/5 border-white/10'}`}>
+                    <div key={c._id} className={`rounded-xl p-4 border ${c.isReworkNote ? 'bg-red-500/5 border-red-500/20' : 'bg-muted/40 border-border'}`}>
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold border border-primary/30">
                           {c.authorName?.charAt(0)?.toUpperCase() || 'U'}
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-white">{c.authorName}</p>
-                          <p className="text-[10px] text-slate-500">{new Date(c.createdAt).toLocaleString()}</p>
+                          <p className="text-xs font-semibold text-foreground">{c.authorName}</p>
+                          <p className="text-[10px] text-muted-foreground/80">{new Date(c.createdAt).toLocaleString()}</p>
                         </div>
                         {c.isReworkNote && (
-                          <span className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full font-bold">REWORK</span>
+                          <span className="text-[10px] bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 dark:border-red-500/30 px-1.5 py-0.5 rounded-full font-bold">REWORK</span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-300 leading-relaxed">{c.content}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{c.content}</p>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="flex gap-3 pt-2 border-t border-white/10">
+              <div className="flex gap-3 pt-2 border-t border-border">
                 <textarea value={newComment} onChange={e => setNewComment(e.target.value)}
                   placeholder="Write a comment..." rows={2}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-primary/50 resize-none placeholder:text-slate-600" />
+                  className="flex-1 bg-muted/40 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:border-primary resize-none placeholder:text-muted-foreground/50" />
                 <button onClick={handleAddComment} disabled={isSubmittingComment || !newComment.trim()}
                   className="self-end px-3 py-3 bg-primary hover:bg-primary/90 disabled:opacity-40 text-white rounded-xl transition-colors">
                   {isSubmittingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -610,25 +622,25 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               {isActivityLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-primary animate-spin" /></div>
               ) : activities.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 text-sm">No activity recorded yet.</div>
+                <div className="text-center py-8 text-muted-foreground text-sm">No activity recorded yet.</div>
               ) : (
                 <div className="relative pl-6">
-                  <div className="absolute left-2.5 top-0 bottom-0 w-px bg-white/10" />
+                  <div className="absolute left-2.5 top-0 bottom-0 w-px bg-border" />
                   {activities.map((a: any) => (
                     <div key={a._id} className="relative mb-4">
-                      <div className="absolute -left-4 top-0.5 w-6 h-6 rounded-full bg-[#0f1117] border border-white/10 flex items-center justify-center">
-                        {ACTION_ICONS[a.action] || <Clock className="w-3 h-3 text-slate-500" />}
+                      <div className="absolute -left-4 top-0.5 w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center">
+                        {ACTION_ICONS[a.action] || <Clock className="w-3 h-3 text-muted-foreground" />}
                       </div>
-                      <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                      <div className="bg-muted/40 rounded-xl p-3 border border-border">
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs font-semibold text-white">{a.actorName}</p>
-                          <p className="text-[10px] text-slate-500">{new Date(a.createdAt).toLocaleString()}</p>
+                          <p className="text-xs font-semibold text-foreground">{a.actorName}</p>
+                          <p className="text-[10px] text-muted-foreground">{new Date(a.createdAt).toLocaleString()}</p>
                         </div>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-muted-foreground">
                           {a.action.replace(/_/g, ' ')}
                           {a.from && a.to && ` · ${a.from} → ${a.to}`}
                         </p>
-                        {a.comment && <p className="text-xs text-slate-500 mt-1 italic">"{a.comment}"</p>}
+                        {a.comment && <p className="text-xs text-muted-foreground/80 mt-1 italic">"{a.comment}"</p>}
                       </div>
                     </div>
                   ))}
@@ -642,37 +654,37 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <div className="space-y-5">
               {/* Submitted notes (visible to Team Lead) */}
               {task.completionNotes && (
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Employee Completion Notes</p>
-                  <p className="text-sm text-slate-200">{task.completionNotes}</p>
+                <div className="bg-muted/40 rounded-xl p-4 border border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Employee Completion Notes</p>
+                  <p className="text-sm text-foreground">{task.completionNotes}</p>
                 </div>
               )}
               {task.progressSummary && (
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Progress Summary</p>
-                  <p className="text-sm text-slate-200">{task.progressSummary}</p>
+                <div className="bg-muted/40 rounded-xl p-4 border border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Progress Summary</p>
+                  <p className="text-sm text-foreground">{task.progressSummary}</p>
                 </div>
               )}
 
               {/* Employee: submit for review (only when IN_PROGRESS) */}
               {isEmployee && task.status === 'IN_PROGRESS' && (
                 <div className="bg-indigo-500/5 rounded-xl p-5 border border-indigo-500/20 space-y-4">
-                  <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
                     <Send className="w-4 h-4" /> Submit for Review
                   </h3>
                   <textarea value={completionNotes} onChange={e => setCompletionNotes(e.target.value)}
                     placeholder="What did you complete? Include any notes for the reviewer..." rows={3}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 resize-none placeholder:text-slate-600" />
+                    className="w-full bg-muted/40 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:border-indigo-500/50 resize-none placeholder:text-muted-foreground/50" />
                   <textarea value={progressSummary} onChange={e => setProgressSummary(e.target.value)}
                     placeholder="Optional: Brief progress summary..." rows={2}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 resize-none placeholder:text-slate-600" />
+                    className="w-full bg-muted/40 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:border-indigo-500/50 resize-none placeholder:text-muted-foreground/50" />
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" checked={checklistConfirmed} onChange={e => setChecklistConfirmed(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-500 text-indigo-500 bg-transparent" />
-                    <span className="text-sm text-slate-300">I confirm all checklist items are complete</span>
+                      className="w-4 h-4 rounded border-border text-indigo-500 bg-transparent" />
+                    <span className="text-sm text-muted-foreground">I confirm all checklist items are complete</span>
                   </label>
                   {workflowError && (
-                    <p className="text-xs text-red-400 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20">{workflowError}</p>
+                    <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20">{workflowError}</p>
                   )}
                   <button onClick={handleSubmitForReview} disabled={isWorkflowSubmitting}
                     className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white font-semibold text-sm py-3 rounded-xl transition-colors disabled:opacity-50">
@@ -687,12 +699,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 <div className="space-y-4">
                   {/* Approve */}
                   <div className="bg-emerald-500/5 rounded-xl p-5 border border-emerald-500/20 space-y-4">
-                    <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                       <ThumbsUp className="w-4 h-4" /> Approve Task
                     </h3>
                     <textarea value={reviewNotes} onChange={e => setReviewNotes(e.target.value)}
                       placeholder="Optional review notes..." rows={2}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 resize-none placeholder:text-slate-600" />
+                      className="w-full bg-muted/40 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:border-emerald-500/50 resize-none placeholder:text-muted-foreground/50" />
                     <button onClick={handleApproveTask} disabled={isWorkflowSubmitting}
                       className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm py-3 rounded-xl transition-colors disabled:opacity-50">
                       {isWorkflowSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
@@ -702,14 +714,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                   {/* Reject / Rework */}
                   <div className="bg-red-500/5 rounded-xl p-5 border border-red-500/20 space-y-4">
-                    <h3 className="text-sm font-bold text-red-400 flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
                       <RotateCcw className="w-4 h-4" /> Request Rework
                     </h3>
                     <textarea value={reworkComment} onChange={e => setReworkComment(e.target.value)}
                       placeholder="Describe what needs to be reworked (required)..." rows={3}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-red-500/50 resize-none placeholder:text-slate-600" />
+                      className="w-full bg-muted/40 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:border-red-500/50 resize-none placeholder:text-muted-foreground/50" />
                     {workflowError && (
-                      <p className="text-xs text-red-400 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20">{workflowError}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20">{workflowError}</p>
                     )}
                     <button onClick={handleRejectTask} disabled={isWorkflowSubmitting || !reworkComment.trim()}
                       className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-semibold text-sm py-3 rounded-xl transition-colors disabled:opacity-50">

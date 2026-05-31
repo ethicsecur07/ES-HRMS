@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { SettingsSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { NavLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leavePolicyApi, type LeavePolicy } from '../api_service/leavePolicyApi';
@@ -402,13 +403,8 @@ export const LeavePolicyPage: React.FC = () => {
   const handlePrevMonth = () => { if (calendarMonth === 0) { setCalendarYear(y => y - 1); setCalendarMonth(11); } else setCalendarMonth(m => m - 1); };
   const handleNextMonth = () => { if (calendarMonth === 11) { setCalendarYear(y => y + 1); setCalendarMonth(0); } else setCalendarMonth(m => m + 1); };
 
-  if (permsLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px] text-primary font-semibold">
-        <Loader2 className="w-8 h-8 animate-spin mr-2" />
-        Loading Permissions...
-      </div>
-    );
+  if (permsLoading || policiesLoading || holidaysLoading) {
+    return <SettingsSkeleton />;
   }
 
   if (!hasPermission('LEAVE_POLICY', 'view')) {

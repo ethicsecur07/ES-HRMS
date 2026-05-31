@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { projectApi } from '../api_service/projectApi';
@@ -12,6 +13,7 @@ import {
   ListTodo, Video
 } from 'lucide-react';
 import { Modal } from '../Components/WrapperComponents/Modal';
+import { DashboardSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { Input, Select, Textarea } from '../Components/WrapperComponents/Input';
 import { Button } from '../Components/WrapperComponents/Button';
 import { usePermission } from '../hooks/usePermission';
@@ -22,26 +24,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 type TabType = 'overview' | 'milestones' | 'tasks' | 'members' | 'timeline' | 'files' | 'analytics' | 'activity';
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  PLANNING: { label: 'Planning', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
-  ACTIVE: { label: 'Active', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  ON_HOLD: { label: 'On Hold', bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30' },
-  COMPLETED: { label: 'Completed', bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/30' },
+  PLANNING: { label: 'Planning', bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/20 dark:border-amber-500/30' },
+  ACTIVE: { label: 'Active', bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/20 dark:border-emerald-500/30' },
+  ON_HOLD: { label: 'On Hold', bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-500/20 dark:border-orange-500/30' },
+  COMPLETED: { label: 'Completed', bg: 'bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-500/20 dark:border-indigo-500/30' },
 };
 
 const PRIORITY_CONFIG: Record<string, { text: string; bg: string; border: string }> = {
-  CRITICAL: { text: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
-  HIGH: { text: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
-  MEDIUM: { text: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-  LOW: { text: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
+  CRITICAL: { text: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
+  HIGH: { text: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+  MEDIUM: { text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  LOW: { text: 'text-muted-foreground', bg: 'bg-muted', border: 'border-border' },
 };
 
 const PROJECT_TYPE_BADGE: Record<string, string> = {
-  'Software Development': 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  'UI/UX': 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-  'QA': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-  'DevOps': 'bg-orange-500/10 text-orange-400 border-orange-500/30',
-  'Marketing': 'bg-pink-500/10 text-pink-400 border-pink-500/30',
-  'General': 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+  'Software Development': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:border-blue-500/30',
+  'UI/UX': 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 dark:border-purple-500/30',
+  'QA': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 dark:border-emerald-500/30',
+  'DevOps': 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 dark:border-orange-500/30',
+  'Marketing': 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 dark:border-pink-500/30',
+  'General': 'bg-muted text-muted-foreground border-border',
 };
 
 export const ProjectDetailsPage = () => {
@@ -341,11 +343,7 @@ export const ProjectDetailsPage = () => {
   };
 
   if (!project) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const assignableMembers = [...(project.teamMemberIds || [])];
@@ -422,12 +420,12 @@ export const ProjectDetailsPage = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background text-left font-sans">
       {/* Top Header */}
-      <div className="bg-card/50 backdrop-blur-md border-b border-white/10 px-6 py-5">
+      <div className="bg-card border-b border-border px-6 py-5 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/projects')}
-              className="p-2.5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all border border-white/10"
+              className="p-2.5 bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground rounded-xl transition-all border border-border"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -443,18 +441,18 @@ export const ProjectDetailsPage = () => {
                   ● {project.priority}
                 </span>
                 {isAdmin && (
-                  <span className="flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/30 text-amber-400">
+                  <span className="flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400">
                     <Eye className="w-3 h-3" /> View Only
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">{project.name}</h1>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-1 font-medium">
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">{project.name}</h1>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1 font-medium">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
                   {new Date(project.startDate).toLocaleDateString()} — {new Date(project.endDate).toLocaleDateString()}
                 </span>
-                <span>Client: <strong className="text-slate-200">{project.clientName}</strong></span>
+                <span>Client: <strong className="text-foreground">{project.clientName}</strong></span>
                 <span>Budget: <strong className="text-primary">${project.budget?.toLocaleString()}</strong></span>
               </div>
             </div>
@@ -465,14 +463,14 @@ export const ProjectDetailsPage = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsScheduleMeetingOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/20 transition-colors text-sm font-semibold"
+                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500/10 dark:bg-indigo-500/20 hover:bg-indigo-500/20 dark:hover:bg-indigo-500/30 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20 dark:border-indigo-500/30 transition-colors text-sm font-semibold"
               >
                 <Video className="w-4 h-4" /> Schedule Meeting
               </button>
               {canEditProject && (
                 <button
                   onClick={() => setIsEditProjectOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl border border-white/10 transition-colors text-sm font-semibold"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-xl border border-border transition-colors text-sm font-semibold"
                 >
                   <Edit className="w-4 h-4" /> Edit Project
                 </button>
@@ -480,7 +478,7 @@ export const ProjectDetailsPage = () => {
               {canEditProject && (
                 <button
                   onClick={handleDeleteProject}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl border border-red-500/20 transition-colors text-sm font-semibold"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 dark:bg-red-500/20 hover:bg-red-500/20 dark:hover:bg-red-500/30 text-red-600 dark:text-red-400 rounded-xl border border-red-500/20 dark:border-red-500/30 transition-colors text-sm font-semibold"
                 >
                   <Trash2 className="w-4 h-4" /> Delete
                 </button>
@@ -491,7 +489,7 @@ export const ProjectDetailsPage = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-card/30 backdrop-blur-md border-b border-white/10 px-6">
+      <div className="bg-card border-b border-border px-6">
         <div className="flex gap-1 overflow-x-auto no-scrollbar">
           {TABS.map(tab => {
             const isTabActive = activeTab === tab.id;
@@ -500,7 +498,7 @@ export const ProjectDetailsPage = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`relative flex items-center gap-2 px-4 py-4 text-sm font-semibold transition-all whitespace-nowrap ${
-                  isTabActive ? 'text-primary' : 'text-slate-400 hover:text-white'
+                  isTabActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {tab.icon}
@@ -519,7 +517,7 @@ export const ProjectDetailsPage = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 p-6 overflow-auto bg-slate-950/20">
+      <div className="flex-1 p-6 overflow-auto bg-muted/20">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -535,41 +533,41 @@ export const ProjectDetailsPage = () => {
                 {/* Left Column (Wide) */}
                 <div className="lg:col-span-2 space-y-6">
                   {/* Description Card */}
-                  <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-lg font-bold text-white mb-4">Project Description</h2>
-                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h2 className="text-lg font-bold text-foreground mb-4">Project Description</h2>
+                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
                       {project.description || 'No description provided.'}
                     </p>
                   </div>
 
                   {/* Metadata Grid */}
-                  <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-lg font-bold text-white mb-4">Project Details</h2>
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h2 className="text-lg font-bold text-foreground mb-4">Project Details</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col">
-                        <span className="text-xs font-semibold text-slate-500">CLIENT NAME</span>
-                        <span className="text-sm font-bold text-slate-200 mt-1">{project.clientName}</span>
+                      <div className="bg-muted/50 border border-border rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-muted-foreground/80">CLIENT NAME</span>
+                        <span className="text-sm font-bold text-foreground mt-1">{project.clientName}</span>
                       </div>
-                      <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col">
-                        <span className="text-xs font-semibold text-slate-500">PROJECT TYPE</span>
-                        <span className="text-sm font-bold text-slate-200 mt-1">{project.projectType || 'General'}</span>
+                      <div className="bg-muted/50 border border-border rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-muted-foreground/80">PROJECT TYPE</span>
+                        <span className="text-sm font-bold text-foreground mt-1">{project.projectType || 'General'}</span>
                       </div>
-                      <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col">
-                        <span className="text-xs font-semibold text-slate-500">BUDGET ALLOCATION</span>
+                      <div className="bg-muted/50 border border-border rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-muted-foreground/80">BUDGET ALLOCATION</span>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-sm font-bold text-primary">${project.budget?.toLocaleString()}</span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                            project.budgetStatus === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                            project.budgetStatus === 'REJECTED' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            project.budgetStatus === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
+                            project.budgetStatus === 'REJECTED' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' :
+                            'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
                           }`}>
                             {project.budgetStatus || 'PENDING'}
                           </span>
                         </div>
                       </div>
-                      <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col">
-                        <span className="text-xs font-semibold text-slate-500">TIMELINE RANGE</span>
-                        <span className="text-sm font-bold text-slate-200 mt-1">
+                      <div className="bg-muted/50 border border-border rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-muted-foreground/80">TIMELINE RANGE</span>
+                        <span className="text-sm font-bold text-foreground mt-1">
                           {new Date(project.startDate).toLocaleDateString()} — {new Date(project.endDate).toLocaleDateString()}
                         </span>
                       </div>
@@ -580,12 +578,12 @@ export const ProjectDetailsPage = () => {
                 {/* Right Column (Narrow) */}
                 <div className="space-y-6">
                   {/* Progress Ring Card */}
-                  <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl flex flex-col items-center text-center">
-                    <h2 className="text-md font-bold text-slate-400 mb-6">Task Completion</h2>
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col items-center text-center">
+                    <h2 className="text-md font-bold text-muted-foreground mb-6">Task Completion</h2>
                     <div className="relative flex items-center justify-center w-36 h-36 mb-4">
                       {/* SVG Progress Circle */}
                       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="transparent" />
+                        <circle cx="50" cy="50" r="40" stroke="currentColor" className="text-muted/30 dark:text-muted/20" strokeWidth="8" fill="transparent" />
                         <motion.circle
                           cx="50"
                           cy="50"
@@ -600,16 +598,16 @@ export const ProjectDetailsPage = () => {
                         />
                       </svg>
                       <div className="absolute flex flex-col items-center">
-                        <span className="text-3xl font-extrabold text-white">{completionPercentage}%</span>
-                        <span className="text-[10px] text-slate-500 mt-0.5">{completedTasksCount}/{totalTasksCount} Tasks</span>
+                        <span className="text-3xl font-extrabold text-foreground">{completionPercentage}%</span>
+                        <span className="text-[10px] text-muted-foreground mt-0.5">{completedTasksCount}/{totalTasksCount} Tasks</span>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-400">Total sprints currently tracked: <strong>{sprints.length}</strong></p>
+                    <p className="text-xs text-muted-foreground">Total sprints currently tracked: <strong>{sprints.length}</strong></p>
                   </div>
 
                   {/* Team Members Summary Card */}
-                  <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-md font-bold text-slate-400 mb-4">Leadership & Contacts</h2>
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h2 className="text-md font-bold text-muted-foreground mb-4">Leadership & Contacts</h2>
                     <div className="space-y-4">
                       {project.allocatedManagerId && (
                         <div className="flex items-center gap-3">
@@ -617,26 +615,26 @@ export const ProjectDetailsPage = () => {
                             {project.allocatedManagerId.name?.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-xs font-semibold text-slate-500">PROJECT MANAGER</p>
-                            <p className="text-sm font-bold text-slate-200">{project.allocatedManagerId.name}</p>
+                            <p className="text-xs font-semibold text-muted-foreground/85">PROJECT MANAGER</p>
+                            <p className="text-sm font-bold text-foreground">{project.allocatedManagerId.name}</p>
                           </div>
                         </div>
                       )}
                       {project.teamLeadId && (
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-xs">
+                          <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 font-bold text-xs">
                             {project.teamLeadId.name?.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-xs font-semibold text-slate-500">TEAM LEAD</p>
-                            <p className="text-sm font-bold text-slate-200">{project.teamLeadId.name}</p>
+                            <p className="text-xs font-semibold text-muted-foreground/85">TEAM LEAD</p>
+                            <p className="text-sm font-bold text-foreground">{project.teamLeadId.name}</p>
                           </div>
                         </div>
                       )}
-                      <div className="border-t border-white/5 pt-4">
-                        <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+                      <div className="border-t border-border pt-4">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
                           <span>Total Assigned Members:</span>
-                          <span className="text-white font-bold">{project.teamMemberIds?.length || 0}</span>
+                          <span className="text-foreground font-bold">{project.teamMemberIds?.length || 0}</span>
                         </div>
                       </div>
                     </div>
@@ -649,10 +647,10 @@ export const ProjectDetailsPage = () => {
             {activeTab === 'milestones' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Sprints Section */}
-                <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
                   <div className="flex justify-between items-center">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Clock className="w-5 h-5 text-slate-400" /> Sprints
+                    <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-muted-foreground" /> Sprints
                     </h2>
                     {hasPermission('PROJECTS', 'edit') && !isAdmin && ['HR', 'MANAGER', 'TEAM_LEAD'].includes(userRole) && (
                       <button
@@ -664,24 +662,24 @@ export const ProjectDetailsPage = () => {
                     )}
                   </div>
                   {sprints.length === 0 ? (
-                    <div className="text-center text-slate-500 py-12 text-sm">No sprints created for this project.</div>
+                    <div className="text-center text-muted-foreground py-12 text-sm">No sprints created for this project.</div>
                   ) : (
                     <div className="space-y-3">
                       {sprints.map((s: any) => (
-                        <div key={s._id} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 transition-all flex justify-between items-center">
+                        <div key={s._id} className="bg-muted/50 hover:bg-muted border border-border rounded-xl p-4 transition-all flex justify-between items-center">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-slate-200">{s.name}</span>
+                              <span className="font-bold text-sm text-foreground">{s.name}</span>
                               <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                                s.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                s.status === 'COMPLETED' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                                'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                                s.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' :
+                                s.status === 'COMPLETED' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20' :
+                                'bg-muted text-muted-foreground border border-border'
                               }`}>
                                 {s.status}
                               </span>
                             </div>
-                            {s.goal && <p className="text-xs text-slate-400 mt-1 italic">"{s.goal}"</p>}
-                            <p className="text-[10px] text-slate-500 mt-2">
+                            {s.goal && <p className="text-xs text-muted-foreground mt-1 italic">"{s.goal}"</p>}
+                            <p className="text-[10px] text-muted-foreground/80 mt-2">
                               {new Date(s.startDate).toLocaleDateString()} — {new Date(s.endDate).toLocaleDateString()}
                             </p>
                           </div>
@@ -691,7 +689,7 @@ export const ProjectDetailsPage = () => {
                                 setSelectedSprintId(s._id);
                                 openEditSprintModal();
                               }}
-                              className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors border border-white/10"
+                              className="p-1.5 bg-muted hover:bg-muted/80 rounded-lg text-muted-foreground hover:text-foreground transition-colors border border-border"
                             >
                               <Settings className="w-4 h-4" />
                             </button>
@@ -703,10 +701,10 @@ export const ProjectDetailsPage = () => {
                 </div>
 
                 {/* Project Milestones Section */}
-                <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
                   <div className="flex justify-between items-center">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-slate-400" /> Milestones Checklist
+                    <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-muted-foreground" /> Milestones Checklist
                     </h2>
                     {hasPermission('PROJECTS', 'edit') && !isAdmin && (
                       <button
@@ -718,28 +716,28 @@ export const ProjectDetailsPage = () => {
                     )}
                   </div>
                   {(!project.milestones || project.milestones.length === 0) ? (
-                    <div className="text-center text-slate-500 py-12 text-sm">No milestones configured for this project.</div>
+                    <div className="text-center text-muted-foreground py-12 text-sm">No milestones configured for this project.</div>
                   ) : (
                     <div className="space-y-3">
                       {project.milestones.map((m: any, idx: number) => (
-                        <div key={idx} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 transition-all flex justify-between items-center">
+                        <div key={idx} className="bg-muted/50 hover:bg-muted border border-border rounded-xl p-4 transition-all flex justify-between items-center">
                           <div className="flex items-center gap-3">
                             <button
                               onClick={() => !isAdmin && handleToggleMilestone(idx)}
                               disabled={isAdmin}
-                              className={`p-1 rounded-lg transition-colors ${isAdmin ? 'cursor-not-allowed' : 'hover:bg-white/5'}`}
+                              className={`p-1 rounded-lg transition-colors ${isAdmin ? 'cursor-not-allowed' : 'hover:bg-muted'}`}
                             >
                               {m.status === 'COMPLETED' ? (
                                 <CheckSquare className="w-5 h-5 text-primary" />
                               ) : (
-                                <Square className="w-5 h-5 text-slate-500" />
+                                <Square className="w-5 h-5 text-muted-foreground" />
                               )}
                             </button>
                             <div>
-                              <span className={`text-sm font-semibold ${m.status === 'COMPLETED' ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                              <span className={`text-sm font-semibold ${m.status === 'COMPLETED' ? 'text-muted-foreground/75 line-through' : 'text-foreground'}`}>
                                 {m.name}
                               </span>
-                              <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                              <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
                                 <Calendar className="w-3 h-3" /> Due Date: {new Date(m.dueDate).toLocaleDateString()}
                               </p>
                             </div>
@@ -747,7 +745,7 @@ export const ProjectDetailsPage = () => {
                           {!isAdmin && hasPermission('PROJECTS', 'edit') && (
                             <button
                               onClick={() => handleDeleteMilestone(idx)}
-                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-colors"
+                              className="p-1.5 bg-red-500/10 dark:bg-red-500/20 hover:bg-red-500/20 border border-red-500/20 text-red-600 dark:text-red-400 rounded-lg transition-colors"
                               title="Delete Milestone"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -764,13 +762,13 @@ export const ProjectDetailsPage = () => {
             {/* ── TASKS TAB ── */}
             {activeTab === 'tasks' && (
               <>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-card border border-white/10 p-4 rounded-2xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-card border border-border p-4 rounded-2xl">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-semibold text-slate-400">Sprint Selection:</span>
+                    <span className="text-sm font-semibold text-muted-foreground">Sprint Selection:</span>
                     <select
                       value={selectedSprintId}
                       onChange={e => setSelectedSprintId(e.target.value)}
-                      className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white outline-none focus:border-primary/50 cursor-pointer font-medium"
+                      className="bg-background dark:bg-card border border-border rounded-xl px-3 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring cursor-pointer font-medium"
                     >
                       <option value="backlog">Backlog / All Tasks</option>
                       {sprints.map(sprint => (
@@ -783,7 +781,7 @@ export const ProjectDetailsPage = () => {
                     {selectedSprintId !== 'backlog' && hasPermission('PROJECTS', 'edit') && !isAdmin && (
                       <button
                         onClick={openEditSprintModal}
-                        className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 rounded-xl transition-colors"
+                        className="p-2 bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border rounded-xl transition-colors"
                         title="Edit Sprint"
                       >
                         <Settings className="w-4 h-4" />
@@ -801,13 +799,13 @@ export const ProjectDetailsPage = () => {
                   </div>
 
                   {selectedSprintObj && (
-                    <div className="text-xs text-slate-400 flex flex-wrap items-center gap-3 font-medium">
+                    <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-3 font-medium">
                       <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground/80" />
                         {new Date(selectedSprintObj.startDate).toLocaleDateString()} — {new Date(selectedSprintObj.endDate).toLocaleDateString()}
                       </span>
                       {selectedSprintObj.goal && (
-                        <span className="italic text-slate-500">"{selectedSprintObj.goal}"</span>
+                        <span className="italic text-muted-foreground/80">"{selectedSprintObj.goal}"</span>
                       )}
                     </div>
                   )}
@@ -826,7 +824,7 @@ export const ProjectDetailsPage = () => {
             {activeTab === 'members' && (
               <div className="space-y-6">
                 {!isAdmin && project.projectType && project.projectType !== 'General' && (
-                  <div className="flex items-center gap-2 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-300 text-xs font-semibold">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/20 dark:border-blue-500/30 rounded-xl text-blue-700 dark:text-blue-300 text-xs font-semibold">
                     <Shield className="w-4 h-4 flex-shrink-0" />
                     This is a <strong>{project.projectType}</strong> project. Only eligible department employees are shown below.
                   </div>
@@ -836,8 +834,8 @@ export const ProjectDetailsPage = () => {
                   {/* Allocated Manager & Lead */}
                   <div className="space-y-6">
                     {project.allocatedManagerId && (
-                      <div className="bg-card border border-white/10 rounded-2xl p-5 shadow-lg">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
                           <Users className="w-3.5 h-3.5" /> Project Manager
                         </p>
                         <div className="flex items-center gap-3">
@@ -845,25 +843,25 @@ export const ProjectDetailsPage = () => {
                             {project.allocatedManagerId.name?.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-white">{project.allocatedManagerId.name}</p>
-                            <p className="text-xs text-slate-400">{project.allocatedManagerId.email}</p>
+                            <p className="text-sm font-semibold text-foreground">{project.allocatedManagerId.name}</p>
+                            <p className="text-xs text-muted-foreground">{project.allocatedManagerId.email}</p>
                           </div>
                         </div>
                       </div>
                     )}
 
                     {project.teamLeadId && (
-                      <div className="bg-card border border-white/10 rounded-2xl p-5 shadow-lg">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <Star className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> Team Lead
+                      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Star className="w-3.5 h-3.5 text-amber-500 animate-pulse" /> Team Lead
                         </p>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm">
+                          <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 font-bold text-sm">
                             {project.teamLeadId.name?.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-white">{project.teamLeadId.name}</p>
-                            <p className="text-xs text-slate-400">{project.teamLeadId.email}</p>
+                            <p className="text-sm font-semibold text-foreground">{project.teamLeadId.name}</p>
+                            <p className="text-xs text-muted-foreground">{project.teamLeadId.email}</p>
                           </div>
                         </div>
                       </div>
@@ -871,22 +869,22 @@ export const ProjectDetailsPage = () => {
                   </div>
 
                   {/* Team Members List */}
-                  <div className="bg-card border border-white/10 rounded-2xl p-5 shadow-lg flex flex-col h-[340px]">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col h-[340px]">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
                       <Users className="w-3.5 h-3.5" /> Team Members ({project.teamMemberIds?.length || 0})
                     </p>
                     {project.teamMemberIds?.length === 0 ? (
-                      <p className="text-sm text-slate-500 text-center py-12 flex-1 flex items-center justify-center">No team members assigned yet.</p>
+                      <p className="text-sm text-muted-foreground text-center py-12 flex-1 flex items-center justify-center">No team members assigned yet.</p>
                     ) : (
                       <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
                         {project.teamMemberIds?.map((emp: any) => (
-                          <div key={emp._id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/5">
+                          <div key={emp._id} className="flex items-center gap-3 bg-muted/50 rounded-xl px-4 py-3 border border-border">
                             <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
                               {emp.fullName?.charAt(0)?.toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-white truncate">{emp.fullName}</p>
-                              <p className="text-xs text-slate-400 truncate">{emp.department} · {emp.designation}</p>
+                              <p className="text-sm font-semibold text-foreground truncate">{emp.fullName}</p>
+                              <p className="text-xs text-muted-foreground truncate">{emp.department} · {emp.designation}</p>
                             </div>
                           </div>
                         ))}
@@ -897,20 +895,20 @@ export const ProjectDetailsPage = () => {
 
                 {/* Eligible Employees */}
                 {canEditProject && eligibleEmployees.length > 0 && (
-                  <div className="bg-card border border-white/10 rounded-2xl p-5 shadow-lg">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Eligible Candidates
+                  <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Eligible Candidates
                     </p>
-                    <p className="text-xs text-slate-500 mb-4 font-medium">These employees fit this project type ({project.projectType || 'General'}) and can be assigned by editing the project.</p>
+                    <p className="text-xs text-muted-foreground mb-4 font-medium">These employees fit this project type ({project.projectType || 'General'}) and can be assigned by editing the project.</p>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                       {eligibleEmployees.map((emp: any) => (
                         <div key={emp._id} className="flex items-center gap-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl px-3 py-2.5">
-                          <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-500 dark:text-emerald-400 font-bold text-xs flex-shrink-0">
                             {emp.fullName?.charAt(0)?.toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-white truncate">{emp.fullName}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{emp.department}</p>
+                            <p className="text-xs font-semibold text-foreground truncate">{emp.fullName}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{emp.department}</p>
                           </div>
                         </div>
                       ))}
@@ -922,15 +920,15 @@ export const ProjectDetailsPage = () => {
 
             {/* ── TIMELINE TAB ── */}
             {activeTab === 'timeline' && (
-              <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
-                <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-slate-400" /> Project Timeline
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-muted-foreground" /> Project Timeline
                 </h2>
                 {timelineEvents.length === 0 ? (
-                  <div className="text-center text-slate-500 py-12 text-sm">No sprints or milestones scheduled for this project.</div>
+                  <div className="text-center text-muted-foreground py-12 text-sm">No sprints or milestones scheduled for this project.</div>
                 ) : (
                   <div className="relative pl-8 space-y-6">
-                    <div className="absolute left-3.5 top-0 bottom-0 w-px bg-white/10" />
+                    <div className="absolute left-3.5 top-0 bottom-0 w-px bg-border" />
                     {timelineEvents.map((event: any, index: number) => {
                       const isSprint = event.type === 'sprint';
                       return (
@@ -944,18 +942,18 @@ export const ProjectDetailsPage = () => {
                             }`} />
                           </div>
 
-                          <div className="bg-white/5 border border-white/5 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="bg-muted/50 border border-border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                  isSprint ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                  isSprint ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                                 }`}>
                                   {isSprint ? 'Sprint' : 'Milestone'}
                                 </span>
-                                <h3 className="text-sm font-bold text-white">{event.name}</h3>
+                                <h3 className="text-sm font-bold text-foreground">{event.name}</h3>
                               </div>
-                              {event.goal && <p className="text-xs text-slate-400 mt-1 italic">Goal: "{event.goal}"</p>}
-                              <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1 font-medium">
+                              {event.goal && <p className="text-xs text-muted-foreground mt-1 italic">Goal: "{event.goal}"</p>}
+                              <p className="text-[10px] text-muted-foreground/80 mt-2 flex items-center gap-1 font-medium">
                                 <Clock className="w-3 h-3" />
                                 {isSprint ? (
                                   `${event.date.toLocaleDateString()} — ${event.endDate.toLocaleDateString()}`
@@ -967,8 +965,8 @@ export const ProjectDetailsPage = () => {
                             <div>
                               <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
                                 event.status === 'COMPLETED' || event.status === 'active' || event.status === 'ACTIVE'
-                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                  : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  : 'bg-muted text-muted-foreground border-border'
                               }`}>
                                 {event.status}
                               </span>
@@ -986,9 +984,9 @@ export const ProjectDetailsPage = () => {
             {activeTab === 'files' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* File Upload Zone */}
-                <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
-                  <h2 className="text-lg font-bold text-white">Upload Project File</h2>
-                  <div className="border-2 border-dashed border-white/10 rounded-xl p-8 text-center hover:border-primary/50 transition-colors flex flex-col items-center justify-center cursor-pointer relative bg-slate-950/20">
+                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
+                  <h2 className="text-lg font-bold text-foreground">Upload Project File</h2>
+                  <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors flex flex-col items-center justify-center cursor-pointer relative bg-muted/30">
                     <input
                       type="file"
                       onChange={handleFileUpload}
@@ -998,39 +996,39 @@ export const ProjectDetailsPage = () => {
                     {isUploading ? (
                       <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
                     ) : (
-                      <UploadCloud className="w-10 h-10 text-slate-400 mb-3" />
+                      <UploadCloud className="w-10 h-10 text-muted-foreground mb-3" />
                     )}
-                    <span className="text-sm font-bold text-slate-300">Drag & Drop or Click</span>
-                    <span className="text-xs text-slate-500 mt-1">Upload reports, specs, or logs (max 10MB)</span>
+                    <span className="text-sm font-bold text-foreground">Drag & Drop or Click</span>
+                    <span className="text-xs text-muted-foreground mt-1">Upload reports, specs, or logs (max 10MB)</span>
                   </div>
-                  <div className="flex gap-2 p-3 bg-white/5 border border-white/5 rounded-xl text-slate-400 text-xs">
-                    <Info className="w-4 h-4 shrink-0 text-slate-500" />
+                  <div className="flex gap-2 p-3 bg-muted/50 border border-border rounded-xl text-muted-foreground text-xs">
+                    <Info className="w-4 h-4 shrink-0 text-muted-foreground/80" />
                     Files uploaded here are stored in simulated local environment. Files uploaded as task attachments are also fetched dynamically.
                   </div>
                 </div>
 
                 {/* Files List (2/3 width) */}
-                <div className="lg:col-span-2 bg-card border border-white/10 rounded-2xl p-6 shadow-xl flex flex-col h-[400px]">
-                  <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-slate-400" /> Files & Attachments ({allFiles.length})
+                <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col h-[400px]">
+                  <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-muted-foreground" /> Files & Attachments ({allFiles.length})
                   </h2>
                   {allFiles.length === 0 ? (
-                    <div className="text-center text-slate-500 py-12 flex-1 flex flex-col items-center justify-center gap-2">
+                    <div className="text-center text-muted-foreground py-12 flex-1 flex flex-col items-center justify-center gap-2">
                       <Paperclip className="w-8 h-8 opacity-20" />
                       <p className="text-sm">No files uploaded for this project yet.</p>
                     </div>
                   ) : (
                     <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
                       {allFiles.map((file: any, index: number) => (
-                        <div key={index} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-3.5 transition-all flex justify-between items-center gap-4">
+                        <div key={index} className="bg-muted/50 hover:bg-muted border border-border rounded-xl p-3.5 transition-all flex justify-between items-center gap-4">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="p-2.5 bg-primary/10 rounded-xl text-primary shrink-0 border border-primary/20">
                               <FileText className="w-5 h-5" />
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-200 truncate" title={file.filename}>{file.filename}</p>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-0.5">
-                                <span>By: <strong className="text-slate-400">{file.uploadedByName}</strong></span>
+                              <p className="text-sm font-bold text-foreground truncate" title={file.filename}>{file.filename}</p>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
+                                <span>By: <strong className="text-foreground">{file.uploadedByName}</strong></span>
                                 <span>•</span>
                                 <span>{new Date(file.uploadedAt).toLocaleDateString()}</span>
                                 {file.taskTitle && (
@@ -1045,7 +1043,7 @@ export const ProjectDetailsPage = () => {
                           <a
                             href={file.url}
                             download
-                            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:text-white text-slate-400 rounded-xl transition-all"
+                            className="p-2.5 bg-muted hover:bg-muted/80 border border-border hover:text-foreground text-muted-foreground rounded-xl transition-all"
                             title="Download File"
                           >
                             <Download className="w-4 h-4" />
@@ -1063,30 +1061,30 @@ export const ProjectDetailsPage = () => {
 
             {/* ── ACTIVITY LOGS TAB ── */}
             {activeTab === 'activity' && (
-              <div className="bg-card border border-white/10 rounded-2xl p-6 shadow-xl">
-                <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-slate-400" /> Project Activity Feed
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-muted-foreground" /> Project Activity Feed
                 </h2>
                 {projectActivity.length === 0 ? (
-                  <div className="text-center text-slate-500 py-12 text-sm">No activity recorded for this project yet.</div>
+                  <div className="text-center text-muted-foreground py-12 text-sm">No activity recorded for this project yet.</div>
                 ) : (
                   <div className="relative pl-8 space-y-4">
-                    <div className="absolute left-3.5 top-0 bottom-0 w-px bg-white/10" />
+                    <div className="absolute left-3.5 top-0 bottom-0 w-px bg-border" />
                     {projectActivity.map((a: any) => (
                       <div key={a._id} className="relative">
-                        <div className="absolute -left-[25px] top-1.5 w-4 h-4 rounded-full bg-card border border-white/15 flex items-center justify-center">
+                        <div className="absolute -left-[25px] top-1.5 w-4 h-4 rounded-full bg-card border border-border flex items-center justify-center">
                           <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                         </div>
-                        <div className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 transition-all">
+                        <div className="bg-muted/50 hover:bg-muted border border-border rounded-xl p-4 transition-all">
                           <div className="flex items-center justify-between mb-1.5">
-                            <p className="text-xs font-bold text-white">{a.actorName}</p>
-                            <p className="text-[10px] text-slate-500">{new Date(a.createdAt).toLocaleString()}</p>
+                            <p className="text-xs font-bold text-foreground">{a.actorName}</p>
+                            <p className="text-[10px] text-muted-foreground">{new Date(a.createdAt).toLocaleString()}</p>
                           </div>
-                          <p className="text-xs text-slate-400 font-medium">
+                          <p className="text-xs text-muted-foreground font-medium">
                             {ACTION_LABELS[a.action] || a.action.toLowerCase().replace(/_/g, ' ')}
-                            {a.from && a.to && <span className="text-slate-500 font-bold"> ({a.from} → {a.to})</span>}
+                            {a.from && a.to && <span className="text-muted-foreground/80 font-bold"> ({a.from} → {a.to})</span>}
                           </p>
-                          {a.comment && <p className="text-xs text-slate-500 mt-2 italic pl-2.5 border-l border-white/10">"{a.comment}"</p>}
+                          {a.comment && <p className="text-xs text-muted-foreground/80 mt-2 italic pl-2.5 border-l border-border">"{a.comment}"</p>}
                         </div>
                       </div>
                     ))}
@@ -1163,7 +1161,7 @@ export const ProjectDetailsPage = () => {
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
               Team Members
-              {projectType !== 'General' && <span className="text-xs text-amber-400 ml-2">(Only {projectType} dept employees shown)</span>}
+              {projectType !== 'General' && <span className="text-xs text-amber-600 dark:text-amber-400 ml-2">(Only {projectType} dept employees shown)</span>}
             </label>
             <div className="border border-border rounded-lg bg-background p-3 max-h-40 overflow-y-auto space-y-2">
               {(projectType !== 'General' && eligibleEmployees.length > 0 ? eligibleEmployees : employees).map(emp => (
@@ -1177,7 +1175,7 @@ export const ProjectDetailsPage = () => {
                     }}
                     className="rounded border-border text-primary bg-background focus:ring-ring"
                   />
-                  <span>{emp.fullName} <span className="text-slate-400 text-xs">({emp.department})</span></span>
+                  <span>{emp.fullName} <span className="text-muted-foreground text-xs">({emp.department})</span></span>
                 </label>
               ))}
             </div>

@@ -4,6 +4,7 @@ import { chatApi } from '../api_service/chatApi';
 import { employeeApi } from '../api_service/employeeApi';
 import { projectApi } from '../api_service/projectApi';
 import { useAuthStore } from '../store/useAuthStore';
+import { ChatSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -45,7 +46,7 @@ export const ChatPage: React.FC = () => {
   const qc = useQueryClient();
   const otherOnlineCount = onlineUserIds.filter(id => id !== user?._id).length;
 
-  const { data: recentConversations = [] } = useQuery({
+  const { data: recentConversations = [], isLoading: recentLoading } = useQuery({
     queryKey: ['chat', 'recent'],
     queryFn: () => chatApi.getRecentConversations(),
   });
@@ -83,13 +84,13 @@ export const ChatPage: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Data queries ─────────────────────────────────────────────────────────────
-  const { data: employeesData } = useQuery({
+  const { data: employeesData, isLoading: empLoading } = useQuery({
     queryKey: ['employees'],
     queryFn: () => employeeApi.getAll(),
   });
   const employees = employeesData?.employees || [];
 
-  const { data: projectsData } = useQuery({
+  const { data: projectsData, isLoading: projLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectApi.getProjects(),
   });
@@ -385,7 +386,9 @@ export const ChatPage: React.FC = () => {
     return groups;
   }, [messages]);
 
-
+  if (empLoading || recentLoading || projLoading) {
+    return <ChatSkeleton />;
+  }
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-3 font-sans">

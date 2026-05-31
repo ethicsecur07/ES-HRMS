@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '../api_service/reportsApi';
 import { Card } from '../Components/WrapperComponents/Card';
@@ -13,12 +14,18 @@ type TabType = typeof TABS[number];
 export const ReportsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('Attendance');
 
-  const { data: attendanceData = [] } = useQuery({ queryKey: ['reports', 'attendance'], queryFn: reportsApi.getAttendanceReport });
-  const { data: payrollData = [] } = useQuery({ queryKey: ['reports', 'payroll'], queryFn: reportsApi.getPayrollReport });
-  const { data: performanceData = [] } = useQuery({ queryKey: ['reports', 'performance'], queryFn: reportsApi.getPerformanceReport });
-  const { data: expenseData = [] } = useQuery({ queryKey: ['reports', 'expenses'], queryFn: reportsApi.getExpenseReport });
-  const { data: leaveData = [] } = useQuery({ queryKey: ['reports', 'leave'], queryFn: reportsApi.getLeaveReport });
-  const { data: projectData = [] } = useQuery({ queryKey: ['reports', 'projects'], queryFn: reportsApi.getProjectReport });
+  const { data: attendanceData = [], isLoading: attLoading } = useQuery({ queryKey: ['reports', 'attendance'], queryFn: reportsApi.getAttendanceReport });
+  const { data: payrollData = [], isLoading: payLoading } = useQuery({ queryKey: ['reports', 'payroll'], queryFn: reportsApi.getPayrollReport });
+  const { data: performanceData = [], isLoading: perfLoading } = useQuery({ queryKey: ['reports', 'performance'], queryFn: reportsApi.getPerformanceReport });
+  const { data: expenseData = [], isLoading: expLoading } = useQuery({ queryKey: ['reports', 'expenses'], queryFn: reportsApi.getExpenseReport });
+  const { data: leaveData = [], isLoading: leaveLoading } = useQuery({ queryKey: ['reports', 'leave'], queryFn: reportsApi.getLeaveReport });
+  const { data: projectData = [], isLoading: projLoading } = useQuery({ queryKey: ['reports', 'projects'], queryFn: reportsApi.getProjectReport });
+
+  const isAnyLoading = attLoading || payLoading || perfLoading || expLoading || leaveLoading || projLoading;
+
+  if (isAnyLoading) {
+    return <TableSkeleton />;
+  }
 
   const getActiveData = () => {
     switch (activeTab) {

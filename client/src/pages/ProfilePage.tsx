@@ -7,6 +7,7 @@ import { authV2Api } from '../api_service/authV2Api';
 import { employeeApi } from '../api_service/employeeApi';
 import { documentApi } from '../api_service/documentApi';
 import { axiosInstance } from '../api_service/axiosInstance';
+import { ProfileSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Textarea, Select } from '../Components/WrapperComponents/Input';
@@ -410,6 +411,10 @@ export const ProfilePage: React.FC = () => {
       },
     },
   ];
+
+  if (user?.employeeId && empLoading) {
+    return <ProfileSkeleton />;
+  }
 
   return (
     <div className="space-y-8 text-left animate-in fade-in duration-300 pb-12">

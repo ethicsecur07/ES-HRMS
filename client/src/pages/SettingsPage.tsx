@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SettingsSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { NavLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { analyticsApi } from '../api_service/analyticsApi';
@@ -435,11 +436,7 @@ export const SettingsPage: React.FC = () => {
     (activeSubTab === 'sso' && isAuthProvidersLoading);
 
   if (isLoading) {
-    return (
-      <Card className="animate-pulse h-96 bg-muted/20 flex items-center justify-center">
-        <div className="text-muted-foreground">Loading configurations...</div>
-      </Card>
-    );
+    return <SettingsSkeleton />;
   }
 
   return (

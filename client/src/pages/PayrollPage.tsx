@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { payrollApi } from '../api_service/payrollApi';
 import { employeeApi } from '../api_service/employeeApi';
@@ -210,11 +211,7 @@ export const PayrollPage: React.FC = () => {
   };
 
   if (payLoading || empLoading) {
-    return (
-      <Card className="animate-pulse h-96 bg-muted/20">
-        <div />
-      </Card>
-    );
+    return <TableSkeleton />;
   }
 
 

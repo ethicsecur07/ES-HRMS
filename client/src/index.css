@@ -68,7 +68,7 @@
 
 @layer base {
   html {
-    font-family: 'Figtree' !important;
+    font-family: 'Inter', sans-serif;
     /* Laptop / Desktop Base Font Size (16px) */
     font-size: 16px;
   }
@@ -89,14 +89,16 @@
 
   * {
     @apply border-border;
-    font-family: 'Figtree', sans-serif !important;
   }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-    font-family: 'Figtree' !important;
+    font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: 'Figtree', sans-serif;
   }
 }
 
