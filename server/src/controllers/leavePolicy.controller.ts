@@ -6,6 +6,8 @@
 
 import { Request, Response } from 'express';
 import { LeavePolicy } from '../models/LeavePolicy.js';
+import { User } from '../models/User.js';
+import { Announcement } from '../models/Announcement.js';
 import { AuthRequest } from '../types/index.js';
 import { createAuditLog } from '../services/auditLog.service.js';
 import { logger } from '../utils/logger.js';
@@ -111,6 +113,21 @@ export const createPolicy = async (req: AuthRequest, res: Response): Promise<voi
       orgId
     );
 
+    try {
+      const creator = await User.findById(req.user!.id);
+      await Announcement.create({
+        organizationId: orgId,
+        title: `New Leave Policy: ${leaveType}`,
+        content: `A new leave policy has been configured for ${leaveType} with a monthly allowance of ${monthlyAllowance} days. Applicable to: ${applicableGender || 'All'}.`,
+        type: 'POLICY_CHANGE',
+        createdBy: req.user!.id,
+        createdByName: creator?.name || req.user!.email,
+        createdByRole: req.user!.role,
+      });
+    } catch (annError: any) {
+      logger.error('[leavePolicy] announcement creation failed in createPolicy', { error: annError.message });
+    }
+
     res.status(201).json({ policy, message: 'Leave policy created successfully.' });
   } catch (error: any) {
     if (error.code === 11000) {
@@ -181,6 +198,21 @@ export const updatePolicy = async (req: AuthRequest, res: Response): Promise<voi
       orgId
     );
 
+    try {
+      const creator = await User.findById(req.user!.id);
+      await Announcement.create({
+        organizationId: orgId,
+        title: `Leave Policy Updated: ${policy.leaveType}`,
+        content: `The leave policy for ${policy.leaveType} has been updated. The monthly allowance is now set to ${policy.monthlyAllowance} days.`,
+        type: 'POLICY_CHANGE',
+        createdBy: req.user!.id,
+        createdByName: creator?.name || req.user!.email,
+        createdByRole: req.user!.role,
+      });
+    } catch (annError: any) {
+      logger.error('[leavePolicy] announcement creation failed in updatePolicy', { error: annError.message });
+    }
+
     res.status(200).json({ policy, message: 'Leave policy updated successfully.' });
   } catch (error: any) {
     logger.error('[leavePolicy] updatePolicy error', { error: error.message });
@@ -218,6 +250,21 @@ export const togglePolicyStatus = async (req: AuthRequest, res: Response): Promi
       `${policy.leaveType} policy set to ${policy.isActive ? 'ACTIVE' : 'INACTIVE'}`,
       orgId
     );
+
+    try {
+      const creator = await User.findById(req.user!.id);
+      await Announcement.create({
+        organizationId: orgId,
+        title: `Leave Policy status changed: ${policy.leaveType}`,
+        content: `The leave policy for ${policy.leaveType} has been ${policy.isActive ? 'activated' : 'deactivated'} by management.`,
+        type: 'POLICY_CHANGE',
+        createdBy: req.user!.id,
+        createdByName: creator?.name || req.user!.email,
+        createdByRole: req.user!.role,
+      });
+    } catch (annError: any) {
+      logger.error('[leavePolicy] announcement creation failed in togglePolicyStatus', { error: annError.message });
+    }
 
     res.status(200).json({
       policy,

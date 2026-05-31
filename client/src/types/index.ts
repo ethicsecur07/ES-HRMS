@@ -233,6 +233,7 @@ export interface CompanySettings {
   customHolidays?: Array<{ date: string; name: string }>;
   loginApprovalRoles?: string[];
   visibleDepartments?: string[];
+  activeWorkdays?: string[];
 }
 
 export type RecruitmentStage = 'NEW' | 'SCREENING' | 'INTERVIEW' | 'TECHNICAL' | 'HR' | 'OFFER' | 'HIRED';
@@ -245,6 +246,7 @@ export interface StageEvaluation {
   toolsExperiences?: string;
   completed?: boolean;
   completedAt?: string;
+  documentVerified?: boolean;
 }
 
 export interface Candidate {
@@ -254,6 +256,7 @@ export interface Candidate {
   email: string;
   phone: string;
   resumeUrl?: string;
+  marksheetUrl?: string;
   appliedRole: string;
   stage: RecruitmentStage;
   interviewSchedule?: {
@@ -267,6 +270,8 @@ export interface Candidate {
   };
   notes?: string;
   evaluations?: StageEvaluation[];
+  accountCreated?: boolean;
+  assignedLeadId?: string;
   createdAt: string;
   updatedAt: string;
 }

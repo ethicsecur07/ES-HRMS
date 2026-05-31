@@ -41,6 +41,7 @@ const CandidateSchema = new mongoose_1.Schema({
     email: { type: String, required: true, unique: true },
     phone: { type: String, required: true },
     resumeUrl: { type: String },
+    marksheetUrl: { type: String },
     appliedRole: { type: String, required: true },
     stage: {
         type: String,
@@ -60,6 +61,8 @@ const CandidateSchema = new mongoose_1.Schema({
         status: { type: String, enum: ['PENDING', 'ACCEPTED', 'REJECTED'], default: 'PENDING' }
     },
     notes: { type: String },
+    accountCreated: { type: Boolean, default: false },
+    assignedLeadId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Employee', default: null },
     evaluations: [
         {
             stage: { type: String, required: true },
@@ -68,7 +71,8 @@ const CandidateSchema = new mongoose_1.Schema({
             ratingTechnical: { type: Number, min: 0, max: 5 },
             toolsExperiences: { type: String },
             completed: { type: Boolean, default: false },
-            completedAt: { type: Date }
+            completedAt: { type: Date },
+            documentVerified: { type: Boolean, default: false }
         }
     ]
 }, { timestamps: true });

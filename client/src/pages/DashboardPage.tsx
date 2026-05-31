@@ -109,25 +109,28 @@ export const DashboardPage: React.FC = () => {
           <AttendanceCheckIn />
           <EmployeeQuickStats stats={projectStats || null} loading={projectStatsLoading} />
 
-          {/* Mini calendar + Task summary side by side */}
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
-            {/* Calendar — takes 2 columns */}
-            <div className="xl:col-span-2 space-y-2">
-              <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-                My Leave & Holiday Calendar
-              </h3>
-              <HolidayEnhancedCalendar
-                leaves={myLeaves || []}
-                wfh={myWfh || []}
-                perms={myPerms || []}
-                compact={false}
-              />
+          {/* 3-column layout: Tasks/Calendar (2/3 width) and Announcements & Actions (1/3 width) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            {/* Calendar + Task Summary */}
+            <div className="lg:col-span-2 space-y-6">
+              <EmployeeTaskSummary />
+              <div className="space-y-2">
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                  My Leave & Holiday Calendar
+                </h3>
+                <HolidayEnhancedCalendar
+                  leaves={myLeaves || []}
+                  wfh={myWfh || []}
+                  perms={myPerms || []}
+                  compact={false}
+                />
+              </div>
             </div>
 
-            {/* Task summary — takes 3 columns */}
-            <div className="xl:col-span-3">
-              <EmployeeTaskSummary />
+            {/* Announcements & Actions Card */}
+            <div className="lg:col-span-1">
+              <HRApprovalQueue />
             </div>
           </div>
         </div>

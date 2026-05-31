@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Employee } from '../models/Employee.js';
 import { User } from '../models/User.js';
+import { Candidate } from '../models/Candidate.js';
 import { PasswordService } from '../domains/auth-engine/services/PasswordService.js';
 import { createAuditLog } from './auditLog.service.js';
 import { Department } from '../models/Department.js';
@@ -26,7 +27,7 @@ export class EmployeeService {
   /**
    * Onboards a new employee, creates their system User account, and hashes their password atomically.
    */
-  static async createEmployee(employeeData: any, password: string | undefined, orgId: mongoose.Types.ObjectId | string, emailForAudit: string) {
+  static async createEmployee(employeeData: any, password: string | undefined, orgId: mongoose.Types.ObjectId | string, emailForAudit: string, candidateId?: string, leadId?: string) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -77,8 +78,14 @@ export class EmployeeService {
         role: 'EMPLOYEE',
         employeeId: employee._id,
         isActive: true,
-        isLoginApproved: false,
+        isLoginApproved: true,
       }], { session });
+
+      // Apply lead assignment as primaryManagerId if provided
+      if (leadId && mongoose.isValidObjectId(leadId)) {
+        (employee as any).primaryManagerId = new mongoose.Types.ObjectId(leadId);
+        await employee.save({ session });
+      }
 
       await createAuditLog(
         'EMPLOYEE_CREATE',
@@ -90,6 +97,19 @@ export class EmployeeService {
       );
 
       await session.commitTransaction();
+
+      // Mark candidate as accountCreated (outside the transaction, best effort)
+      if (candidateId && mongoose.isValidObjectId(candidateId)) {
+        try {
+          await Candidate.findByIdAndUpdate(candidateId, {
+            accountCreated: true,
+            ...(leadId && mongoose.isValidObjectId(leadId) ? { assignedLeadId: new mongoose.Types.ObjectId(leadId) } : {})
+          });
+        } catch (_) {
+          // non-critical, log only
+        }
+      }
+
       return { employee, generatedPassword: defaultPassword };
     } catch (error) {
       await session.abortTransaction();

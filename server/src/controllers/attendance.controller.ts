@@ -222,10 +222,10 @@ export const submitPendingReport = async (req: AuthRequest, res: Response): Prom
       employeeId,
       date: att.date,
       completedTasks,
-      inProgressTasks: inProgressTasks || '',
-      pendingTasks: pendingTasks || '',
+      inProgressTasks: inProgressTasks || 'None',
+      pendingTasks: pendingTasks || 'None',
       blockers: blockers || 'None',
-      tomorrowPlan: tomorrowPlan || '',
+      tomorrowPlan: tomorrowPlan || 'None',
       submittedAt: new Date()
     });
 

@@ -25,4 +25,9 @@ export const analyticsApi = {
     const response = await axiosInstance.put<{ settings?: CompanySettings } & CompanySettings>('/analytics/settings', data);
     return response.data.settings || response.data;
   },
+
+  getAnnouncementsAndActions: async () => {
+    const response = await axiosInstance.get('/analytics/announcements-actions');
+    return response.data;
+  },
 };

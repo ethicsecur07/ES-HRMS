@@ -28,6 +28,7 @@ const findOrCreateCandidate = async (id: string): Promise<any> => {
         phone: applicant.mobile,
         appliedRole: applicant.role,
         resumeUrl: applicant.resumeUrl,
+        marksheetUrl: (applicant as any).marksheetUrl || '',
         stage: 'NEW'
       });
       await candidate.save();
@@ -56,6 +57,7 @@ const findOrCreateCandidate = async (id: string): Promise<any> => {
           phone: applicant.mobile || applicant.phone || '',
           appliedRole: applicant.role,
           resumeUrl: applicant.resumeUrl,
+          marksheetUrl: applicant.marksheetUrl || '',
           stage: 'NEW'
         });
         await candidate.save();
@@ -90,7 +92,40 @@ export const createCandidate = async (req: Request, res: Response): Promise<void
 export const getCandidates = async (req: Request, res: Response): Promise<void> => {
   try {
     // 1. Fetch all local candidate documents
-    const localCandidates = await Candidate.find().sort({ createdAt: -1 });
+    const rawLocalCandidates = await Candidate.find().sort({ createdAt: -1 });
+    
+    // Auto-heal/sync missing marksheetUrl for already promoted candidates
+    const localCandidates = await Promise.all(
+      rawLocalCandidates.map(async (c) => {
+        if (!c.marksheetUrl) {
+          try {
+            // Check local applicant source
+            const applicant = await ApplicantModel.findById(c._id);
+            if (applicant && (applicant as any).marksheetUrl) {
+              c.marksheetUrl = (applicant as any).marksheetUrl;
+              await c.save();
+              logger.info(`[RecruitmentController] Auto-healed local candidate marksheetUrl: ${c.email}`);
+            } else {
+              // Check external applicant source
+              const extRes = await fetch(`https://qcyokzjqdb.execute-api.ap-south-1.amazonaws.com/prod/api/applicants/${c._id}`);
+              if (extRes.ok) {
+                const extData = await extRes.json();
+                const extApp = extData.data;
+                if (extApp && extApp.marksheetUrl) {
+                  c.marksheetUrl = extApp.marksheetUrl;
+                  await c.save();
+                  logger.info(`[RecruitmentController] Auto-healed external candidate marksheetUrl: ${c.email}`);
+                }
+              }
+            }
+          } catch (healErr: any) {
+            logger.error(`[RecruitmentController] Failed to auto-heal candidate marksheetUrl for ${c.email}`, { error: healErr.message });
+          }
+        }
+        return c;
+      })
+    );
+
     const localEmails = new Set(localCandidates.map(c => c.email.toLowerCase().trim()));
 
     // 2. Fetch all local applicant documents
@@ -161,6 +196,7 @@ export const getCandidates = async (req: Request, res: Response): Promise<void> 
           phone: app.mobile || app.phone || '',
           appliedRole: app.role || 'Applicant',
           resumeUrl: app.resumeUrl || '',
+          marksheetUrl: app.marksheetUrl || '',
           stage: 'NEW',
           createdAt: app.createdAt || new Date(),
           updatedAt: app.updatedAt || new Date(),

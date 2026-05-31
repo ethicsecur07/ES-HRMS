@@ -11,7 +11,7 @@ exports.createEmployeeSchema = zod_1.z.object({
         department: zod_1.z.string().min(2),
         designation: zod_1.z.string().min(2),
         joiningDate: zod_1.z.string(),
-        salary: zod_1.z.number().min(1000),
+        salary: zod_1.z.number().min(0),
         address: zod_1.z.string().min(5),
         password: zod_1.z.string().optional(),
         profileImage: zod_1.z.string().optional(),
@@ -38,6 +38,8 @@ exports.createEmployeeSchema = zod_1.z.object({
             panNumber: zod_1.z.string().optional(),
             taxRegime: zod_1.z.enum(['OLD', 'NEW', '']).optional(),
         }).optional(),
+        candidateId: zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid candidate ID').optional(),
+        leadId: zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid lead ID').optional(),
     }),
 });
 exports.updateEmployeeSchema = zod_1.z.object({
@@ -49,7 +51,7 @@ exports.updateEmployeeSchema = zod_1.z.object({
         department: zod_1.z.string().min(2).optional(),
         designation: zod_1.z.string().min(2).optional(),
         joiningDate: zod_1.z.string().optional(),
-        salary: zod_1.z.number().min(1000).optional(),
+        salary: zod_1.z.number().min(0).optional(),
         address: zod_1.z.string().min(5).optional(),
         profileImage: zod_1.z.string().optional(),
         emergencyContact: zod_1.z.object({

@@ -7,6 +7,7 @@ const ApplicantSchema = new Schema(
     mobile: { type: String, required: true },
     role: { type: String, required: true },
     resumeUrl: { type: String, required: true },
+    marksheetUrl: { type: String },
   },
   { timestamps: true }
 );
