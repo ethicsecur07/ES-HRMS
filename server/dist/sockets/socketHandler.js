@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.forceUserOffline = exports.getIO = exports.initSockets = void 0;
+exports.forceUserOffline = exports.getIO = exports.initSockets = exports.getOnlineUserIdsByOrg = void 0;
 const socket_io_1 = require("socket.io");
 const logger_js_1 = require("../utils/logger.js");
 const jwt_js_1 = require("../utils/jwt.js");
@@ -32,15 +32,19 @@ const getOnlineUserIdsByOrg = (orgId) => {
     }
     return ids;
 };
+exports.getOnlineUserIdsByOrg = getOnlineUserIdsByOrg;
 const initSockets = (httpServer) => {
     const io = new socket_io_1.Server(httpServer, {
         cors: {
+            // Must NOT combine credentials:true with origin:'*' — browsers reject it.
+            // Socket auth uses Bearer tokens (not cookies), so credentials is not needed.
             origin: '*',
-            methods: ['GET', 'POST'],
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         },
-        // Keep-alive tuning: ping every 10 s, timeout after 20 s
+        allowEIO3: true,
+        transports: ['websocket', 'polling'],
         pingInterval: 10000,
-        pingTimeout: 20000,
+        pingTimeout: 15000,
     });
     ioInstance = io;
     // ── Authentication Middleware (Zero-Trust Session Validation) ──────────────
@@ -115,7 +119,8 @@ const initSockets = (httpServer) => {
             // ── Presence: register this socket ──────────────────────────────────
             // If there's a pending offline timer for this user, cancel it.
             // This handles the page-refresh race condition gracefully.
-            if (disconnectTimeouts.has(user.id)) {
+            const hasTimeout = disconnectTimeouts.has(user.id);
+            if (hasTimeout) {
                 clearTimeout(disconnectTimeouts.get(user.id));
                 disconnectTimeouts.delete(user.id);
                 logger_js_1.logger.info(`Reconnect within grace period for user ${user.email} — offline cancelled.`);
@@ -127,7 +132,7 @@ const initSockets = (httpServer) => {
                 });
             }
             const presence = userPresence.get(user.id);
-            const wasOffline = presence.sockets.size === 0;
+            const wasOffline = presence.sockets.size === 0 && !hasTimeout;
             presence.sockets.add(socket.id);
             if (wasOffline) {
                 // Broadcast to ALL org members that this user is now online
@@ -135,7 +140,7 @@ const initSockets = (httpServer) => {
                 logger_js_1.logger.info(`User ${user.email} is now ONLINE (socket: ${socket.id}).`);
             }
             // Send the full current online list to ONLY the newly connected socket
-            socket.emit('online_users', getOnlineUserIdsByOrg(user.organizationId));
+            socket.emit('online_users', (0, exports.getOnlineUserIdsByOrg)(user.organizationId));
         }
         // ── Group/Broadcast room join ────────────────────────────────────────────
         socket.on('join_room', (roomId) => {
@@ -234,7 +239,7 @@ const initSockets = (httpServer) => {
                         logger_js_1.logger.info(`User ${user.email} is now OFFLINE (grace period elapsed).`);
                     }
                     disconnectTimeouts.delete(user.id);
-                }, 8000); // 8-second grace period
+                }, 5000); // 5-second grace period — enough to survive page refresh, fast enough for real closes
                 disconnectTimeouts.set(user.id, timeout);
             }
         });

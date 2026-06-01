@@ -317,6 +317,7 @@ export const useNotificationStore = create<NotificationState>()(
       logoutClear: () => {
         const { socket } = get();
         if (socket) {
+          socket.emit('user_offline_hard');
           socket.removeAllListeners();
           socket.disconnect();
         }
