@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Message } from '../../models/Message.js';
-import { getIO } from '../../sockets/socketHandler.js';
+import { getIO, forceUserOffline } from '../../sockets/socketHandler.js';
 import { notificationService } from '../../services/notification.service.js';
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
@@ -252,3 +252,14 @@ export const getRecentConversations = async (req: Request, res: Response): Promi
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const markOfflineHard = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    forceUserOffline(userId);
+    res.status(200).json({ success: true, message: 'User marked offline.' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
