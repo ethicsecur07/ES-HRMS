@@ -271,7 +271,7 @@ export const initSockets = (httpServer: Server) => {
             logger.info(`User ${user.email} is now OFFLINE (grace period elapsed).`);
           }
           disconnectTimeouts.delete(user.id);
-        }, 3000); // 3-second grace period — enough to survive page refresh, fast enough for real closes
+        }, 5000); // 5-second grace period — enough to survive page refresh, fast enough for real closes
 
         disconnectTimeouts.set(user.id, timeout);
       }
