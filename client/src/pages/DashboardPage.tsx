@@ -131,7 +131,7 @@ export const DashboardPage: React.FC = () => {
       {/* 2 & 3. MANAGER & HR DASHBOARD */}
       {(role === 'MANAGER' || role === 'HR') && (
         <div className="space-y-8">
-         
+          <AttendanceCheckIn />
           <AdminAnalyticsCharts stats={stats} />
 
           {/* Quick Access Grid */}

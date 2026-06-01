@@ -11,6 +11,7 @@ import { LatePenaltyService } from '../../leave-engine/services/LatePenaltyServi
 import { PermissionRequest } from '../../../models/PermissionRequest.js';
 import { Leave } from '../../../models/Leave.js';
 import { Organization } from '../../../models/Organization.js';
+import { HolidayCalendar } from '../../../models/HolidayCalendar.js';
 
 // Haversine formula helper
 const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -55,6 +56,14 @@ export class AttendanceService {
       } else {
         return [];
       }
+    } else if (role === 'ADMIN') {
+      const allowedUsers = await User.find({
+        organizationId: orgId,
+        role: { $in: ['HR', 'MANAGER'] },
+        employeeId: { $exists: true, $ne: null }
+      }).select('employeeId');
+      const allowedEmployeeIds = allowedUsers.map(u => u.employeeId);
+      query.employeeId = { $in: allowedEmployeeIds };
     }
 
     return Attendance.find(query).populate('employeeId');
@@ -85,6 +94,14 @@ export class AttendanceService {
       } else {
         return [];
       }
+    } else if (role === 'ADMIN') {
+      const allowedUsers = await User.find({
+        organizationId: orgId,
+        role: { $in: ['HR', 'MANAGER'] },
+        employeeId: { $exists: true, $ne: null }
+      }).select('employeeId');
+      const allowedEmployeeIds = allowedUsers.map(u => u.employeeId);
+      query.employeeId = { $in: allowedEmployeeIds };
     }
 
     return Attendance.find(query).populate('employeeId').sort({ date: -1, loginTime: -1 });
@@ -105,17 +122,61 @@ export class AttendanceService {
   ): Promise<IAttendance> {
     const today = new Date().toISOString().split('T')[0];
     const orgId = new mongoose.Types.ObjectId(organizationId.toString());
-    const empId = new mongoose.Types.ObjectId(employeeId);
+    let empId = new mongoose.Types.ObjectId(employeeId);
 
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
       // 1. Validate employee exists in organization
-      const employee = await Employee.findOne({ _id: empId, organizationId: orgId }).session(session);
+      let employee = await Employee.findOne({ _id: empId, organizationId: orgId }).session(session);
+      if (!employee) {
+        // Fallback: search for employee by email
+        employee = await Employee.findOne({ email: email.toLowerCase(), organizationId: orgId }).session(session);
+        
+        if (!employee) {
+          // Find the User document
+          const userDoc = await User.findOne({ email: email.toLowerCase(), organizationId: orgId }).session(session);
+          if (userDoc) {
+            // Auto-create matching Employee profile
+            const code = 'EMP-' + Math.floor(1000 + Math.random() * 9000);
+            const dept = userDoc.ssoData?.department || (userDoc.role === 'HR' ? 'HR' : 'Management');
+            const desig = userDoc.ssoData?.jobTitle || userDoc.role;
+            
+            [employee] = await Employee.create([
+              {
+                organizationId: orgId,
+                employeeCode: code,
+                fullName: userDoc.name,
+                email: userDoc.email,
+                phone: '0000000000',
+                department: dept,
+                designation: desig,
+                joiningDate: new Date(),
+                salary: 0,
+                address: 'Office Address',
+                emergencyContact: {
+                  name: 'Self',
+                  relationship: 'Self',
+                  phone: '0000000000',
+                },
+                isActive: true,
+              }
+            ], { session });
+
+            // Link User to Employee
+            userDoc.employeeId = employee._id as any;
+            await userDoc.save({ session });
+          }
+        }
+      }
+
       if (!employee) {
         throw new Error('Target employee not found in this organization.');
       }
+
+      // Reassign empId to the correct found/created Employee ID
+      empId = employee._id as mongoose.Types.ObjectId;
 
       // 1.5 Enforce Approved Leave Block (Do not allow check-in on approved leave days)
       const approvedLeaveToday = await Leave.findOne({
@@ -135,6 +196,37 @@ export class AttendanceService {
       const existing = await Attendance.findOne({ employeeId: empId, date: today, organizationId: orgId }).session(session);
       if (existing) {
         throw new Error('Attendance already recorded for today.');
+      }
+
+      // 2.5. Prevent check-in on Sundays, holidays, and non-working days
+      const todayDate = new Date();
+      const isSunday = todayDate.getDay() === 0;
+
+      // Enforce Sunday check
+      if (isSunday) {
+        throw new Error('Check-in is disabled on Sundays.');
+      }
+
+      // Enforce Active Workdays check
+      const org = await Organization.findOne({ _id: orgId })
+        .session(session)
+        .select('settings.activeWorkdays');
+      const activeWorkdays = org?.settings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+      const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const currentDayLabel = DAY_LABELS[todayDate.getDay()];
+      if (!activeWorkdays.includes(currentDayLabel)) {
+        throw new Error(`Check-in is not allowed on non-working days (${currentDayLabel}).`);
+      }
+
+      // Enforce Public Holiday check
+      const publicHoliday = await HolidayCalendar.findOne({
+        organizationId: orgId,
+        date: today,
+        isRestricted: false
+      }).session(session);
+
+      if (publicHoliday) {
+        throw new Error(`Check-in is disabled today due to the public holiday: ${publicHoliday.name}.`);
       }
 
       // 3. Verify location (Office IP Range or GPS GeoFence)
@@ -519,8 +611,8 @@ export class AttendanceService {
     const now = new Date();
     const currentHour = now.getHours();
 
-    // If it is >= 7:00 PM (19:00), we can check out today's record as well
-    const queryDate = currentHour >= 19 ? { $lte: todayStr } : { $lt: todayStr };
+    // If it is >= 6:00 PM (18:00), we can check out today's record as well
+    const queryDate = currentHour >= 18 ? { $lte: todayStr } : { $lt: todayStr };
 
     // Find attendance records where logoutTime is missing
     const openAttendances = await Attendance.find({
@@ -532,13 +624,13 @@ export class AttendanceService {
 
     for (const att of openAttendances) {
       const loginTime = new Date(att.loginTime);
-      // Set logout to exactly 7:00 PM (19:00) on that day in local time
+      // Set logout to exactly 6:00 PM (18:00) on that day in local time
       const logoutTime = new Date(loginTime);
-      logoutTime.setHours(19, 0, 0, 0);
+      logoutTime.setHours(18, 0, 0, 0);
       
       let workingHours = parseFloat(((logoutTime.getTime() - loginTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
       if (workingHours <= 0) {
-        // Fallback to exactly 9 hours after login if login was after 7:00 PM
+        // Fallback to exactly 9 hours after login if login was after 6:00 PM
         logoutTime.setTime(loginTime.getTime() + 9 * 60 * 60 * 1000);
         workingHours = 9;
       }
@@ -554,7 +646,7 @@ export class AttendanceService {
         email,
         'ATTENDANCE',
         att.id,
-        `Auto-checked out at 7:00 PM for forgot checkout on ${att.date}. Total hours: ${workingHours}`,
+        `Auto-checked out at 6:00 PM for forgot checkout on ${att.date}. Total hours: ${workingHours}`,
         orgId
       );
     }

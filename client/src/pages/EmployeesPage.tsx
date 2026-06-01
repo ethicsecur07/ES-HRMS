@@ -262,6 +262,38 @@ export const EmployeesPage: React.FC = () => {
       };
 
       if (editingId) {
+        // Find the original employee to preserve general/professional fields
+        const originalEmp = employees.find((e: any) => e._id === editingId);
+        if (originalEmp) {
+          const origDeptId = typeof originalEmp.departmentId === 'object' && originalEmp.departmentId !== null
+            ? originalEmp.departmentId?._id
+            : originalEmp.departmentId;
+          const origDesigId = typeof originalEmp.designationId === 'object' && originalEmp.designationId !== null
+            ? originalEmp.designationId?._id
+            : originalEmp.designationId;
+          const targetDept = departments.find((d) => d._id === origDeptId);
+          const targetDesig = designations.find((d) => d._id === origDesigId);
+
+          const preservedData = {
+            employeeCode: originalEmp.employeeCode,
+            fullName: originalEmp.fullName,
+            email: originalEmp.email,
+            password: 'EthicSec@2026', // backend ignores passwords on update if empty/not-onboarding
+            phone: originalEmp.phone,
+            department: targetDept?.name || originalEmp.department,
+            designation: targetDesig?.name || originalEmp.designation,
+            departmentId: origDeptId,
+            designationId: origDesigId,
+            joiningDate: originalEmp.joiningDate ? originalEmp.joiningDate.split('T')[0] : '',
+            profileImage: originalEmp.profileImage || '',
+            salary: originalEmp.salary,
+            address: originalEmp.address,
+            emergencyContact: data.emergencyContact,
+            bankDetails: data.bankDetails,
+            taxDetails: data.taxDetails,
+          };
+          return employeeApi.update(editingId, preservedData);
+        }
         return employeeApi.update(editingId, data);
       }
       return employeeApi.create(data);
@@ -653,13 +685,22 @@ export const EmployeesPage: React.FC = () => {
                   ) : (
                     <Camera className="w-6 h-6 text-primary opacity-60" />
                   )}
-                  <label
-                    className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                    title="Upload Profile Image"
-                  >
-                    <Camera className="w-5 h-5 text-white" />
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                  </label>
+                  {!editingId ? (
+                    <label
+                      className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      title="Upload Profile Image"
+                    >
+                      <Camera className="w-5 h-5 text-white" />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    </label>
+                  ) : (
+                    <div
+                      className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-not-allowed"
+                      title="Profile photograph is read-only"
+                    >
+                      <Camera className="w-5 h-5 text-white/50" />
+                    </div>
+                  )}
                   {isUploadingImg && (
                     <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
                       <Loader2 className="w-5 h-5 text-white animate-spin" />
@@ -669,27 +710,39 @@ export const EmployeesPage: React.FC = () => {
                 <div>
                   <p className="text-sm font-bold text-foreground">Profile Photograph</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Click the image box to upload a high-fidelity profile picture
+                    {editingId
+                      ? 'Profile picture is locked in edit mode'
+                      : 'Click the image box to upload a high-fidelity profile picture'}
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1 relative">
-                  <Input label="Employee Code *" {...register('employeeCode')} error={errors.employeeCode?.message} />
-                  <button
-                    type="button"
-                    onClick={handleGenerateCode}
-                    className="absolute right-2 top-8 text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 text-[10px] font-bold"
-                    title="Auto-generate sequential code"
-                  >
-                    <Sparkles className="w-3 h-3" /> Auto Gen
-                  </button>
+                  <Input
+                    label="Employee Code *"
+                    {...register('employeeCode')}
+                    disabled={!!editingId}
+                    className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
+                    error={errors.employeeCode?.message}
+                  />
+                  {!editingId && (
+                    <button
+                      type="button"
+                      onClick={handleGenerateCode}
+                      className="absolute right-2 top-8 text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 text-[10px] font-bold"
+                      title="Auto-generate sequential code"
+                    >
+                      <Sparkles className="w-3 h-3" /> Auto Gen
+                    </button>
+                  )}
                 </div>
 
                 <Input
                   label="Full Name *"
                   {...register('fullName')}
+                  disabled={!!editingId}
+                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
                   error={errors.fullName?.message}
                   onKeyPress={(e) => {
                     if (!/^[a-zA-Z\s]$/.test(e.key)) {
@@ -697,17 +750,28 @@ export const EmployeesPage: React.FC = () => {
                     }
                   }}
                 />
-                <Input label="Work Email *" type="email" {...register('email')} error={errors.email?.message} />
+                <Input
+                  label="Work Email *"
+                  type="email"
+                  {...register('email')}
+                  disabled={!!editingId}
+                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
+                  error={errors.email?.message}
+                />
                 <Input
                   label={editingId ? 'New Login Password (Optional)' : 'Login Password *'}
                   type="text"
                   {...register('password')}
+                  disabled={!!editingId}
+                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
                   error={errors.password?.message}
                   placeholder={editingId ? 'Leave blank to keep unchanged' : 'Default: EthicSec@2026'}
                 />
                 <Input
                   label="Phone Number *"
                   {...register('phone')}
+                  disabled={!!editingId}
+                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
                   error={errors.phone?.message}
                   onKeyPress={(e) => {
                     if (!/^[0-9\s+-]$/.test(e.key)) {
@@ -716,7 +780,13 @@ export const EmployeesPage: React.FC = () => {
                   }}
                 />
               </div>
-              <Textarea label="Residential Address *" {...register('address')} error={errors.address?.message} />
+              <Textarea
+                label="Residential Address *"
+                {...register('address')}
+                disabled={!!editingId}
+                className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
+                error={errors.address?.message}
+              />
             </div>
           )}
 
@@ -727,6 +797,7 @@ export const EmployeesPage: React.FC = () => {
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department *</label>
                   <select
                     {...register('departmentId')}
+                    disabled={!!editingId}
                     className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                   >
                     <option value="" disabled>Select Department</option>
@@ -743,7 +814,7 @@ export const EmployeesPage: React.FC = () => {
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Designation *</label>
                   <select
                     {...register('designationId')}
-                    disabled={!selectedDeptIdWatch}
+                    disabled={!!editingId || !selectedDeptIdWatch}
                     className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
                   >
                     <option value="" disabled>Select Designation</option>
@@ -756,8 +827,22 @@ export const EmployeesPage: React.FC = () => {
                   {errors.designationId && <p className="text-xs text-red-500 font-bold mt-1">{errors.designationId.message}</p>}
                 </div>
 
-                <Input label="Employee Hire Date *" type="date" {...register('joiningDate')} error={errors.joiningDate?.message} />
-                <Input label="Monthly Base Salary (INR) *" type="number" {...register('salary')} error={errors.salary?.message} />
+                <Input
+                  label="Employee Hire Date *"
+                  type="date"
+                  {...register('joiningDate')}
+                  disabled={!!editingId}
+                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
+                  error={errors.joiningDate?.message}
+                />
+                <Input
+                  label="Monthly Base Salary (INR) *"
+                  type="number"
+                  {...register('salary')}
+                  disabled={!!editingId}
+                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
+                  error={errors.salary?.message}
+                />
               </div>
             </div>
           )}
