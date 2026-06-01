@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Message } from '../../models/Message.js';
 import { getIO, forceUserOffline, getOnlineUserIdsByOrg } from '../../sockets/socketHandler.js';
 import { notificationService } from '../../services/notification.service.js';
+import { User } from '../../models/User.js';
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
 
@@ -94,13 +95,16 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
 
     // Only dispatch notification for 1:1 messages
     if (receiverId !== 'broadcast' && !receiverId.startsWith('group_')) {
+      const sender = await User.findById(senderId);
+      const senderName = sender ? sender.name : 'Someone';
       await notificationService.dispatchNotification({
         organizationId: (req as any).user.organizationId,
         recipientId: receiverId,
-        title: 'New Message',
-        message: `You have a new message.`,
+        title: `New Message from ${senderName}`,
+        message: content || 'Sent an attachment.',
         channels: ['IN_APP'],
-        type: 'CHAT'
+        type: 'CHAT',
+        payload: { senderId }
       });
     }
 
@@ -159,6 +163,22 @@ export const sendFileMessage = async (req: Request, res: Response): Promise<void
         io.to(`user_${receiverId}`).emit('receive_message', message);
         io.to(`user_${senderId}`).emit('receive_message', message);
       }
+    }
+
+    // Only dispatch notification for 1:1 messages
+    if (receiverId !== 'broadcast' && !receiverId.startsWith('group_')) {
+      const sender = await User.findById(senderId);
+      const senderName = sender ? sender.name : 'Someone';
+      const description = messageType === 'image' ? 'Sent an image' : `Sent a file: ${req.file.originalname}`;
+      await notificationService.dispatchNotification({
+        organizationId: (req as any).user.organizationId,
+        recipientId: receiverId,
+        title: `New Message from ${senderName}`,
+        message: description,
+        channels: ['IN_APP'],
+        type: 'CHAT',
+        payload: { senderId }
+      });
     }
 
     res.status(201).json({ success: true, data: message });

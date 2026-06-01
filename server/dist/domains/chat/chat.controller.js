@@ -7,6 +7,7 @@ exports.getOnlineUsers = exports.markOfflineHard = exports.getRecentConversation
 const Message_js_1 = require("../../models/Message.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const notification_service_js_1 = require("../../services/notification.service.js");
+const User_js_1 = require("../../models/User.js");
 const cloudinary_1 = require("cloudinary");
 const multer_1 = __importDefault(require("multer"));
 // Multer in-memory storage for chat file uploads
@@ -87,13 +88,16 @@ const sendMessage = async (req, res) => {
         }
         // Only dispatch notification for 1:1 messages
         if (receiverId !== 'broadcast' && !receiverId.startsWith('group_')) {
+            const sender = await User_js_1.User.findById(senderId);
+            const senderName = sender ? sender.name : 'Someone';
             await notification_service_js_1.notificationService.dispatchNotification({
                 organizationId: req.user.organizationId,
                 recipientId: receiverId,
-                title: 'New Message',
-                message: `You have a new message.`,
+                title: `New Message from ${senderName}`,
+                message: content || 'Sent an attachment.',
                 channels: ['IN_APP'],
-                type: 'CHAT'
+                type: 'CHAT',
+                payload: { senderId }
             });
         }
         res.status(201).json({ success: true, data: message });
@@ -148,6 +152,21 @@ const sendFileMessage = async (req, res) => {
                 io.to(`user_${receiverId}`).emit('receive_message', message);
                 io.to(`user_${senderId}`).emit('receive_message', message);
             }
+        }
+        // Only dispatch notification for 1:1 messages
+        if (receiverId !== 'broadcast' && !receiverId.startsWith('group_')) {
+            const sender = await User_js_1.User.findById(senderId);
+            const senderName = sender ? sender.name : 'Someone';
+            const description = messageType === 'image' ? 'Sent an image' : `Sent a file: ${req.file.originalname}`;
+            await notification_service_js_1.notificationService.dispatchNotification({
+                organizationId: req.user.organizationId,
+                recipientId: receiverId,
+                title: `New Message from ${senderName}`,
+                message: description,
+                channels: ['IN_APP'],
+                type: 'CHAT',
+                payload: { senderId }
+            });
         }
         res.status(201).json({ success: true, data: message });
     }
