@@ -29,7 +29,7 @@ const userPresence = new Map<string, {
 const disconnectTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 /** Return all userIds in an org that currently have ≥ 1 socket connected */
-const getOnlineUserIdsByOrg = (orgId: string): string[] => {
+export const getOnlineUserIdsByOrg = (orgId: string): string[] => {
   const ids: string[] = [];
   for (const [userId, presence] of userPresence.entries()) {
     if (presence.organizationId === orgId && presence.sockets.size > 0) {
@@ -42,14 +42,13 @@ const getOnlineUserIdsByOrg = (orgId: string): string[] => {
 export const initSockets = (httpServer: Server) => {
   const io = new SocketIOServer(httpServer, {
     cors: {
+      // Must NOT combine credentials:true with origin:'*' — browsers reject it.
+      // Socket auth uses Bearer tokens (not cookies), so credentials is not needed.
       origin: '*',
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      credentials: true,
-      allowedHeaders: ['Authorization', 'Content-Type'],
     },
-    allowEIO3: true,          // EIO v3 compatibility for older clients
+    allowEIO3: true,
     transports: ['websocket', 'polling'],
-    // Tighter keep-alive: detect dead cross-device connections faster
     pingInterval: 10000,
     pingTimeout: 15000,
   });

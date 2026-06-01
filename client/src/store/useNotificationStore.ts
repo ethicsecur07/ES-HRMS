@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { NotificationItem } from '../types';
 import { io, Socket } from 'socket.io-client';
 import { notificationApi } from '../api_service/notificationApi';
+import axiosInstance from '../api_service/axiosInstance';
 
 interface Toast {
   id: string;
@@ -33,6 +34,8 @@ interface NotificationState {
   logoutClear: () => void;
   initializeSocket: (token: string, currentUserId?: string) => void;
   fetchNotifications: () => Promise<void>;
+  /** HTTP fallback: sync online presence from server — called on connect & periodically */
+  fetchOnlineUsers: () => Promise<void>;
   /** Clear unread count when opening a conversation */
   clearUnreadChat: (conversationId: string) => void;
   socket: Socket | null;
@@ -69,6 +72,25 @@ export const useNotificationStore = create<NotificationState>()(
           });
         } catch (err) {
           console.error('Failed to fetch notifications:', err);
+        }
+      },
+
+      /**
+       * fetchOnlineUsers — HTTP fallback to sync presence.
+       * Called on socket connect (handles page-load race with socket events)
+       * and periodically from ChatPage (handles missed events on poor networks).
+       * The axiosInstance already has cross-device URL logic baked in.
+       */
+      fetchOnlineUsers: async () => {
+        try {
+          const res = await axiosInstance.get('/chat/online-users');
+          // axiosInstance unwraps { success, data: { onlineUserIds } } → { onlineUserIds }
+          const onlineUserIds: string[] = res.data?.onlineUserIds ?? [];
+          if (Array.isArray(onlineUserIds)) {
+            set({ onlineUserIds });
+          }
+        } catch (err) {
+          console.warn('[Presence] HTTP sync failed (socket is primary):', err);
         }
       },
 
@@ -123,7 +145,9 @@ export const useNotificationStore = create<NotificationState>()(
 
         socket.on('connect', () => {
           console.log('[Socket] Connected to EthicSec real-time server:', socket.id);
-
+          // HTTP sync on every connect/reconnect — ensures correct state
+          // even if the 'online_users' socket event was missed due to a race.
+          get().fetchOnlineUsers();
         });
 
         socket.on('disconnect', (reason) => {
@@ -319,6 +343,17 @@ export const useNotificationStore = create<NotificationState>()(
         // IMPORTANT: socket, onlineUserIds must NOT be persisted —
         // they are live runtime state that must be re-established on each load.
       }),
+      /**
+       * After every localStorage hydration, forcibly reset runtime-only state.
+       * This prevents stale onlineUserIds (from an older schema version that
+       * persisted them) from leaking into the current session.
+       */
+      onRehydrateStorage: () => (rehydratedState) => {
+        if (rehydratedState) {
+          rehydratedState.onlineUserIds = [];
+          rehydratedState.socket = null;
+        }
+      },
     }
   )
 );

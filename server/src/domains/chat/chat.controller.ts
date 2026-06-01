@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Message } from '../../models/Message.js';
-import { getIO, forceUserOffline } from '../../sockets/socketHandler.js';
+import { getIO, forceUserOffline, getOnlineUserIdsByOrg } from '../../sockets/socketHandler.js';
 import { notificationService } from '../../services/notification.service.js';
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
@@ -263,3 +263,17 @@ export const markOfflineHard = async (req: Request, res: Response): Promise<void
   }
 };
 
+/**
+ * GET /api/chat/online-users
+ * Returns the list of user IDs currently online in the caller's organization.
+ * Used as an HTTP fallback when socket events are missed (page load race, etc.).
+ */
+export const getOnlineUsers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const organizationId = (req as any).user.organizationId;
+    const onlineUserIds = getOnlineUserIdsByOrg(organizationId);
+    res.status(200).json({ success: true, data: { onlineUserIds } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
