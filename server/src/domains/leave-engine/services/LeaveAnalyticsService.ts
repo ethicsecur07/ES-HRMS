@@ -55,6 +55,7 @@ export class LeaveAnalyticsService {
         $match: {
           organizationId: new mongoose.Types.ObjectId(organizationId),
           status: 'APPROVED',
+          leaveType: { $ne: 'WFH' },
           startDate: { $gte: startStr },
         },
       },
@@ -100,7 +101,10 @@ export class LeaveAnalyticsService {
 
     const results = await Leave.aggregate([
       {
-        $match: { organizationId: orgObjectId },
+        $match: {
+          organizationId: orgObjectId,
+          leaveType: { $ne: 'WFH' },
+        },
       },
       {
         $lookup: {

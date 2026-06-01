@@ -5,7 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmployeeService = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
-const crypto_1 = __importDefault(require("crypto"));
 const Employee_js_1 = require("../models/Employee.js");
 const User_js_1 = require("../models/User.js");
 const Candidate_js_1 = require("../models/Candidate.js");
@@ -23,21 +22,10 @@ class EmployeeService {
         const session = await mongoose_1.default.startSession();
         session.startTransaction();
         try {
-            if (candidateId) {
-                // Onboarded candidates completely do not have an employee code
-                delete employeeData.employeeCode;
-            }
-            else if (!employeeData.employeeCode) {
+            if (!employeeData.employeeCode) {
                 const isIntern = employeeData.designation?.toLowerCase().includes('intern');
-                // Generate employee code based on department/designation unless intern
-                employeeData.employeeCode = await EmployeeService.generateEmployeeCode(orgId, employeeData.departmentId?.toString(), employeeData.designationId?.toString(), isIntern);
-                if (isIntern) {
-                    // Interns should not have an employeeCode field
-                    delete employeeData.employeeCode;
-                }
-                else if (!employeeData.employeeCode || employeeData.employeeCode.trim() === '') {
-                    employeeData.employeeCode = `EMP-${crypto_1.default.randomBytes(3).toString('hex').toUpperCase()}`;
-                }
+                // Generate code based on department/designation if provided, otherwise fallback to simple prefix
+                employeeData.employeeCode = await EmployeeService.generateEmployeeCode(orgId, employeeData.departmentId, employeeData.designationId, isIntern);
             }
             // 1. Pre-flight check for duplicate employeeCode or email within organization
             if (employeeData.employeeCode) {
@@ -73,12 +61,13 @@ class EmployeeService {
                     isActive: true,
                     organizationId: orgId,
                 }], { session });
+            const isInternRole = (employee.designation?.toLowerCase().includes('intern') || employee.department?.toLowerCase().includes('intern'));
             await User_js_1.User.findOneAndUpdate({ organizationId: orgId, email: employee.email }, {
                 organizationId: orgId,
                 name: employee.fullName,
                 email: employee.email,
                 password: hashedPassword,
-                role: 'EMPLOYEE',
+                role: isInternRole ? 'INTERN' : 'EMPLOYEE',
                 employeeId: employee._id,
                 isActive: true,
                 isLoginApproved: true,
@@ -179,7 +168,10 @@ class EmployeeService {
             if (Object.keys(userUpdate).length > 0) {
                 userUpdate.employeeId = employee._id;
                 await User_js_1.User.findOneAndUpdate({
-                    employeeId: employee._id,
+                    $or: [
+                        { employeeId: employee._id },
+                        { email: employee.email.toLowerCase().trim() }
+                    ],
                     organizationId: orgId
                 }, userUpdate, { session });
             }
@@ -427,13 +419,10 @@ class EmployeeService {
      * The numeric suffix is zero‑padded to 4 digits to allow for many employees.
      */
     static async generateEmployeeCode(orgId, departmentId, designationId, isIntern) {
-        if (isIntern) {
-            // Interns do not receive an employee code
-            return '';
-        }
-        let prefix = 'EMP-';
-        // If a department is provided, use its code (fallback to generic)
-        if (departmentId) {
+        // Base prefix handling
+        let prefix = isIntern ? 'INT-' : 'EMP-';
+        // If a department is provided and it's not an intern, use its code (fallback to generic)
+        if (departmentId && !isIntern) {
             const dept = await Department_js_1.Department.findById(departmentId).select('name');
             const deptCode = dept?.name?.replace(/\s+/g, '').toUpperCase().slice(0, 4) || 'DEP';
             prefix = `${deptCode}-`;

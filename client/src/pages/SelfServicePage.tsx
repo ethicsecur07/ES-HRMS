@@ -208,6 +208,11 @@ export const SelfServicePage: React.FC = () => {
     const { id, type, approve } = showApproveModal;
     const status = approve ? 'APPROVED' : 'REJECTED';
 
+    if (!approve && (!rejectionReason || rejectionReason.trim().length < 5)) {
+      addToast('Validation Error', 'Please provide a rejection reason of at least 5 characters.', 'warning');
+      return;
+    }
+
     if (type === 'reimbursement') {
       approveReimbMutation.mutate({ id, status, rejectionReason });
     } else if (type === 'attendance') {
@@ -250,7 +255,7 @@ export const SelfServicePage: React.FC = () => {
         }]
       : []),
     { header: 'Category', accessor: (row: ReimbursementClaim) => <span className="font-semibold text-xs">{row.category}</span> },
-    { header: 'Amount', accessor: (row: ReimbursementClaim) => <span className="font-bold font-mono text-xs text-primary">${row.amount.toFixed(2)}</span> },
+    { header: 'Amount', accessor: (row: ReimbursementClaim) => <span className="font-bold font-mono text-xs text-primary">₹{row.amount.toFixed(2)}</span> },
     { header: 'Claim Date', accessor: (row: ReimbursementClaim) => <span className="font-mono text-[11px]">{formatDate(row.expenseDate)}</span> },
     { header: 'Description', accessor: (row: ReimbursementClaim) => <span className="text-xs truncate max-w-[200px] block">{row.description}</span> },
     {
@@ -484,16 +489,35 @@ export const SelfServicePage: React.FC = () => {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            
+            if (!reimbForm.expenseDate) {
+              addToast('Validation Error', 'Expense date is required.', 'warning');
+              return;
+            }
+            const amt = parseFloat(reimbForm.amount);
+            if (isNaN(amt) || amt <= 0) {
+              addToast('Validation Error', 'Please enter a valid positive claim amount.', 'warning');
+              return;
+            }
+            if (!reimbForm.description || reimbForm.description.trim().length < 5) {
+              addToast('Validation Error', 'Description must be at least 5 characters long.', 'warning');
+              return;
+            }
+            if (isHRAdmin && !reimbForm.employeeId) {
+              addToast('Validation Error', 'Please select a target employee.', 'warning');
+              return;
+            }
+
             createReimbMutation.mutate({
               expenseDate: new Date(reimbForm.expenseDate).toISOString(),
-              amount: parseFloat(reimbForm.amount),
+              amount: amt,
               category: reimbForm.category,
               description: reimbForm.description,
               receiptUrl: reimbForm.receiptUrl || undefined,
               employeeId: isHRAdmin ? reimbForm.employeeId || undefined : undefined
             });
           }}
-          className="space-y-4"
+          className="space-y-4 px-4"
         >
           {isHRAdmin && (
             <div className="space-y-1">
@@ -535,7 +559,7 @@ export const SelfServicePage: React.FC = () => {
           </div>
 
           <Input
-            label="Claim Amount ($) *"
+            label="Claim Amount (₹) *"
             type="number"
             step="0.01"
             placeholder="0.00"
@@ -605,8 +629,6 @@ export const SelfServicePage: React.FC = () => {
         </form>
       </Modal>
 
-
-
       {/* Modal - New Attendance Correction */}
       <Modal
         isOpen={showAttModal}
@@ -617,15 +639,41 @@ export const SelfServicePage: React.FC = () => {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            
+            if (!attForm.attendanceDate) {
+              addToast('Validation Error', 'Attendance date is required.', 'warning');
+              return;
+            }
+            if (!attForm.requestedLoginTime || !attForm.requestedLogoutTime) {
+              addToast('Validation Error', 'Both login and logout times are required.', 'warning');
+              return;
+            }
+            if (attForm.requestedLoginTime >= attForm.requestedLogoutTime) {
+              addToast('Validation Error', 'Requested login time must be earlier than the logout time.', 'warning');
+              return;
+            }
+            if (!attForm.reason || attForm.reason.trim().length < 5) {
+              addToast('Validation Error', 'Reason for correction must be at least 5 characters long.', 'warning');
+              return;
+            }
+            if (isHRAdmin && !attForm.employeeId) {
+              addToast('Validation Error', 'Please select a target employee.', 'warning');
+              return;
+            }
+
+            // Construct ISO date-time strings
+            const loginIso = new Date(`${attForm.attendanceDate}T${attForm.requestedLoginTime}:00`).toISOString();
+            const logoutIso = new Date(`${attForm.attendanceDate}T${attForm.requestedLogoutTime}:00`).toISOString();
+            
             createAttMutation.mutate({
               attendanceDate: attForm.attendanceDate,
-              requestedLoginTime: new Date(`${attForm.attendanceDate}T${attForm.requestedLoginTime}`).toISOString(),
-              requestedLogoutTime: new Date(`${attForm.attendanceDate}T${attForm.requestedLogoutTime}`).toISOString(),
+              requestedLoginTime: loginIso,
+              requestedLogoutTime: logoutIso,
               reason: attForm.reason,
               employeeId: isHRAdmin ? attForm.employeeId || undefined : undefined
             });
           }}
-          className="space-y-4"
+          className="space-y-4 px-4"
         >
           {isHRAdmin && (
             <div className="space-y-1">
@@ -633,7 +681,7 @@ export const SelfServicePage: React.FC = () => {
               <select
                 value={attForm.employeeId}
                 onChange={(e) => setAttForm(p => ({ ...p, employeeId: e.target.value }))}
-                className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
+                className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
                 required
               >
                 <option value="">Select Employee...</option>
@@ -645,7 +693,7 @@ export const SelfServicePage: React.FC = () => {
           )}
 
           <Input
-            label="Correction Target Date *"
+            label="Attendance Date *"
             type="date"
             value={attForm.attendanceDate}
             onChange={(e) => setAttForm(p => ({ ...p, attendanceDate: e.target.value }))}
@@ -654,14 +702,14 @@ export const SelfServicePage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Requested Check-In *"
+              label="Requested Login Time *"
               type="time"
               value={attForm.requestedLoginTime}
               onChange={(e) => setAttForm(p => ({ ...p, requestedLoginTime: e.target.value }))}
               required
             />
             <Input
-              label="Requested Check-Out *"
+              label="Requested Logout Time *"
               type="time"
               value={attForm.requestedLogoutTime}
               onChange={(e) => setAttForm(p => ({ ...p, requestedLogoutTime: e.target.value }))}
@@ -670,11 +718,11 @@ export const SelfServicePage: React.FC = () => {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-muted-foreground uppercase">Correction Reason *</label>
+            <label className="text-xs font-bold text-muted-foreground uppercase">Reason for Correction *</label>
             <textarea
               value={attForm.reason}
               onChange={(e) => setAttForm(p => ({ ...p, reason: e.target.value }))}
-              placeholder="e.g. Forgot to clock in, out-of-office client meet, internet breakdown..."
+              placeholder="Provide a reason (e.g. forgot checkout, power outage, on-site travel)..."
               className="w-full h-24 bg-background text-foreground border border-border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 resize-none"
               required
             />
@@ -685,11 +733,12 @@ export const SelfServicePage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" isLoading={createAttMutation.isPending}>
-              Send Request
+              Submit Request
             </Button>
           </div>
         </form>
       </Modal>
+
 
       {/* Modal - Approve/Reject with Reason Option */}
       <Modal
@@ -698,7 +747,7 @@ export const SelfServicePage: React.FC = () => {
         title={showApproveModal?.approve ? 'Confirm Request Approval' : 'Provide Rejection Explanation'}
         maxWidth="max-w-md"
       >
-        <form onSubmit={handleApproveSubmit} className="space-y-4">
+        <form onSubmit={handleApproveSubmit} className="space-y-4 px-4">
           <div className="flex items-start gap-3 p-4 bg-muted/40 rounded-xl border border-border">
             {showApproveModal?.approve ? (
               <>

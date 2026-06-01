@@ -37,7 +37,7 @@ exports.Employee = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const employeeSchema = new mongoose_1.Schema({
     organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
-    employeeCode: { type: String, sparse: true },
+    employeeCode: { type: String, required: false },
     fullName: { type: String, required: true },
     email: { type: String, required: true, lowercase: true },
     phone: { type: String, required: true },
@@ -76,7 +76,6 @@ const employeeSchema = new mongoose_1.Schema({
         taxRegime: { type: String, enum: ['OLD', 'NEW', ''], default: '' },
     },
 }, { timestamps: true });
-employeeSchema.index({ organizationId: 1, employeeCode: 1 }, { unique: true });
 employeeSchema.index({ organizationId: 1, email: 1 }, { unique: true });
 const softDeletePlugin_js_1 = require("../utils/softDeletePlugin.js");
 const User_js_1 = require("./User.js");

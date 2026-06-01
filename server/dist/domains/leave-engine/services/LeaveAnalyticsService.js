@@ -46,6 +46,7 @@ class LeaveAnalyticsService {
                 $match: {
                     organizationId: new mongoose_1.default.Types.ObjectId(organizationId),
                     status: 'APPROVED',
+                    leaveType: { $ne: 'WFH' },
                     startDate: { $gte: startStr },
                 },
             },
@@ -79,7 +80,10 @@ class LeaveAnalyticsService {
         const orgObjectId = new mongoose_1.default.Types.ObjectId(organizationId);
         const results = await Leave_js_1.Leave.aggregate([
             {
-                $match: { organizationId: orgObjectId },
+                $match: {
+                    organizationId: orgObjectId,
+                    leaveType: { $ne: 'WFH' },
+                },
             },
             {
                 $lookup: {
