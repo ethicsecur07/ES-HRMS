@@ -160,9 +160,30 @@ export const Layout: React.FC = () => {
     if (!socket) return;
 
     const handleUnload = () => {
-      // Synchronously signal offline so the server doesn't wait for the
-      // 8-second grace period when the user actually closes the tab.
+      // 1. Send hard offline event over socket (best effort)
       try { socket.emit('user_offline_hard'); } catch (_) {}
+
+      // 2. Send fetch with keepalive: true to ensure the server gets the offline signal even if the socket closes first
+      if (token) {
+        const getApiUrl = () => {
+          const envApiUrl = import.meta.env.VITE_API_URL;
+          if (envApiUrl) return envApiUrl;
+          return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+        };
+        const apiUrl = getApiUrl();
+        try {
+          fetch(`${apiUrl}/chat/offline-hard`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            keepalive: true
+          });
+        } catch (_) {}
+      }
+
+      // 3. Disconnect socket
       socket.disconnect();
     };
 
@@ -173,7 +194,7 @@ export const Layout: React.FC = () => {
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
     };
-  }, [socket]);
+  }, [socket, token]);
 
   // ── Tab visibility presence ──────────────────────────────────────────────
   // We only use `document.visibilitychange` (tab hidden/shown) for presence.

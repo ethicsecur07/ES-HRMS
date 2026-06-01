@@ -62,7 +62,7 @@ const DEMO_USERS: Record<Role, User> = {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       role: null,
@@ -77,6 +77,23 @@ export const useAuthStore = create<AuthState>()(
         }),
 
       logout: () => {
+        // Clear offline status first via API
+        const token = get().token;
+        if (token) {
+          const getApiUrl = () => {
+            const envApiUrl = import.meta.env.VITE_API_URL;
+            if (envApiUrl) return envApiUrl;
+            return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+          };
+          const apiUrl = getApiUrl();
+          fetch(`${apiUrl}/chat/offline-hard`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          }).catch(() => {});
+        }
         useNotificationStore.getState().logoutClear();
         set({
           user: null,

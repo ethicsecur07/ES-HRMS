@@ -285,3 +285,23 @@ export const getIO = () => {
   }
   return ioInstance;
 };
+
+export const forceUserOffline = (userId: string) => {
+  const presence = userPresence.get(userId);
+  if (!presence) return;
+
+  // Cancel any existing grace-period timer
+  if (disconnectTimeouts.has(userId)) {
+    clearTimeout(disconnectTimeouts.get(userId)!);
+    disconnectTimeouts.delete(userId);
+  }
+
+  // Clean up user presence
+  userPresence.delete(userId);
+
+  // Broadcast to organization
+  if (ioInstance) {
+    ioInstance.to(`org_${presence.organizationId}`).emit('user_offline', { userId });
+  }
+  logger.info(`User ${userId} forced OFFLINE via forceUserOffline API.`);
+};
