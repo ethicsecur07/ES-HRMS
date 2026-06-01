@@ -250,7 +250,7 @@ export const SelfServicePage: React.FC = () => {
         }]
       : []),
     { header: 'Category', accessor: (row: ReimbursementClaim) => <span className="font-semibold text-xs">{row.category}</span> },
-    { header: 'Amount', accessor: (row: ReimbursementClaim) => <span className="font-bold font-mono text-xs text-primary">${row.amount.toFixed(2)}</span> },
+    { header: 'Amount', accessor: (row: ReimbursementClaim) => <span className="font-bold font-mono text-xs text-primary">₹{row.amount.toFixed(2)}</span> },
     { header: 'Claim Date', accessor: (row: ReimbursementClaim) => <span className="font-mono text-[11px]">{formatDate(row.expenseDate)}</span> },
     { header: 'Description', accessor: (row: ReimbursementClaim) => <span className="text-xs truncate max-w-[200px] block">{row.description}</span> },
     {
@@ -401,17 +401,6 @@ export const SelfServicePage: React.FC = () => {
           <Receipt className="w-4 h-4" />
           Reimbursements
         </button>
-        <button
-          onClick={() => { setActiveTab('attendance'); setStatusFilter(''); }}
-          className={`flex items-center gap-2 px-5 py-3 border-b-2 font-semibold text-sm transition-all duration-200 ${
-            activeTab === 'attendance'
-              ? 'border-primary text-primary bg-primary/5'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'
-          }`}
-        >
-          <CalendarDays className="w-4 h-4" />
-          Attendance Corrections
-        </button>
       </div>
 
       {/* Main card panel with filters */}
@@ -535,7 +524,7 @@ export const SelfServicePage: React.FC = () => {
           </div>
 
           <Input
-            label="Claim Amount ($) *"
+            label="Claim Amount (₹) *"
             type="number"
             step="0.01"
             placeholder="0.00"
@@ -605,91 +594,6 @@ export const SelfServicePage: React.FC = () => {
         </form>
       </Modal>
 
-
-
-      {/* Modal - New Attendance Correction */}
-      <Modal
-        isOpen={showAttModal}
-        onClose={() => setShowAttModal(false)}
-        title="Request Attendance Correction"
-        maxWidth="max-w-md"
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createAttMutation.mutate({
-              attendanceDate: attForm.attendanceDate,
-              requestedLoginTime: new Date(`${attForm.attendanceDate}T${attForm.requestedLoginTime}`).toISOString(),
-              requestedLogoutTime: new Date(`${attForm.attendanceDate}T${attForm.requestedLogoutTime}`).toISOString(),
-              reason: attForm.reason,
-              employeeId: isHRAdmin ? attForm.employeeId || undefined : undefined
-            });
-          }}
-          className="space-y-4"
-        >
-          {isHRAdmin && (
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground uppercase">Target Employee *</label>
-              <select
-                value={attForm.employeeId}
-                onChange={(e) => setAttForm(p => ({ ...p, employeeId: e.target.value }))}
-                className="w-full h-10 bg-background text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-                required
-              >
-                <option value="">Select Employee...</option>
-                {employees?.map((emp) => (
-                  <option key={emp._id} value={emp._id}>{emp.fullName}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <Input
-            label="Correction Target Date *"
-            type="date"
-            value={attForm.attendanceDate}
-            onChange={(e) => setAttForm(p => ({ ...p, attendanceDate: e.target.value }))}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Requested Check-In *"
-              type="time"
-              value={attForm.requestedLoginTime}
-              onChange={(e) => setAttForm(p => ({ ...p, requestedLoginTime: e.target.value }))}
-              required
-            />
-            <Input
-              label="Requested Check-Out *"
-              type="time"
-              value={attForm.requestedLogoutTime}
-              onChange={(e) => setAttForm(p => ({ ...p, requestedLogoutTime: e.target.value }))}
-              required
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-muted-foreground uppercase">Correction Reason *</label>
-            <textarea
-              value={attForm.reason}
-              onChange={(e) => setAttForm(p => ({ ...p, reason: e.target.value }))}
-              placeholder="e.g. Forgot to clock in, out-of-office client meet, internet breakdown..."
-              className="w-full h-24 bg-background text-foreground border border-border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50 resize-none"
-              required
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" type="button" onClick={() => setShowAttModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={createAttMutation.isPending}>
-              Send Request
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Modal - Approve/Reject with Reason Option */}
       <Modal
