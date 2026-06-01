@@ -246,7 +246,7 @@ export const AttendancePage: React.FC = () => {
               Current Cycle:&nbsp;
             </span>
             <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">
-              {formatDate(cycleDates.startStr)} â€“ {formatDate(cycleDates.endStr)}
+              {formatDate(cycleDates.startStr)} - {formatDate(cycleDates.endStr)}
             </span>
             {orgSettings?.salaryCycleStartDay && orgSettings.salaryCycleStartDay > 1 && (
               <span className="text-[10px] text-muted-foreground">

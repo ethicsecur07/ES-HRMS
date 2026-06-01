@@ -42,7 +42,7 @@ const formatDateLabel = (dateStr: string | undefined | null): string => {
 
 export const ChatPage: React.FC = () => {
   const { user } = useAuthStore();
-  const { socket, setActiveChatUserId, onlineUserIds, unreadChatCounts, lastMessageAt, clearUnreadChat } = useNotificationStore();
+  const { socket, setActiveChatUserId, onlineUserIds, unreadChatCounts, lastMessageAt, clearUnreadChat, fetchOnlineUsers } = useNotificationStore();
   const qc = useQueryClient();
   const otherOnlineCount = onlineUserIds.filter(id => id !== user?._id).length;
 
@@ -64,6 +64,15 @@ export const ChatPage: React.FC = () => {
       }));
     }
   }, [recentConversations]);
+
+  // ── Presence sync — fetch on mount + every 30 s as HTTP fallback ─────────────
+  // This ensures online dots are correct even when socket 'online_users' events
+  // are missed (network hiccup, page-load race, different devices on LAN).
+  useEffect(() => {
+    fetchOnlineUsers(); // immediate sync on mount
+    const presenceTimer = setInterval(fetchOnlineUsers, 30_000);
+    return () => clearInterval(presenceTimer);
+  }, [fetchOnlineUsers]);
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('direct');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
