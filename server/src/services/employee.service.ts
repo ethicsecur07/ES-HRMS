@@ -17,6 +17,7 @@ export interface EmployeeQueryOptions {
   designationId?: string;
   branchId?: string;
   isActive?: string | boolean;
+  isLoginApproved?: string | boolean;
   page?: string | number;
   limit?: string | number;
   sortBy?: string;
@@ -232,12 +233,54 @@ export class EmployeeService {
 
   /**
    * Retrieves list of employees with support for search, pagination, and sorting.
+   * Restricts employees to only those with approved and active login accounts by default (Payroll, Documents, Projects, Chat, etc.).
    */
   static async getEmployees(orgId: mongoose.Types.ObjectId | string, options: EmployeeQueryOptions = {}) {
-    const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder } = options;
+    const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder, isLoginApproved } = options;
 
     const query: any = { organizationId: orgId };
     const andConditions: any[] = [];
+
+    if (isLoginApproved === 'false' || isLoginApproved === false) {
+      // Resolve all revoked or inactive users within this organization
+      const revokedUsers = await User.find({
+        organizationId: orgId,
+        $or: [
+          { isLoginApproved: false },
+          { isActive: false }
+        ]
+      }).select('employeeId email');
+
+      const revokedEmployeeIds = revokedUsers.map(u => u.employeeId).filter(Boolean);
+      const revokedEmails = revokedUsers.map(u => u.email?.toLowerCase().trim()).filter(Boolean);
+
+      // Explicit filter: Show ONLY revoked/inactive employees
+      andConditions.push({
+        $or: [
+          { _id: { $in: revokedEmployeeIds } },
+          { email: { $in: revokedEmails } }
+        ]
+      });
+    } else if (isActive === 'false' || isActive === false) {
+      // Admin filter: "Inactive Only" is selected, so we allow showing revoked logins for possible reactivation
+    } else {
+      // Default: Strict filter to ONLY show login-approved and active employees
+      const approvedUsers = await User.find({
+        organizationId: orgId,
+        isLoginApproved: true,
+        isActive: true
+      }).select('employeeId email');
+
+      const approvedEmployeeIds = approvedUsers.map(u => u.employeeId).filter(Boolean);
+      const approvedEmails = approvedUsers.map(u => u.email?.toLowerCase().trim()).filter(Boolean);
+
+      andConditions.push({
+        $or: [
+          { _id: { $in: approvedEmployeeIds } },
+          { email: { $in: approvedEmails } }
+        ]
+      });
+    }
 
     if (search) {
       const escapedSearch = String(search).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');

@@ -151,6 +151,7 @@ export const EmployeesPage: React.FC = () => {
         search: searchQuery || undefined,
         departmentId: selectedDeptId !== 'All' ? selectedDeptId : undefined,
         isActive: selectedStatus === 'Active' ? 'true' : selectedStatus === 'Inactive' ? 'false' : undefined,
+        isLoginApproved: selectedStatus === 'Revoked' ? 'false' : undefined,
         page: currentPage,
         limit: itemsPerPage,
       }),
@@ -572,6 +573,7 @@ export const EmployeesPage: React.FC = () => {
               <option value="All">All Statuses</option>
               <option value="Active">Active Only</option>
               <option value="Inactive">Inactive Only</option>
+              <option value="Revoked">Revoked Logins</option>
             </select>
           </div>
 

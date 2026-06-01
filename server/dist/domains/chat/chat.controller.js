@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRecentConversations = exports.markMessageRead = exports.sendFileMessage = exports.sendMessage = exports.getConversation = exports.chatUpload = void 0;
+exports.markOfflineHard = exports.getRecentConversations = exports.markMessageRead = exports.sendFileMessage = exports.sendMessage = exports.getConversation = exports.chatUpload = void 0;
 const Message_js_1 = require("../../models/Message.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const notification_service_js_1 = require("../../services/notification.service.js");
@@ -237,3 +237,14 @@ const getRecentConversations = async (req, res) => {
     }
 };
 exports.getRecentConversations = getRecentConversations;
+const markOfflineHard = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        (0, socketHandler_js_1.forceUserOffline)(userId);
+        res.status(200).json({ success: true, message: 'User marked offline.' });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.markOfflineHard = markOfflineHard;

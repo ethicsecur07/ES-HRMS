@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getIO = exports.initSockets = void 0;
+exports.forceUserOffline = exports.getIO = exports.initSockets = void 0;
 const socket_io_1 = require("socket.io");
 const logger_js_1 = require("../utils/logger.js");
 const jwt_js_1 = require("../utils/jwt.js");
@@ -250,3 +250,21 @@ const getIO = () => {
     return ioInstance;
 };
 exports.getIO = getIO;
+const forceUserOffline = (userId) => {
+    const presence = userPresence.get(userId);
+    if (!presence)
+        return;
+    // Cancel any existing grace-period timer
+    if (disconnectTimeouts.has(userId)) {
+        clearTimeout(disconnectTimeouts.get(userId));
+        disconnectTimeouts.delete(userId);
+    }
+    // Clean up user presence
+    userPresence.delete(userId);
+    // Broadcast to organization
+    if (ioInstance) {
+        ioInstance.to(`org_${presence.organizationId}`).emit('user_offline', { userId });
+    }
+    logger_js_1.logger.info(`User ${userId} forced OFFLINE via forceUserOffline API.`);
+};
+exports.forceUserOffline = forceUserOffline;
