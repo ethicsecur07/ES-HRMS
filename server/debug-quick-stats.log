@@ -494,3 +494,96 @@
     "completedProjectCount": 0
   }
 }
+{
+  "timestamp": "2026-06-01T05:13:59.111Z",
+  "msg": "Resolved employee profile",
+  "user": {
+    "id": "6a19407d06ba32c0a73d969c",
+    "role": "EMPLOYEE",
+    "email": "logapriyanm@ethicsecur.co.in",
+    "organizationId": "605c72ef1f77bcf86cd79000",
+    "employeeId": "6a19413a42dc44db7c864f79",
+    "sessionId": "6a1d1515b566eabce10d1297",
+    "iat": 1780290838,
+    "exp": 1780291738
+  },
+  "employeeFound": true,
+  "employeeDetails": {
+    "id": "6a19413a42dc44db7c864f79",
+    "fullName": "Logapriyan Mahendran",
+    "email": "logapriyanm@ethicsecur.co.in",
+    "department": "MERN Stack Developer"
+  }
+}
+{
+  "timestamp": "2026-06-01T05:13:59.198Z",
+  "msg": "Computed stats successfully",
+  "counts": {
+    "departmentProjectCount": 3,
+    "onboardProjectCount": 3,
+    "assignedProjectCount": 1,
+    "completedProjectCount": 0
+  }
+}
+{
+  "timestamp": "2026-06-01T05:15:47.548Z",
+  "msg": "Resolved employee profile",
+  "user": {
+    "id": "6a19407d06ba32c0a73d969c",
+    "role": "EMPLOYEE",
+    "email": "logapriyanm@ethicsecur.co.in",
+    "organizationId": "605c72ef1f77bcf86cd79000",
+    "employeeId": "6a19413a42dc44db7c864f79",
+    "sessionId": "6a1d1582b566eabce10d1476",
+    "iat": 1780290946,
+    "exp": 1780291846
+  },
+  "employeeFound": true,
+  "employeeDetails": {
+    "id": "6a19413a42dc44db7c864f79",
+    "fullName": "Logapriyan Mahendran",
+    "email": "logapriyanm@ethicsecur.co.in",
+    "department": "MERN Stack Developer"
+  }
+}
+{
+  "timestamp": "2026-06-01T05:15:47.636Z",
+  "msg": "Computed stats successfully",
+  "counts": {
+    "departmentProjectCount": 3,
+    "onboardProjectCount": 3,
+    "assignedProjectCount": 1,
+    "completedProjectCount": 0
+  }
+}
+{
+  "timestamp": "2026-06-01T05:26:28.572Z",
+  "msg": "Resolved employee profile",
+  "user": {
+    "id": "6a19407d06ba32c0a73d969c",
+    "role": "EMPLOYEE",
+    "email": "logapriyanm@ethicsecur.co.in",
+    "organizationId": "605c72ef1f77bcf86cd79000",
+    "employeeId": "6a19413a42dc44db7c864f79",
+    "sessionId": "6a1d1582b566eabce10d1476",
+    "iat": 1780291584,
+    "exp": 1780292484
+  },
+  "employeeFound": true,
+  "employeeDetails": {
+    "id": "6a19413a42dc44db7c864f79",
+    "fullName": "Logapriyan Mahendran",
+    "email": "logapriyanm@ethicsecur.co.in",
+    "department": "MERN Stack Developer"
+  }
+}
+{
+  "timestamp": "2026-06-01T05:26:28.668Z",
+  "msg": "Computed stats successfully",
+  "counts": {
+    "departmentProjectCount": 3,
+    "onboardProjectCount": 3,
+    "assignedProjectCount": 1,
+    "completedProjectCount": 0
+  }
+}

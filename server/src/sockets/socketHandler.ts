@@ -43,11 +43,15 @@ export const initSockets = (httpServer: Server) => {
   const io = new SocketIOServer(httpServer, {
     cors: {
       origin: '*',
-      methods: ['GET', 'POST'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      credentials: true,
+      allowedHeaders: ['Authorization', 'Content-Type'],
     },
-    // Keep-alive tuning: ping every 10 s, timeout after 20 s
+    allowEIO3: true,          // EIO v3 compatibility for older clients
+    transports: ['websocket', 'polling'],
+    // Tighter keep-alive: detect dead cross-device connections faster
     pingInterval: 10000,
-    pingTimeout: 20000,
+    pingTimeout: 15000,
   });
 
   ioInstance = io;
@@ -268,7 +272,7 @@ export const initSockets = (httpServer: Server) => {
             logger.info(`User ${user.email} is now OFFLINE (grace period elapsed).`);
           }
           disconnectTimeouts.delete(user.id);
-        }, 8000); // 8-second grace period
+        }, 3000); // 3-second grace period — enough to survive page refresh, fast enough for real closes
 
         disconnectTimeouts.set(user.id, timeout);
       }
