@@ -152,66 +152,6 @@ export const Layout: React.FC = () => {
     }
   }, [isAuthenticated, token, user?._id, initializeSocket]);
 
-  // ── Hard close: tell the server we're gone before the page unloads ─────────
-  // `beforeunload` fires for tab close, browser close, and navigation away.
-  // `pagehide` covers mobile browsers and bfcache-suspended pages.
-  // We use sendBeacon-style synchronous disconnect here for reliability.
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleUnload = () => {
-      /**
-       * Build the API base URL the same way axiosInstance does —
-       * fall back to window.location.hostname so Device B on the LAN
-       * still reaches the correct server, not its own localhost.
-       */
-      const getApiBaseUrl = () => {
-        const envApiUrl = import.meta.env.VITE_API_URL;
-        if (envApiUrl && !envApiUrl.includes('localhost')) return envApiUrl;
-        return `${window.location.protocol}//${window.location.hostname}:5000/api`;
-      };
-      const apiBase = getApiBaseUrl();
-
-      // 1. sendBeacon — most reliable on tab/browser close (fire-and-forget,
-      //    survives page destruction, works cross-device).
-      //    We encode the auth header as a URL param because Beacon can't set headers.
-      //    The server endpoint reads from Authorization header; use fetch+keepalive
-      //    as the primary and Beacon as secondary.
-      if (token) {
-        // Primary: keepalive fetch (carries Authorization header properly)
-        try {
-          fetch(`${apiBase}/chat/offline-hard`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            keepalive: true
-          });
-        } catch (_) {}
-
-        // Secondary: sendBeacon fallback (no headers, so we pass token as query param)
-        // The server should accept ?token= as well for beacon requests
-        try {
-          navigator.sendBeacon(`${apiBase}/chat/offline-hard?token=${encodeURIComponent(token)}`);
-        } catch (_) {}
-      }
-
-      // 2. Best-effort socket signal
-      try { socket.emit('user_offline_hard'); } catch (_) {}
-
-      // 3. Disconnect socket
-      socket.disconnect();
-    };
-
-    window.addEventListener('beforeunload', handleUnload);
-    window.addEventListener('pagehide', handleUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-      window.removeEventListener('pagehide', handleUnload);
-    };
-  }, [socket, token]);
 
   // ── Tab visibility presence ──────────────────────────────────────────────
   // We only use `document.visibilitychange` (tab hidden/shown) for presence.

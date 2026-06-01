@@ -10,7 +10,7 @@ export const chatApi = {
   sendMessage: async (receiverId: string, content: string): Promise<ChatMessage> => {
     const res = await axiosInstance.post('/chat', { receiverId, content });
     // Server responds with { success: true, data: <message> }
-    return res.data.data;
+    return res.data;
   },
 
   sendFile: async (receiverId: string, file: File): Promise<ChatMessage> => {
@@ -21,7 +21,7 @@ export const chatApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     // Server responds with { success: true, data: <message> }
-    return res.data.data;
+    return res.data;
   },
 
   markRead: async (messageId: string): Promise<void> => {
