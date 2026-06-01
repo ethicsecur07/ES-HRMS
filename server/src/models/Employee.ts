@@ -46,7 +46,7 @@ export interface IEmployee extends Document {
 const employeeSchema = new Schema<IEmployee>(
   {
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
-    employeeCode: { type: String, required: true },
+    employeeCode: { type: String, required: false },
     fullName: { type: String, required: true },
     email: { type: String, required: true, lowercase: true },
     phone: { type: String, required: true },
@@ -88,7 +88,6 @@ const employeeSchema = new Schema<IEmployee>(
   { timestamps: true }
 );
 
-employeeSchema.index({ organizationId: 1, employeeCode: 1 }, { unique: true });
 employeeSchema.index({ organizationId: 1, email: 1 }, { unique: true });
 
 import { softDeletePlugin } from '../utils/softDeletePlugin.js';

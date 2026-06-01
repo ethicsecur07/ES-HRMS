@@ -13,7 +13,10 @@ const getNextEmployeeCode = async (req, res) => {
             res.status(400).json({ message: 'Organization context is missing.' });
             return;
         }
-        const nextCode = await employee_service_js_1.EmployeeService.generateNextEmployeeCode(orgId);
+        const isIntern = req.query.isIntern === 'true';
+        const departmentId = req.query.departmentId || undefined;
+        const designationId = req.query.designationId || undefined;
+        const nextCode = await employee_service_js_1.EmployeeService.generateEmployeeCode(orgId, departmentId, designationId, isIntern);
         res.status(200).json({ nextCode });
     }
     catch (error) {

@@ -391,6 +391,22 @@ const updateSettings = async (req, res) => {
                     type: 'POLICY_UPDATE',
                 });
             }
+            // Automatically create a POLICY_CHANGE announcement for the Feed
+            try {
+                const creator = await User_js_1.User.findById(authReq.user?.id);
+                await Announcement_js_1.Announcement.create({
+                    organizationId: org._id,
+                    title: notificationTitle,
+                    content: notificationMessage,
+                    type: 'POLICY_CHANGE',
+                    createdBy: authReq.user?.id,
+                    createdByName: creator?.name || authReq.user?.email || 'Administrator',
+                    createdByRole: authReq.user?.role || 'ADMIN',
+                });
+            }
+            catch (annError) {
+                console.error('[AnalyticsController] Failed to create policy update announcement:', annError?.message);
+            }
         }
         res.status(200).json({ message: 'Settings updated successfully', settings: req.body });
     }
@@ -462,14 +478,17 @@ const getAnnouncementsAndActions = async (req, res) => {
         }
         // 4. Employee Applied Requests & Work (Tasks/Projects)
         if (empId) {
-            // Applied requests (Leaves, WFH, Permissions)
+            // Applied requests (Leaves, WFH, Permissions) - Populate approvedBy to display who acted on it
             myLeaves = await Leave_js_1.Leave.find({ organizationId: orgId, employeeId: empId })
+                .populate('approvedBy', 'name role')
                 .sort({ createdAt: -1 })
                 .limit(10);
             myWFH = await WFHRequest_js_1.WFHRequest.find({ organizationId: orgId, employeeId: empId })
+                .populate('approvedBy', 'name role')
                 .sort({ createdAt: -1 })
                 .limit(10);
             myPermissions = await PermissionRequest_js_1.PermissionRequest.find({ organizationId: orgId, employeeId: empId })
+                .populate('approvedBy', 'name role')
                 .sort({ createdAt: -1 })
                 .limit(10);
             // Active Projects containing this employee
@@ -490,8 +509,79 @@ const getAnnouncementsAndActions = async (req, res) => {
                 .populate('projectId', 'name')
                 .sort({ dueDate: 1 });
         }
+        // Dynamic Personal Feed Integration:
+        // Filter and format the employee's approved/rejected requests as live feed items, then merge and sort them chronologically
+        let feedAnnouncements = [...announcements];
+        if (empId) {
+            const personalFeeds = [];
+            // Leaves
+            myLeaves.forEach((leave) => {
+                if (leave.status !== 'PENDING') {
+                    const approverName = leave.approvedBy?.name || 'HR / Manager';
+                    const approverRole = leave.approvedBy?.role || 'HR';
+                    personalFeeds.push({
+                        _id: leave._id,
+                        title: leave.status === 'APPROVED' ? '🟢 Leave Request Approved' : '🔴 Leave Request Rejected',
+                        content: leave.status === 'APPROVED'
+                            ? `Your ${leave.leaveType} request for ${leave.totalDays} day(s) from ${leave.startDate} to ${leave.endDate} has been APPROVED by ${approverName}.`
+                            : `Your ${leave.leaveType} request for ${leave.totalDays} day(s) from ${leave.startDate} to ${leave.endDate} has been REJECTED by ${approverName}.${leave.rejectionReason ? ` Reason: ${leave.rejectionReason}` : ''}`,
+                        type: 'ANNOUNCEMENT',
+                        createdBy: leave.approvedBy?._id || leave.employeeId,
+                        createdByName: approverName,
+                        createdByRole: approverRole,
+                        createdAt: leave.updatedAt || leave.createdAt || new Date(),
+                        updatedAt: leave.updatedAt || leave.createdAt || new Date(),
+                    });
+                }
+            });
+            // WFH Requests
+            myWFH.forEach((wfh) => {
+                if (wfh.status !== 'PENDING') {
+                    const approverName = wfh.approvedBy?.name || 'HR / Manager';
+                    const approverRole = wfh.approvedBy?.role || 'HR';
+                    personalFeeds.push({
+                        _id: wfh._id,
+                        title: wfh.status === 'APPROVED' ? '🟢 WFH Request Approved' : '🔴 WFH Request Rejected',
+                        content: wfh.status === 'APPROVED'
+                            ? `Your Work From Home request for ${wfh.totalDays} day(s) from ${wfh.startDate} to ${wfh.endDate} has been APPROVED by ${approverName}.`
+                            : `Your Work From Home request for ${wfh.totalDays} day(s) from ${wfh.startDate} to ${wfh.endDate} has been REJECTED by ${approverName}.${wfh.rejectionReason ? ` Reason: ${wfh.rejectionReason}` : ''}`,
+                        type: 'ANNOUNCEMENT',
+                        createdBy: wfh.approvedBy?._id || wfh.employeeId,
+                        createdByName: approverName,
+                        createdByRole: approverRole,
+                        createdAt: wfh.updatedAt || wfh.createdAt || new Date(),
+                        updatedAt: wfh.updatedAt || wfh.createdAt || new Date(),
+                    });
+                }
+            });
+            // Permission Requests
+            myPermissions.forEach((perm) => {
+                if (perm.approvalStatus !== 'PENDING') {
+                    const approverName = perm.approvedBy?.name || 'HR / Manager';
+                    const approverRole = perm.approvedBy?.role || 'HR';
+                    personalFeeds.push({
+                        _id: perm._id,
+                        title: perm.approvalStatus === 'APPROVED' ? '🟢 Permission Approved' : '🔴 Permission Rejected',
+                        content: perm.approvalStatus === 'APPROVED'
+                            ? `Your Permission request for ${perm.totalHours} hour(s) on ${perm.date} (${perm.startTime} - ${perm.endTime}) has been APPROVED by ${approverName}.`
+                            : `Your Permission request for ${perm.totalHours} hour(s) on ${perm.date} (${perm.startTime} - ${perm.endTime}) has been REJECTED by ${approverName}.`,
+                        type: 'ANNOUNCEMENT',
+                        createdBy: perm.approvedBy?._id || perm.employeeId,
+                        createdByName: approverName,
+                        createdByRole: approverRole,
+                        createdAt: perm.updatedAt || perm.createdAt || new Date(),
+                        updatedAt: perm.updatedAt || perm.createdAt || new Date(),
+                    });
+                }
+            });
+            feedAnnouncements = [...feedAnnouncements, ...personalFeeds];
+            // Sort combined feed items by date descending (latest first)
+            feedAnnouncements.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            // Limit to latest 20 items to keep UI responsive and scroll locks clean
+            feedAnnouncements = feedAnnouncements.slice(0, 20);
+        }
         res.status(200).json({
-            announcements,
+            announcements: feedAnnouncements,
             meetingsToday,
             pendingLeaves,
             pendingWFH,

@@ -36,7 +36,7 @@ export const DashboardPage: React.FC = () => {
   const { data: myEmployee } = useQuery({
     queryKey: ['myEmployee', user?.employeeId],
     queryFn: () => employeeApi.getById(user?.employeeId as string),
-    enabled: role === 'EMPLOYEE' && !!user?.employeeId,
+    enabled: (role === 'EMPLOYEE' || role === 'INTERN') && !!user?.employeeId,
     retry: false,
     throwOnError: false,
   });
@@ -44,7 +44,7 @@ export const DashboardPage: React.FC = () => {
   const { data: projectStats, isLoading: projectStatsLoading } = useQuery({
     queryKey: ['employeeProjectStats'],
     queryFn: projectApi.getEmployeeQuickStats,
-    enabled: role === 'EMPLOYEE',
+    enabled: role === 'EMPLOYEE' || role === 'INTERN',
     retry: false,
     throwOnError: false,
   });
@@ -52,24 +52,24 @@ export const DashboardPage: React.FC = () => {
   useQuery({
     queryKey: ['myTasks', user?.employeeId || user?._id],
     queryFn: () => taskApi.getByEmployee(user?.employeeId || user?._id || 'emp-dev-001'),
-    enabled: role === 'EMPLOYEE',
+    enabled: role === 'EMPLOYEE' || role === 'INTERN',
   });
 
   // For calendar: fetch leave/wfh/perms for employee role
   const { data: myLeaves } = useQuery({
     queryKey: ['leaves'],
     queryFn: leaveApi.getAll,
-    enabled: role === 'EMPLOYEE',
+    enabled: role === 'EMPLOYEE' || role === 'INTERN',
   });
   const { data: myWfh } = useQuery({
     queryKey: ['wfh'],
     queryFn: wfhApi.getAll,
-    enabled: role === 'EMPLOYEE',
+    enabled: role === 'EMPLOYEE' || role === 'INTERN',
   });
   const { data: myPerms } = useQuery({
     queryKey: ['permissions'],
     queryFn: permissionApi.getAll,
-    enabled: role === 'EMPLOYEE',
+    enabled: role === 'EMPLOYEE' || role === 'INTERN',
   });
 
   const { data: allTasks } = useQuery({
@@ -96,27 +96,28 @@ export const DashboardPage: React.FC = () => {
       
 
       {/* 1. EMPLOYEE DASHBOARD */}
-      {role === 'EMPLOYEE' && (
+      {(role === 'EMPLOYEE' || role === 'INTERN') && (
         <div className="space-y-8">
           <AttendanceCheckIn />
           <EmployeeQuickStats stats={projectStats || null} loading={projectStatsLoading} />
 
-          {/* Top Row: My Work Summary (2/3 width) and Announcements & Actions (1/3 width) side-by-side with matched fixed height */}
+
+          {/* Top Row: My Work Summary (2/3) and Announcements & Actions (1/3) – fixed height, scrollable */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {/* My Work Summary */}
-            <div className="lg:col-span-2 flex flex-col h-[520px]">
+            <div className="lg:col-span-2 flex flex-col h-[520px] overflow-y-auto">
               <EmployeeTaskSummary />
             </div>
 
-            {/* Announcements & Actions Card */}
-            <div className="lg:col-span-1 flex flex-col h-[520px]">
+            {/* Announcements & Actions */}
+            <div className="lg:col-span-1 flex flex-col h-[520px] overflow-y-auto">
               <HRApprovalQueue />
             </div>
           </div>
 
-          {/* Bottom Row: Full-width My Leave & Holiday Calendar section */}
-          <div className="space-y-1 w-full">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          {/* Bottom Row: Leave & Holiday Calendar */}
+          <div className="flex flex-col h-[520px] w-full">
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
               <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
               My Leave & Holiday Calendar
             </h3>

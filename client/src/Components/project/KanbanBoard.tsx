@@ -134,7 +134,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [newStoryPoints, setNewStoryPoints] = useState(0);
 
   const isAdmin = userRole === 'ADMIN';
-  const isEmployee = userRole === 'EMPLOYEE';
+  const isEmployee = userRole === 'EMPLOYEE' || userRole === 'INTERN';
   const isTeamLead = ['TEAM_LEAD', 'MANAGER', 'HR'].includes(userRole);
   const canCreateTasks = isTeamLead;
 

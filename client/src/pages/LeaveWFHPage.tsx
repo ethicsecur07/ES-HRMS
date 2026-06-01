@@ -196,8 +196,8 @@ export const LeaveWFHPage: React.FC = () => {
               </Button>
             </>
           )}
-          {/* Only Employees can cancel their own PENDING leaves */}
-          {role === 'EMPLOYEE' && row.status === 'PENDING' && (
+          {/* Only Employees/Interns can cancel their own PENDING leaves */}
+          {(role === 'EMPLOYEE' || role === 'INTERN') && row.status === 'PENDING' && (
             <Button
               size="sm"
               variant="outline"
@@ -344,7 +344,7 @@ export const LeaveWFHPage: React.FC = () => {
           </p>
         </div>
 
-        {role === 'EMPLOYEE' && (
+        {(role === 'EMPLOYEE' || role === 'INTERN') && (
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button size="sm" onClick={() => setShowLeaveModal(true)} className="bg-primary text-white font-bold tracking-wider shadow-md shadow-primary/20">
               <Plus className="w-4 h-4 mr-1.5" /> Apply Leave
@@ -527,7 +527,7 @@ export const LeaveWFHPage: React.FC = () => {
 
             {/* Simple Search/Filters */}
             <div className="flex items-center gap-3">
-              {role !== 'EMPLOYEE' && (
+              {(role !== 'EMPLOYEE' && role !== 'INTERN') && (
                 <div className="w-48 sm:w-64">
                   <Input
                     placeholder="Search name..."
@@ -552,13 +552,13 @@ export const LeaveWFHPage: React.FC = () => {
           </div>
 
           {activeHistoryTab === 'LEAVE' && (
-            <TableWrapper columns={role === 'EMPLOYEE' ? leaveColumns.filter(c => c.header !== 'Employee') : leaveColumns} data={filteredLeaves} />
+            <TableWrapper columns={(role === 'EMPLOYEE' || role === 'INTERN') ? leaveColumns.filter(c => c.header !== 'Employee') : leaveColumns} data={filteredLeaves} />
           )}
           {activeHistoryTab === 'WFH' && (
-            <TableWrapper columns={role === 'EMPLOYEE' ? wfhColumns.filter(c => c.header !== 'Employee') : wfhColumns} data={filteredWFH} />
+            <TableWrapper columns={(role === 'EMPLOYEE' || role === 'INTERN') ? wfhColumns.filter(c => c.header !== 'Employee') : wfhColumns} data={filteredWFH} />
           )}
           {activeHistoryTab === 'PERMISSION' && (
-            <TableWrapper columns={role === 'EMPLOYEE' ? permColumns.filter(c => c.header !== 'Employee') : permColumns} data={filteredPerms} />
+            <TableWrapper columns={(role === 'EMPLOYEE' || role === 'INTERN') ? permColumns.filter(c => c.header !== 'Employee') : permColumns} data={filteredPerms} />
           )}
         </Card>
       )}

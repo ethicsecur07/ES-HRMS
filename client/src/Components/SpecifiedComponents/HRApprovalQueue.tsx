@@ -202,7 +202,7 @@ export const HRApprovalQueue: React.FC = () => {
       <div className="flex bg-muted/40 p-1 rounded-xl border border-border/40 gap-1 my-4 text-xs font-bold overflow-x-auto scrollbar-none flex-nowrap w-full">
         <button
           onClick={() => { setActiveTab('feed'); setShowCreateForm(false); }}
-          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-[85px] xs:min-w-[95px] sm:min-w-0 ${
+          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'feed'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
@@ -219,7 +219,7 @@ export const HRApprovalQueue: React.FC = () => {
         
         <button
           onClick={() => { setActiveTab('meetings'); setShowCreateForm(false); }}
-          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-[85px] xs:min-w-[95px] sm:min-w-0 ${
+          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'meetings'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
@@ -236,7 +236,7 @@ export const HRApprovalQueue: React.FC = () => {
 
         <button
           onClick={() => { setActiveTab('actions'); setShowCreateForm(false); }}
-          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-[85px] xs:min-w-[95px] sm:min-w-0 ${
+          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'actions'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
@@ -261,7 +261,7 @@ export const HRApprovalQueue: React.FC = () => {
 
         <button
           onClick={() => { setActiveTab('work'); setShowCreateForm(false); }}
-          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-[85px] xs:min-w-[95px] sm:min-w-0 ${
+          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'work'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'

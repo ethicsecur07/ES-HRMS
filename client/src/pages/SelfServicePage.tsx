@@ -78,7 +78,7 @@ export const SelfServicePage: React.FC = () => {
   const { data: reimbursements, isLoading: reimbLoading } = useQuery({
     queryKey: ['reimbursements', empFilter, statusFilter],
     queryFn: () => selfServiceApi.getReimbursements({
-      employeeId: role === 'EMPLOYEE' ? undefined : empFilter || undefined,
+      employeeId: (role === 'EMPLOYEE' || role === 'INTERN') ? undefined : empFilter || undefined,
       status: statusFilter || undefined
     }),
   });
@@ -86,7 +86,7 @@ export const SelfServicePage: React.FC = () => {
   const { data: attendanceCorrections, isLoading: attLoading } = useQuery({
     queryKey: ['attendanceCorrections', empFilter, statusFilter],
     queryFn: () => selfServiceApi.getAttendanceCorrections({
-      employeeId: role === 'EMPLOYEE' ? undefined : empFilter || undefined,
+      employeeId: (role === 'EMPLOYEE' || role === 'INTERN') ? undefined : empFilter || undefined,
       status: statusFilter || undefined
     }),
   });
