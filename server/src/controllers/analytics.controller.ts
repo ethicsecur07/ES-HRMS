@@ -82,14 +82,28 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
     const attendanceTrends = [];
     for (const { dateStr, dayName } of weekDates) {
       const present = recentAttendance.filter(a => a.date === dateStr && (a.status === 'OFFICE' || a.status === 'PRESENT')).length;
-      const wfh = recentAttendance.filter(a => a.date === dateStr && a.status === 'WFH').length;
+      
+      const wfhEmployeesFromAttendance = recentAttendance
+        .filter(a => a.date === dateStr && a.status === 'WFH')
+        .map(a => a.employeeId.toString());
+
+      const wfhEmployeesFromRequests = approvedLeaves
+        .filter(l => l.startDate <= dateStr && l.endDate >= dateStr && l.leaveType === 'WFH')
+        .map(l => l.employeeId.toString());
+
+      const uniqueWfhEmployeeIds = new Set([
+        ...wfhEmployeesFromAttendance,
+        ...wfhEmployeesFromRequests
+      ]);
+
+      const wfh = uniqueWfhEmployeeIds.size;
       
       const leaveEmployeesFromAttendance = recentAttendance
         .filter(a => a.date === dateStr && a.status === 'LEAVE')
         .map(a => a.employeeId.toString());
 
       const leaveEmployeesFromLeaves = approvedLeaves
-        .filter(l => l.startDate <= dateStr && l.endDate >= dateStr)
+        .filter(l => l.startDate <= dateStr && l.endDate >= dateStr && l.leaveType !== 'WFH')
         .map(l => l.employeeId.toString());
 
       const uniqueLeaveEmployeeIds = new Set([

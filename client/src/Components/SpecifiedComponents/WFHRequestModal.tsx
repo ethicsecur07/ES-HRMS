@@ -89,8 +89,8 @@ export const WFHRequestModal: React.FC<WFHRequestModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Request Work From Home (WFH)" maxWidth="max-w-lg">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+    <Modal isOpen={isOpen} onClose={onClose} title="Request Work From Home (WFH)" maxWidth="max-w-xl">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left px-4">
         <div className="p-3 bg-muted rounded-xl text-xs text-muted-foreground leading-relaxed">
           <span className="font-bold text-foreground">Company Policy:</span> 1 WFH is permitted per month. Minimum 8 working hours and daily task reporting are mandatory upon check-out.
         </div>

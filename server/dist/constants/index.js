@@ -7,6 +7,7 @@ exports.ROLES = {
     HR: 'HR',
     TEAM_LEAD: 'TEAM_LEAD',
     EMPLOYEE: 'EMPLOYEE',
+    INTERN: 'INTERN',
 };
 exports.ATTENDANCE_TYPES = {
     OFFICE: 'OFFICE',

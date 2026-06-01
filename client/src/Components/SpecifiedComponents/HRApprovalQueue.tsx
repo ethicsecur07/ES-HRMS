@@ -379,9 +379,9 @@ export const HRApprovalQueue: React.FC = () => {
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex gap-3">
+                        <div className="flex items-start gap-3">
                           {/* Announcement Icon */}
-                          <div className={`p-2 rounded-lg mt-0.5 flex-shrink-0 ${
+                          <div className={`w-10 h-10 rounded-lg mt-0.5 flex-shrink-0 flex items-center justify-center ${
                             isPolicy ? 'bg-indigo-500/10 text-indigo-600' : 'bg-primary/10 text-primary'
                           }`}>
                             {isPolicy ? <BookOpen className="w-4 h-4" /> : <Megaphone className="w-4 h-4" />}

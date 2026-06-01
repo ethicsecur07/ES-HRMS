@@ -167,7 +167,7 @@ export const LeaveApplyModal: React.FC<LeaveApplyModalProps> = ({ isOpen, onClos
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Apply Leave / WFH / Permission" maxWidth="max-w-xl">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2  px-2 text-left">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2 px-4 text-left">
         {applyMutation.isError && (
           <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold space-y-1 mb-2 animate-in fade-in duration-200">
             <p className="uppercase tracking-wider font-extrabold text-[10px]">Submission Failed</p>

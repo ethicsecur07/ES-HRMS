@@ -4,7 +4,7 @@ exports.updateEmployeeSchema = exports.createEmployeeSchema = void 0;
 const zod_1 = require("zod");
 exports.createEmployeeSchema = zod_1.z.object({
     body: zod_1.z.object({
-        employeeCode: zod_1.z.string().min(2).optional(),
+        employeeCode: zod_1.z.string().min(2).optional().or(zod_1.z.literal('')),
         fullName: zod_1.z.string().min(3),
         email: zod_1.z.string().email(),
         phone: zod_1.z.string().min(10),

@@ -483,11 +483,7 @@ export const EmployeesPage: React.FC = () => {
           <Button size="sm" variant="outline" onClick={() => navigate(`/employees/${row._id}`)} title="View Details">
             <Eye className="w-4 h-4" />
           </Button>
-          {hasPermission('EMPLOYEES', 'edit') && (
-            <Button size="sm" variant="outline" onClick={() => handleEdit(row)} title="Edit Employee">
-              <Edit className="w-4 h-4" />
-            </Button>
-          )}
+         
           {hasPermission('EMPLOYEES', 'delete') && (
             <Button
               size="sm"
