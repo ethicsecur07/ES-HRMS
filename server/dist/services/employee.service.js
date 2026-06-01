@@ -96,57 +96,69 @@ class EmployeeService {
     }
     /**
      * Updates employee record and synchronizes User credentials.
+     * Restricts editable fields exclusively to Emergency, Bank, and Tax details.
      */
     static async updateEmployee(id, updateData, orgId, emailForAudit, userRole) {
         const session = await mongoose_1.default.startSession();
         session.startTransaction();
         try {
-            const { email, employeeCode } = updateData;
-            // 1. Scan for duplicates when email or employeeCode is updated
-            if (employeeCode) {
-                const codeExists = await Employee_js_1.Employee.findOne({
-                    organizationId: orgId,
-                    employeeCode,
-                    _id: { $ne: id },
-                }).session(session);
-                if (codeExists) {
-                    throw new Error(`Employee with code ${employeeCode} already exists.`);
-                }
+            // 1. Enforce RBAC access (only ADMIN, HR, and MANAGER roles allowed)
+            const allowedRoles = ['ADMIN', 'HR', 'MANAGER'];
+            if (!userRole || !allowedRoles.includes(userRole)) {
+                throw new Error('Forbidden: Only ADMIN, HR, and MANAGER roles are allowed to edit employee details.');
             }
-            if (email) {
-                const normalizedEmail = email.toLowerCase().trim();
-                const emailExists = await Employee_js_1.Employee.findOne({
-                    organizationId: orgId,
-                    email: normalizedEmail,
-                    _id: { $ne: id },
-                }).session(session);
-                if (emailExists) {
-                    throw new Error(`Employee with email ${email} already exists.`);
-                }
+            // 2. Verify employee exists within the organization
+            const existingEmployee = await Employee_js_1.Employee.findOne({ _id: id, organizationId: orgId }).session(session);
+            if (!existingEmployee) {
+                throw new Error('Employee not found or unauthorized.');
             }
-            // 2. Perform the update
-            const employee = await Employee_js_1.Employee.findOneAndUpdate({ _id: id, organizationId: orgId }, updateData, { new: true, session });
+            // 3. Construct safe update payload containing ONLY emergency, bank, and tax details
+            const safeUpdateData = {};
+            if (updateData.emergencyContact) {
+                safeUpdateData.emergencyContact = {
+                    name: updateData.emergencyContact.name ?? existingEmployee.emergencyContact?.name,
+                    relationship: updateData.emergencyContact.relationship ?? existingEmployee.emergencyContact?.relationship,
+                    phone: updateData.emergencyContact.phone ?? existingEmployee.emergencyContact?.phone,
+                };
+            }
+            if (updateData.bankDetails) {
+                safeUpdateData.bankDetails = {
+                    bankName: updateData.bankDetails.bankName ?? existingEmployee.bankDetails?.bankName,
+                    accountName: updateData.bankDetails.accountName ?? existingEmployee.bankDetails?.accountName,
+                    accountNumber: updateData.bankDetails.accountNumber ?? existingEmployee.bankDetails?.accountNumber,
+                    ifscCode: updateData.bankDetails.ifscCode ?? existingEmployee.bankDetails?.ifscCode,
+                    branchName: updateData.bankDetails.branchName ?? existingEmployee.bankDetails?.branchName,
+                };
+            }
+            if (updateData.taxDetails) {
+                safeUpdateData.taxDetails = {
+                    panNumber: updateData.taxDetails.panNumber ?? existingEmployee.taxDetails?.panNumber,
+                    taxRegime: updateData.taxDetails.taxRegime ?? existingEmployee.taxDetails?.taxRegime,
+                };
+            }
+            // Keep support for soft-deactivation flags if passed explicitly
+            if (updateData.isActive !== undefined) {
+                safeUpdateData.isActive = updateData.isActive === true || updateData.isActive === 'true';
+            }
+            // 4. Perform the database update
+            const employee = await Employee_js_1.Employee.findOneAndUpdate({ _id: id, organizationId: orgId }, safeUpdateData, { new: true, session });
             if (!employee) {
                 throw new Error('Employee not found or unauthorized.');
             }
-            // 3. Keep corresponding User login details in sync
+            // 5. Keep corresponding User login details in sync (primarily for active/deactive status)
             const userUpdate = {};
-            if (updateData.fullName)
-                userUpdate.name = updateData.fullName;
-            if (updateData.email)
-                userUpdate.email = updateData.email.toLowerCase().trim();
-            if (updateData.isActive !== undefined)
-                userUpdate.isActive = updateData.isActive;
+            if (safeUpdateData.isActive !== undefined) {
+                userUpdate.isActive = safeUpdateData.isActive;
+            }
             if (updateData.isLoginApproved !== undefined) {
                 const organization = await Organization_js_1.Organization.findById(orgId).session(session);
-                const allowedRoles = organization?.settings?.loginApprovalRoles || ['ADMIN'];
-                if (userRole !== 'ADMIN' && !allowedRoles.includes(userRole || '')) {
+                const allowedRolesForLogin = organization?.settings?.loginApprovalRoles || ['ADMIN'];
+                if (userRole !== 'ADMIN' && !allowedRolesForLogin.includes(userRole || '')) {
                     throw new Error('Forbidden: You do not have permission to approve/disapprove logins.');
                 }
                 userUpdate.isLoginApproved = updateData.isLoginApproved === true || updateData.isLoginApproved === 'true';
             }
             if (Object.keys(userUpdate).length > 0) {
-                // Automatically link the employeeId if it's missing on the User document
                 userUpdate.employeeId = employee._id;
                 await User_js_1.User.findOneAndUpdate({
                     $or: [
@@ -156,7 +168,7 @@ class EmployeeService {
                     organizationId: orgId
                 }, userUpdate, { session });
             }
-            await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_UPDATE', emailForAudit, 'EMPLOYEE', employee.employeeCode, `Updated profile details for ${employee.fullName}`, orgId);
+            await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_UPDATE', emailForAudit, 'EMPLOYEE', employee.employeeCode, `Updated emergency/bank/tax details for ${employee.fullName}`, orgId);
             const user = await User_js_1.User.findOne({
                 $or: [
                     { employeeId: employee._id },

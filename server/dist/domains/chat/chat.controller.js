@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.markOfflineHard = exports.getRecentConversations = exports.markMessageRead = exports.sendFileMessage = exports.sendMessage = exports.getConversation = exports.chatUpload = void 0;
+exports.getOnlineUsers = exports.markOfflineHard = exports.getRecentConversations = exports.markMessageRead = exports.sendFileMessage = exports.sendMessage = exports.getConversation = exports.chatUpload = void 0;
 const Message_js_1 = require("../../models/Message.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const notification_service_js_1 = require("../../services/notification.service.js");
@@ -248,3 +248,19 @@ const markOfflineHard = async (req, res) => {
     }
 };
 exports.markOfflineHard = markOfflineHard;
+/**
+ * GET /api/chat/online-users
+ * Returns the list of user IDs currently online in the caller's organization.
+ * Used as an HTTP fallback when socket events are missed (page load race, etc.).
+ */
+const getOnlineUsers = async (req, res) => {
+    try {
+        const organizationId = req.user.organizationId;
+        const onlineUserIds = (0, socketHandler_js_1.getOnlineUserIdsByOrg)(organizationId);
+        res.status(200).json({ success: true, data: { onlineUserIds } });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.getOnlineUsers = getOnlineUsers;

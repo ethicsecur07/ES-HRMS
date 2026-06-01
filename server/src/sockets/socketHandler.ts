@@ -139,7 +139,8 @@ export const initSockets = (httpServer: Server) => {
       // ── Presence: register this socket ──────────────────────────────────
       // If there's a pending offline timer for this user, cancel it.
       // This handles the page-refresh race condition gracefully.
-      if (disconnectTimeouts.has(user.id)) {
+      const hasTimeout = disconnectTimeouts.has(user.id);
+      if (hasTimeout) {
         clearTimeout(disconnectTimeouts.get(user.id)!);
         disconnectTimeouts.delete(user.id);
         logger.info(`Reconnect within grace period for user ${user.email} — offline cancelled.`);
@@ -153,7 +154,7 @@ export const initSockets = (httpServer: Server) => {
       }
 
       const presence = userPresence.get(user.id)!;
-      const wasOffline = presence.sockets.size === 0;
+      const wasOffline = presence.sockets.size === 0 && !hasTimeout;
       presence.sockets.add(socket.id);
 
       if (wasOffline) {

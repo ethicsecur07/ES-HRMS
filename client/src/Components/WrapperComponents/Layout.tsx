@@ -169,6 +169,8 @@ export const Layout: React.FC = () => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         socket.emit('user_active');
+        // Instantly sync online presence on return to tab to handle suspended/throttled socket connection
+        useNotificationStore.getState().fetchOnlineUsers();
       } else {
         socket.emit('user_inactive');
       }
@@ -180,6 +182,43 @@ export const Layout: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [socket, isAuthenticated]);
+
+  // ── Unload / Tab Close handler ──────────────────────────────────────────
+  // Immediately notify server the user is exiting (closing tab/browser)
+  // using keepalive fetch and socket emit to bypass the reconnect grace period.
+  useEffect(() => {
+    if (!token || !isAuthenticated) return;
+
+    const handleBeforeUnload = () => {
+      // 1. Emit socket offline_hard if connected
+      if (socket && socket.connected) {
+        socket.emit('user_offline_hard');
+      }
+
+      // 2. Beacon/Keepalive HTTP post to immediately force offline
+      const getApiUrl = () => {
+        const envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+        if (envApiUrl && !envApiUrl.includes('localhost')) {
+          return envApiUrl;
+        }
+        return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+      };
+      const apiUrl = getApiUrl().replace(/\/$/, '');
+      fetch(`${apiUrl}/chat/offline-hard`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        keepalive: true
+      }).catch(() => {});
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [socket, token, isAuthenticated]);
 
   useEffect(() => {
     if (!socket) return;
