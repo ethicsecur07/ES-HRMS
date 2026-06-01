@@ -45,6 +45,7 @@ const recruitment_routes_js_1 = __importDefault(require("./domains/recruitment/r
 const applicant_routes_js_1 = __importDefault(require("./routes/applicant.routes.js"));
 const announcement_routes_js_1 = __importDefault(require("./routes/announcement.routes.js"));
 const chat_routes_js_1 = __importDefault(require("./domains/chat/chat.routes.js"));
+const payrollConfig_routes_js_1 = __importDefault(require("./routes/payrollConfig.routes.js"));
 const notification_routes_js_1 = __importDefault(require("./domains/notification/notification.routes.js"));
 const reports_routes_js_1 = __importDefault(require("./routes/reports.routes.js"));
 const selfService_routes_js_1 = __importDefault(require("./routes/selfService.routes.js"));
@@ -118,6 +119,7 @@ const createApp = () => {
     app.use('/api/holiday-calendar', holidayCalendar_routes_js_1.default);
     app.use('/api/leave-policies', leavePolicy_routes_js_1.default);
     app.use('/api/announcements', announcement_routes_js_1.default);
+    app.use('/api/payroll-config', payrollConfig_routes_js_1.default);
     // Healthcheck Route
     app.get('/health', (req, res) => {
         res.status(200).json({ status: 'UP', timestamp: new Date() });

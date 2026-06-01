@@ -181,6 +181,8 @@ export const submitPendingReport = async (req: AuthRequest, res: Response): Prom
     }
 
     const { attendanceId, completedTasks, inProgressTasks, pendingTasks, blockers, tomorrowPlan } = req.body;
+    console.log('[submitPendingReport] Request body:', req.body);
+    console.log('[submitPendingReport] req.user:', req.user);
     if (!attendanceId || !completedTasks) {
       res.status(400).json({ message: 'Attendance ID and completed tasks are required.' });
       return;
@@ -199,10 +201,19 @@ export const submitPendingReport = async (req: AuthRequest, res: Response): Prom
       if (employee) employeeId = employee._id;
     }
 
+    console.log('[submitPendingReport] resolved employeeId:', employeeId);
+
     if (!employeeId) {
       res.status(400).json({ message: 'Employee profile not found.' });
       return;
     }
+
+    console.log('[submitPendingReport] Querying Attendance with:', {
+      _id: attendanceId,
+      employeeId,
+      organizationId,
+      pendingReportUpdate: true
+    });
 
     const att = await Attendance.findOne({
       _id: attendanceId,
@@ -210,6 +221,8 @@ export const submitPendingReport = async (req: AuthRequest, res: Response): Prom
       organizationId,
       pendingReportUpdate: true
     });
+
+    console.log('[submitPendingReport] Query result att:', att);
 
     if (!att) {
       res.status(404).json({ message: 'Pending attendance record not found.' });

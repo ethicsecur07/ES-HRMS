@@ -17,6 +17,7 @@ export interface EmployeeQueryOptions {
   designationId?: string;
   branchId?: string;
   isActive?: string | boolean;
+  isLoginApproved?: string | boolean;
   page?: string | number;
   limit?: string | number;
   sortBy?: string;
@@ -121,65 +122,84 @@ export class EmployeeService {
 
   /**
    * Updates employee record and synchronizes User credentials.
+   * Restricts editable fields exclusively to Emergency, Bank, and Tax details.
    */
   static async updateEmployee(id: string, updateData: any, orgId: mongoose.Types.ObjectId | string, emailForAudit: string, userRole?: string) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      const { email, employeeCode } = updateData;
-
-      // 1. Scan for duplicates when email or employeeCode is updated
-      if (employeeCode) {
-        const codeExists = await Employee.findOne({
-          organizationId: orgId,
-          employeeCode,
-          _id: { $ne: id },
-        }).session(session);
-        if (codeExists) {
-          throw new Error(`Employee with code ${employeeCode} already exists.`);
-        }
+      // 1. Enforce RBAC access (only ADMIN, HR, and MANAGER roles allowed)
+      const allowedRoles = ['ADMIN', 'HR', 'MANAGER'];
+      if (!userRole || !allowedRoles.includes(userRole)) {
+        throw new Error('Forbidden: Only ADMIN, HR, and MANAGER roles are allowed to edit employee details.');
       }
 
-      if (email) {
-        const normalizedEmail = email.toLowerCase().trim();
-        const emailExists = await Employee.findOne({
-          organizationId: orgId,
-          email: normalizedEmail,
-          _id: { $ne: id },
-        }).session(session);
-        if (emailExists) {
-          throw new Error(`Employee with email ${email} already exists.`);
-        }
+      // 2. Verify employee exists within the organization
+      const existingEmployee = await Employee.findOne({ _id: id, organizationId: orgId }).session(session);
+      if (!existingEmployee) {
+        throw new Error('Employee not found or unauthorized.');
       }
 
-      // 2. Perform the update
+      // 3. Construct safe update payload containing ONLY emergency, bank, and tax details
+      const safeUpdateData: any = {};
+
+      if (updateData.emergencyContact) {
+        safeUpdateData.emergencyContact = {
+          name: updateData.emergencyContact.name ?? existingEmployee.emergencyContact?.name,
+          relationship: updateData.emergencyContact.relationship ?? existingEmployee.emergencyContact?.relationship,
+          phone: updateData.emergencyContact.phone ?? existingEmployee.emergencyContact?.phone,
+        };
+      }
+
+      if (updateData.bankDetails) {
+        safeUpdateData.bankDetails = {
+          bankName: updateData.bankDetails.bankName ?? existingEmployee.bankDetails?.bankName,
+          accountName: updateData.bankDetails.accountName ?? existingEmployee.bankDetails?.accountName,
+          accountNumber: updateData.bankDetails.accountNumber ?? existingEmployee.bankDetails?.accountNumber,
+          ifscCode: updateData.bankDetails.ifscCode ?? existingEmployee.bankDetails?.ifscCode,
+          branchName: updateData.bankDetails.branchName ?? existingEmployee.bankDetails?.branchName,
+        };
+      }
+
+      if (updateData.taxDetails) {
+        safeUpdateData.taxDetails = {
+          panNumber: updateData.taxDetails.panNumber ?? existingEmployee.taxDetails?.panNumber,
+          taxRegime: updateData.taxDetails.taxRegime ?? existingEmployee.taxDetails?.taxRegime,
+        };
+      }
+
+      // Keep support for soft-deactivation flags if passed explicitly
+      if (updateData.isActive !== undefined) {
+        safeUpdateData.isActive = updateData.isActive === true || updateData.isActive === 'true';
+      }
+
+      // 4. Perform the database update
       const employee = await Employee.findOneAndUpdate(
         { _id: id, organizationId: orgId },
-        updateData,
+        safeUpdateData,
         { new: true, session }
       );
       if (!employee) {
         throw new Error('Employee not found or unauthorized.');
       }
 
-      // 3. Keep corresponding User login details in sync
+      // 5. Keep corresponding User login details in sync (primarily for active/deactive status)
       const userUpdate: any = {};
-      if (updateData.fullName) userUpdate.name = updateData.fullName;
-      if (updateData.email) userUpdate.email = updateData.email.toLowerCase().trim();
-      if (updateData.isActive !== undefined) userUpdate.isActive = updateData.isActive;
+      if (safeUpdateData.isActive !== undefined) {
+        userUpdate.isActive = safeUpdateData.isActive;
+      }
 
       if (updateData.isLoginApproved !== undefined) {
         const organization = await Organization.findById(orgId).session(session);
-        const allowedRoles = organization?.settings?.loginApprovalRoles || ['ADMIN'];
-        if (userRole !== 'ADMIN' && !allowedRoles.includes(userRole || '')) {
+        const allowedRolesForLogin = organization?.settings?.loginApprovalRoles || ['ADMIN'];
+        if (userRole !== 'ADMIN' && !allowedRolesForLogin.includes(userRole || '')) {
           throw new Error('Forbidden: You do not have permission to approve/disapprove logins.');
         }
         userUpdate.isLoginApproved = updateData.isLoginApproved === true || updateData.isLoginApproved === 'true';
       }
 
       if (Object.keys(userUpdate).length > 0) {
-        // Automatically link the employeeId if it's missing on the User document
         userUpdate.employeeId = employee._id;
 
         await User.findOneAndUpdate(
@@ -200,7 +220,7 @@ export class EmployeeService {
         emailForAudit,
         'EMPLOYEE',
         employee.employeeCode,
-        `Updated profile details for ${employee.fullName}`,
+        `Updated emergency/bank/tax details for ${employee.fullName}`,
         orgId
       );
 
@@ -232,12 +252,54 @@ export class EmployeeService {
 
   /**
    * Retrieves list of employees with support for search, pagination, and sorting.
+   * Restricts employees to only those with approved and active login accounts by default (Payroll, Documents, Projects, Chat, etc.).
    */
   static async getEmployees(orgId: mongoose.Types.ObjectId | string, options: EmployeeQueryOptions = {}) {
-    const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder } = options;
+    const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder, isLoginApproved } = options;
 
     const query: any = { organizationId: orgId };
     const andConditions: any[] = [];
+
+    if (isLoginApproved === 'false' || isLoginApproved === false) {
+      // Resolve all revoked or inactive users within this organization
+      const revokedUsers = await User.find({
+        organizationId: orgId,
+        $or: [
+          { isLoginApproved: false },
+          { isActive: false }
+        ]
+      }).select('employeeId email');
+
+      const revokedEmployeeIds = revokedUsers.map(u => u.employeeId).filter(Boolean);
+      const revokedEmails = revokedUsers.map(u => u.email?.toLowerCase().trim()).filter(Boolean);
+
+      // Explicit filter: Show ONLY revoked/inactive employees
+      andConditions.push({
+        $or: [
+          { _id: { $in: revokedEmployeeIds } },
+          { email: { $in: revokedEmails } }
+        ]
+      });
+    } else if (isActive === 'false' || isActive === false) {
+      // Admin filter: "Inactive Only" is selected, so we allow showing revoked logins for possible reactivation
+    } else {
+      // Default: Strict filter to ONLY show login-approved and active employees
+      const approvedUsers = await User.find({
+        organizationId: orgId,
+        isLoginApproved: true,
+        isActive: true
+      }).select('employeeId email');
+
+      const approvedEmployeeIds = approvedUsers.map(u => u.employeeId).filter(Boolean);
+      const approvedEmails = approvedUsers.map(u => u.email?.toLowerCase().trim()).filter(Boolean);
+
+      andConditions.push({
+        $or: [
+          { _id: { $in: approvedEmployeeIds } },
+          { email: { $in: approvedEmails } }
+        ]
+      });
+    }
 
     if (search) {
       const escapedSearch = String(search).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');

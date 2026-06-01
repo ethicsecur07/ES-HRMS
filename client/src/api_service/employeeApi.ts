@@ -9,6 +9,7 @@ export const employeeApi = {
     departmentId?: string;
     designationId?: string;
     isActive?: string | boolean;
+    isLoginApproved?: string | boolean;
     page?: number | string;
     limit?: number | string;
     sortBy?: string;

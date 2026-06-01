@@ -183,32 +183,6 @@ export const EmployeeTaskSummary: React.FC = () => {
           View All <ArrowRight className="w-3.5 h-3.5 ml-1" />
         </Button>
       </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatPill
-          icon={<CheckCircle2 className="w-4 h-4" />}
-          label="Days Completed"
-          value={stats.completed}
-          color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-          bg="border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-500/5"
-        />
-        <StatPill
-          icon={<Loader2 className="w-4 h-4" />}
-          label="In Progress Days"
-          value={stats.inProgress}
-          color="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-          bg="border-blue-200/60 dark:border-blue-800/40 bg-blue-500/5"
-        />
-        <StatPill
-          icon={<Clock className="w-4 h-4" />}
-          label="Pending Days"
-          value={stats.pending}
-          color="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-          bg="border-amber-200/60 dark:border-amber-800/40 bg-amber-500/5"
-        />
-      </div>
-
       {/* Latest report quick view */}
       {latest && (
         <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">

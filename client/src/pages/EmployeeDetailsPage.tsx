@@ -63,6 +63,76 @@ export const EmployeeDetailsPage: React.FC = () => {
 
   const [showHistory, setShowHistory] = useState<{ [key: string]: boolean }>({});
 
+  const [isEditingEmergency, setIsEditingEmergency] = useState(false);
+  const [emergencyForm, setEmergencyForm] = useState({
+    name: '',
+    relationship: '',
+    phone: '',
+  });
+
+  const [isEditingBank, setIsEditingBank] = useState(false);
+  const [bankForm, setBankForm] = useState({
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    ifscCode: '',
+    branchName: '',
+  });
+
+  const [isEditingTax, setIsEditingTax] = useState(false);
+  const [taxForm, setTaxForm] = useState({
+    panNumber: '',
+    taxRegime: '' as 'OLD' | 'NEW' | '',
+  });
+
+  const isAllowedToEdit = currentUser?.role === 'ADMIN' || currentUser?.role === 'HR' || currentUser?.role === 'MANAGER';
+
+  const startEditingEmergency = () => {
+    setEmergencyForm({
+      name: employee?.emergencyContact?.name || '',
+      relationship: employee?.emergencyContact?.relationship || '',
+      phone: employee?.emergencyContact?.phone || '',
+    });
+    setIsEditingEmergency(true);
+  };
+
+  const startEditingBank = () => {
+    setBankForm({
+      bankName: employee?.bankDetails?.bankName || '',
+      accountName: employee?.bankDetails?.accountName || '',
+      accountNumber: employee?.bankDetails?.accountNumber || '',
+      ifscCode: employee?.bankDetails?.ifscCode || '',
+      branchName: employee?.bankDetails?.branchName || '',
+    });
+    setIsEditingBank(true);
+  };
+
+  const startEditingTax = () => {
+    setTaxForm({
+      panNumber: employee?.taxDetails?.panNumber || '',
+      taxRegime: (employee?.taxDetails?.taxRegime || '') as 'OLD' | 'NEW' | '',
+    });
+    setIsEditingTax(true);
+  };
+
+  const updateDetailsMutation = useMutation({
+    mutationFn: async (updatedFields: any) => {
+      return employeeApi.update(id || '', updatedFields);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee', id] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      addToast('Success', 'Details updated successfully.', 'success');
+      setIsEditingEmergency(false);
+      setIsEditingBank(false);
+      setIsEditingTax(false);
+    },
+    onError: (err: any) => {
+      addToast('Update Failed', err.response?.data?.message || err.message || 'Could not update details.', 'error');
+    },
+  });
+
+
   const { data: employee, isLoading: empLoading } = useQuery({
     queryKey: ['employee', id],
     queryFn: () => employeeApi.getById(id || ''),
@@ -481,23 +551,73 @@ export const EmployeeDetailsPage: React.FC = () => {
         {activeTab === 'EMERGENCY' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <Card className="space-y-4 border-l-4 border-l-destructive shadow-md">
-              <h3 className="text-lg font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
-                <PhoneCall className="w-5 h-5 text-destructive" /> Emergency Contacts
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20">
-                  <p className="text-[10px] text-destructive font-bold uppercase tracking-wider">Contact Name</p>
-                  <p className="font-bold text-foreground mt-0.5">{employee.emergencyContact?.name || 'Not Set'}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20">
-                  <p className="text-[10px] text-destructive font-bold uppercase tracking-wider">Relationship</p>
-                  <p className="font-bold text-foreground mt-0.5">{employee.emergencyContact?.relationship || 'Not Set'}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20">
-                  <p className="text-[10px] text-destructive font-bold uppercase tracking-wider">Phone Number</p>
-                  <p className="font-mono font-bold text-foreground mt-0.5">{employee.emergencyContact?.phone || 'Not Set'}</p>
-                </div>
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <PhoneCall className="w-5 h-5 text-destructive" /> Emergency Contacts
+                </h3>
+                {isAllowedToEdit && !isEditingEmergency && (
+                  <Button size="sm" variant="outline" onClick={startEditingEmergency}>
+                    Edit Details
+                  </Button>
+                )}
               </div>
+              
+              {isEditingEmergency ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input
+                      label="Contact Name *"
+                      value={emergencyForm.name}
+                      onChange={(e) => setEmergencyForm({ ...emergencyForm, name: e.target.value })}
+                    />
+                    <Input
+                      label="Relationship *"
+                      value={emergencyForm.relationship}
+                      onChange={(e) => setEmergencyForm({ ...emergencyForm, relationship: e.target.value })}
+                    />
+                    <Input
+                      label="Phone Number *"
+                      value={emergencyForm.phone}
+                      onChange={(e) => setEmergencyForm({ ...emergencyForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsEditingEmergency(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      isLoading={updateDetailsMutation.isPending}
+                      onClick={() =>
+                        updateDetailsMutation.mutate({
+                          emergencyContact: {
+                            name: emergencyForm.name,
+                            relationship: emergencyForm.relationship,
+                            phone: emergencyForm.phone,
+                          },
+                        })
+                      }
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20">
+                    <p className="text-[10px] text-destructive font-bold uppercase tracking-wider">Contact Name</p>
+                    <p className="font-bold text-foreground mt-0.5">{employee.emergencyContact?.name || 'Not Set'}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20">
+                    <p className="text-[10px] text-destructive font-bold uppercase tracking-wider">Relationship</p>
+                    <p className="font-bold text-foreground mt-0.5">{employee.emergencyContact?.relationship || 'Not Set'}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20">
+                    <p className="text-[10px] text-destructive font-bold uppercase tracking-wider">Phone Number</p>
+                    <p className="font-mono font-bold text-foreground mt-0.5">{employee.emergencyContact?.phone || 'Not Set'}</p>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         )}
@@ -506,46 +626,110 @@ export const EmployeeDetailsPage: React.FC = () => {
         {activeTab === 'BANK' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <Card className="space-y-6 border-l-4 border-l-primary shadow-md">
-              <h3 className="text-lg font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-primary" /> Bank Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-                  <Building className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Bank Name</p>
-                    <p className="font-semibold text-foreground">{employee.bankDetails?.bankName || 'Not Provided'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-                  <User className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Account Holder Name</p>
-                    <p className="font-semibold text-foreground">{employee.bankDetails?.accountName || 'Not Provided'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-                  <CreditCard className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Account Number</p>
-                    <p className="font-semibold text-foreground font-mono">{employee.bankDetails?.accountNumber || 'Not Provided'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-                  <FileText className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">IFSC Code</p>
-                    <p className="font-semibold text-foreground font-mono uppercase">{employee.bankDetails?.ifscCode || 'Not Provided'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border md:col-span-2">
-                  <MapPin className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Branch Name</p>
-                    <p className="font-semibold text-foreground">{employee.bankDetails?.branchName || 'Not Provided'}</p>
-                  </div>
-                </div>
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" /> Bank Details
+                </h3>
+                {isAllowedToEdit && !isEditingBank && (
+                  <Button size="sm" variant="outline" onClick={startEditingBank}>
+                    Edit Details
+                  </Button>
+                )}
               </div>
+              
+              {isEditingBank ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Bank Name"
+                      value={bankForm.bankName}
+                      onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+                    />
+                    <Input
+                      label="Account Holder Name"
+                      value={bankForm.accountName}
+                      onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })}
+                    />
+                    <Input
+                      label="Account Number"
+                      value={bankForm.accountNumber}
+                      onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                    />
+                    <Input
+                      label="IFSC Code"
+                      value={bankForm.ifscCode}
+                      onChange={(e) => setBankForm({ ...bankForm, ifscCode: e.target.value })}
+                    />
+                    <div className="md:col-span-2">
+                      <Input
+                        label="Branch Name"
+                        value={bankForm.branchName}
+                        onChange={(e) => setBankForm({ ...bankForm, branchName: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsEditingBank(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      isLoading={updateDetailsMutation.isPending}
+                      onClick={() =>
+                        updateDetailsMutation.mutate({
+                          bankDetails: {
+                            bankName: bankForm.bankName,
+                            accountName: bankForm.accountName,
+                            accountNumber: bankForm.accountNumber,
+                            ifscCode: bankForm.ifscCode,
+                            branchName: bankForm.branchName,
+                          },
+                        })
+                      }
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <Building className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Bank Name</p>
+                      <p className="font-semibold text-foreground">{employee.bankDetails?.bankName || 'Not Provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <User className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Account Holder Name</p>
+                      <p className="font-semibold text-foreground">{employee.bankDetails?.accountName || 'Not Provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <CreditCard className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Account Number</p>
+                      <p className="font-semibold text-foreground font-mono">{employee.bankDetails?.accountNumber || 'Not Provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <FileText className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">IFSC Code</p>
+                      <p className="font-semibold text-foreground font-mono uppercase">{employee.bankDetails?.ifscCode || 'Not Provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border md:col-span-2">
+                    <MapPin className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Branch Name</p>
+                      <p className="font-semibold text-foreground">{employee.bankDetails?.branchName || 'Not Provided'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         )}
@@ -554,25 +738,76 @@ export const EmployeeDetailsPage: React.FC = () => {
         {activeTab === 'TAX' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <Card className="space-y-6 border-l-4 border-l-primary shadow-md">
-              <h3 className="text-lg font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
-                <FileDigit className="w-5 h-5 text-primary" /> Tax Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-                  <FileDigit className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">PAN Card Number</p>
-                    <p className="font-semibold text-foreground font-mono uppercase">{employee.taxDetails?.panNumber || 'Not Provided'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-                  <Calendar className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Income Tax Regime</p>
-                    <p className="font-semibold text-foreground uppercase">{employee.taxDetails?.taxRegime || 'Not Decided'}</p>
-                  </div>
-                </div>
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <FileDigit className="w-5 h-5 text-primary" /> Tax Details
+                </h3>
+                {isAllowedToEdit && !isEditingTax && (
+                  <Button size="sm" variant="outline" onClick={startEditingTax}>
+                    Edit Details
+                  </Button>
+                )}
               </div>
+              
+              {isEditingTax ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="PAN Card Number"
+                      value={taxForm.panNumber}
+                      onChange={(e) => setTaxForm({ ...taxForm, panNumber: e.target.value })}
+                    />
+                    <div className="space-y-1 text-left">
+                      <label className="text-sm font-medium text-foreground mb-1.5 block">Income Tax Regime</label>
+                      <select
+                        value={taxForm.taxRegime}
+                        onChange={(e) => setTaxForm({ ...taxForm, taxRegime: e.target.value as any })}
+                        className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
+                      >
+                        <option value="">Select Regime (Optional)</option>
+                        <option value="NEW">New Tax Regime</option>
+                        <option value="OLD">Old Tax Regime</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsEditingTax(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      isLoading={updateDetailsMutation.isPending}
+                      onClick={() =>
+                        updateDetailsMutation.mutate({
+                          taxDetails: {
+                            panNumber: taxForm.panNumber,
+                            taxRegime: taxForm.taxRegime,
+                          },
+                        })
+                      }
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <FileDigit className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">PAN Card Number</p>
+                      <p className="font-semibold text-foreground font-mono uppercase">{employee.taxDetails?.panNumber || 'Not Provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <Calendar className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Income Tax Regime</p>
+                      <p className="font-semibold text-foreground uppercase">{employee.taxDetails?.taxRegime || 'Not Decided'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         )}

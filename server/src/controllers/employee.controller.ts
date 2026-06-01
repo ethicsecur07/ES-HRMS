@@ -26,7 +26,7 @@ export const getEmployees = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder } = req.query;
+    const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder, isLoginApproved } = req.query;
     const result = await EmployeeService.getEmployees(orgId, {
       search: search as string,
       department: department as string,
@@ -39,6 +39,7 @@ export const getEmployees = async (req: AuthRequest, res: Response): Promise<voi
       limit: limit as string,
       sortBy: sortBy as string,
       sortOrder: sortOrder as any,
+      isLoginApproved: isLoginApproved as string,
     });
 
     if ((res as any).jsonSanitized) {

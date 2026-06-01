@@ -10,4 +10,5 @@ router.get('/:otherUserId', auth_middleware_js_1.authenticate, (0, rbacGuard_js_
 router.post('/', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('CHAT', 'create'), chat_controller_js_1.sendMessage);
 router.post('/upload', auth_middleware_js_1.authenticate, (0, rbacGuard_js_1.rbacGuard)('CHAT', 'create'), chat_controller_js_1.chatUpload.single('file'), chat_controller_js_1.sendFileMessage);
 router.patch('/:messageId/read', auth_middleware_js_1.authenticate, chat_controller_js_1.markMessageRead);
+router.post('/offline-hard', auth_middleware_js_1.authenticate, chat_controller_js_1.markOfflineHard);
 exports.default = router;

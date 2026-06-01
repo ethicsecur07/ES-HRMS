@@ -17,7 +17,7 @@ export const attendanceApi = {
     return response.data;
   },
 
-  checkOut: async (attendanceId: string, taskReportId: string) => {
+  checkOut: async (attendanceId: string, taskReportId?: string) => {
     const response = await axiosInstance.post<Attendance>(`/attendance/checkout/${attendanceId}`, { taskReportId });
     return response.data;
   },

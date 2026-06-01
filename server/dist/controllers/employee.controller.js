@@ -28,7 +28,7 @@ const getEmployees = async (req, res) => {
             res.status(400).json({ message: 'Organization context is missing.' });
             return;
         }
-        const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder } = req.query;
+        const { search, department, designation, departmentId, designationId, branchId, isActive, page, limit, sortBy, sortOrder, isLoginApproved } = req.query;
         const result = await employee_service_js_1.EmployeeService.getEmployees(orgId, {
             search: search,
             department: department,
@@ -41,6 +41,7 @@ const getEmployees = async (req, res) => {
             limit: limit,
             sortBy: sortBy,
             sortOrder: sortOrder,
+            isLoginApproved: isLoginApproved,
         });
         if (res.jsonSanitized) {
             res.jsonSanitized(result);

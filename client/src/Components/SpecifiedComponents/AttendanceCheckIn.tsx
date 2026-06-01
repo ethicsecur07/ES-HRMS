@@ -11,6 +11,8 @@ import { Input, Textarea } from '../WrapperComponents/Input';
 import { TaskReportForm } from './TaskReportForm';
 import { permissionApi } from '../../api_service/permissionApi';
 import { leaveApi } from '../../api_service/leaveApi';
+import { analyticsApi } from '../../api_service/analyticsApi';
+import { holidayCalendarApi } from '../../api_service/holidayCalendarApi';
 import { Clock, CheckCircle2, MapPin, Compass, AlertOctagon, Info, Palmtree } from 'lucide-react';
 
 const formatElapsedTime = (ms: number): string => {
@@ -79,6 +81,19 @@ export const AttendanceCheckIn: React.FC = () => {
   const { data: todayAttendance, isLoading: attLoading } = useQuery({
     queryKey: ['todayAttendance'],
     queryFn: attendanceApi.getToday,
+  });
+
+  const { data: companySettings } = useQuery({
+    queryKey: ['companySettings'],
+    queryFn: analyticsApi.getSettings,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const currentYear = currentTime.getFullYear();
+  const { data: holidays = [] } = useQuery({
+    queryKey: ['holidays', currentYear],
+    queryFn: () => holidayCalendarApi.getAll(currentYear),
+    staleTime: 10 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -160,14 +175,15 @@ export const AttendanceCheckIn: React.FC = () => {
     submitRetroMutation.mutate();
   };
 
-  const myAttendance = todayAttendance?.find(
-    (a) =>
-      a.employeeId === user?.employeeId ||
-      a.employeeId === user?._id ||
-      (a.employeeId &&
-        typeof a.employeeId === 'object' &&
-        (a.employeeId._id === user?.employeeId || a.employeeId._id === user?._id))
-  );
+  const myAttendance = todayAttendance?.find((a) => {
+    const empId = a.employeeId && typeof a.employeeId === 'object' ? a.employeeId._id : a.employeeId;
+    const empEmail = a.employeeId && typeof a.employeeId === 'object' ? a.employeeId.email : null;
+    return (
+      empId === user?.employeeId ||
+      empId === user?._id ||
+      (empEmail && empEmail.toLowerCase() === user?.email?.toLowerCase())
+    );
+  });
 
   const isCheckedIn = myAttendance && !myAttendance.logoutTime;
   const elapsedMs = isCheckedIn ? currentTime.getTime() - new Date(myAttendance.loginTime).getTime() : 0;
@@ -205,6 +221,18 @@ export const AttendanceCheckIn: React.FC = () => {
     onError: (error: Error & { response?: { data?: { message?: string } } }) => {
       const msg = error.response?.data?.message || 'Check-in failed. Please try again.';
       addToast('Check-In Failed', msg, 'error');
+    },
+  });
+
+  const checkOutMutation = useMutation({
+    mutationFn: () => attendanceApi.checkOut(myAttendance?._id || ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todayAttendance'] });
+      addToast('Check-Out Successful', 'Your checkout attendance has been recorded.', 'success');
+    },
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || 'Checkout failed. Please try again.';
+      addToast('Check-Out Failed', msg, 'error');
     },
   });
 
@@ -305,11 +333,31 @@ export const AttendanceCheckIn: React.FC = () => {
     );
   }
 
-  const localToday = new Date();
+  const localToday = currentTime;
   const year = localToday.getFullYear();
   const month = String(localToday.getMonth() + 1).padStart(2, '0');
   const day = String(localToday.getDate()).padStart(2, '0');
   const localTodayStr = `${year}-${month}-${day}`;
+
+  const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const currentDayLabel = DAY_LABELS[currentTime.getDay()];
+  const isSunday = currentTime.getDay() === 0;
+
+  const activeWorkdays = companySettings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const isNonWorkingDay = !activeWorkdays.includes(currentDayLabel);
+  const todayHoliday = holidays?.find((h) => h.date === localTodayStr && !h.isRestricted);
+
+  const isCheckInLocked = isSunday || isNonWorkingDay || !!todayHoliday;
+  let lockReason = '';
+  if (isSunday) {
+    lockReason = 'SUNDAY';
+  } else if (todayHoliday) {
+    lockReason = `HOLIDAY (${todayHoliday.name.toUpperCase()})`;
+  } else if (isNonWorkingDay) {
+    lockReason = 'NON-WORKING DAY';
+  }
+
+  const isHrOrManager = user?.role === 'HR' || user?.role === 'MANAGER';
 
   const myEmpId = user?.employeeId || user?._id;
 
@@ -396,6 +444,11 @@ export const AttendanceCheckIn: React.FC = () => {
             <p className="text-sm font-medium text-muted-foreground mt-0.5">
               {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
+            {isCheckInLocked && (
+              <p className="text-xs text-muted-foreground mt-1.5 font-medium italic">
+                🕒 Check-in is locked today because it is a {lockReason.toLowerCase()}. Enjoy your day off!
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-4 items-center pt-2">
@@ -403,6 +456,11 @@ export const AttendanceCheckIn: React.FC = () => {
             {attendanceSettings?.fences && attendanceSettings.fences.length > 0 && (
               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-black uppercase tracking-wider text-primary">
                 <MapPin className="w-3.5 h-3.5" /> Geofencing Active
+              </div>
+            )}
+            {isCheckInLocked && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-black uppercase tracking-wider text-amber-500 animate-pulse">
+                <AlertOctagon className="w-3.5 h-3.5" /> Check-In Restricted ({lockReason})
               </div>
             )}
           </div>
@@ -414,9 +472,9 @@ export const AttendanceCheckIn: React.FC = () => {
               size="lg"
               onClick={handleCheckInClick}
               isLoading={checkInMutation.isPending || isLocChecking}
-              disabled={!!activePermBlock}
+              disabled={!!activePermBlock || isCheckInLocked}
               className={`w-full sm:w-auto font-bold tracking-wider shadow-lg transition-all scale-105 my-2 ${
-                activePermBlock
+                activePermBlock || isCheckInLocked
                   ? 'bg-muted text-muted-foreground border border-border pointer-events-none opacity-60'
                   : 'bg-gradient-to-r from-primary to-accent text-white shadow-primary/30 hover:shadow-xl hover:shadow-primary/40'
               }`}
@@ -425,6 +483,11 @@ export const AttendanceCheckIn: React.FC = () => {
                 <>
                   <Clock className="w-5 h-5 mr-2 text-destructive animate-pulse" />
                   LOCKED (PERMISSION {activePermBlock.startTime}-{activePermBlock.endTime})
+                </>
+              ) : isCheckInLocked ? (
+                <>
+                  <Clock className="w-5 h-5 mr-2 text-destructive animate-pulse" />
+                  LOCKED ({lockReason})
                 </>
               ) : isLocChecking ? (
                 <>
@@ -466,10 +529,17 @@ export const AttendanceCheckIn: React.FC = () => {
                 <Button
                   size="lg"
                   variant="destructive"
-                  onClick={() => setShowTaskModal(true)}
+                  onClick={() => {
+                    if (isHrOrManager) {
+                      checkOutMutation.mutate();
+                    } else {
+                      setShowTaskModal(true);
+                    }
+                  }}
+                  isLoading={checkOutMutation.isPending}
                   className="w-full sm:w-auto font-bold tracking-wider shadow-lg shadow-destructive/30"
                 >
-                  CHECK OUT & SUBMIT TASK
+                  {isHrOrManager ? 'CHECK OUT NOW' : 'CHECK OUT & SUBMIT TASK'}
                 </Button>
               )}
             </div>
@@ -574,7 +644,7 @@ export const AttendanceCheckIn: React.FC = () => {
                 <AlertOctagon className="w-4 h-4" /> RETROACTIVE REPORT REQUIRED
               </span>
               <p>
-                You forgot to check out on <strong className="font-mono">{pendingReportToSubmit.date}</strong> (Checked In: <strong className="font-mono">{new Date(pendingReportToSubmit.loginTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>). The system has automatically checked you out at <strong>7:00 PM</strong> (Working Hours: <strong>{pendingReportToSubmit.workingHours} hrs</strong>).
+                You forgot to check out on <strong className="font-mono">{pendingReportToSubmit.date}</strong> (Checked In: <strong className="font-mono">{new Date(pendingReportToSubmit.loginTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>). The system has automatically checked you out at <strong>6:00 PM</strong> (Working Hours: <strong>{pendingReportToSubmit.workingHours} hrs</strong>).
               </p>
               <p className="font-semibold mt-1">
                 You must submit your tasks and daily report for {pendingReportToSubmit.date} to unlock and use the HRMS application.
