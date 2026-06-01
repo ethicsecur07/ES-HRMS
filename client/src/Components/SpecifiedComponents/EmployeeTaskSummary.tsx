@@ -160,7 +160,7 @@ export const EmployeeTaskSummary: React.FC = () => {
   }
 
   return (
-    <Card className="border-l-4 border-l-primary shadow-md space-y-5">
+    <Card className="border-l-4 border-l-primary shadow-md space-y-5 h-full">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>

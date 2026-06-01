@@ -101,29 +101,31 @@ export const DashboardPage: React.FC = () => {
           <AttendanceCheckIn />
           <EmployeeQuickStats stats={projectStats || null} loading={projectStatsLoading} />
 
-          {/* 3-column layout: Tasks/Calendar (2/3 width) and Announcements & Actions (1/3 width) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            {/* Calendar + Task Summary */}
-            <div className="lg:col-span-2 space-y-6">
+          {/* Top Row: My Work Summary (2/3 width) and Announcements & Actions (1/3 width) side-by-side with matched fixed height */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+            {/* My Work Summary */}
+            <div className="lg:col-span-2 flex flex-col h-[520px]">
               <EmployeeTaskSummary />
-              <div className="space-y-2">
-                <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-                  My Leave & Holiday Calendar
-                </h3>
-                <HolidayEnhancedCalendar
-                  leaves={myLeaves || []}
-                  wfh={myWfh || []}
-                  perms={myPerms || []}
-                  compact={false}
-                />
-              </div>
             </div>
 
             {/* Announcements & Actions Card */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 flex flex-col h-[520px]">
               <HRApprovalQueue />
             </div>
+          </div>
+
+          {/* Bottom Row: Full-width My Leave & Holiday Calendar section */}
+          <div className="space-y-1 w-full">
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+              My Leave & Holiday Calendar
+            </h3>
+            <HolidayEnhancedCalendar
+              leaves={myLeaves || []}
+              wfh={myWfh || []}
+              perms={myPerms || []}
+              compact={false}
+            />
           </div>
         </div>
       )}
