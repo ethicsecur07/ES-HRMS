@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chatApi } from '../api_service/chatApi';
 import { employeeApi } from '../api_service/employeeApi';
@@ -76,6 +77,24 @@ export const ChatPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('direct');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state && typeof location.state === 'object' && 'selectedUser' in location.state) {
+      const targetUser = (location.state as any).selectedUser;
+      if (targetUser) {
+        setSelectedUser(targetUser);
+        if (targetUser === 'broadcast') {
+          setActiveTab('broadcast');
+        } else if (targetUser.startsWith('group_')) {
+          setActiveTab('groups');
+        } else {
+          setActiveTab('direct');
+        }
+      }
+    }
+  }, [location.state]);
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);

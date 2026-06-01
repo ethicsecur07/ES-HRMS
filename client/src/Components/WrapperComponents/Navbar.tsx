@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Sun, Moon, Menu } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { employeeApi } from '../../api_service/employeeApi';
+import { leaveApi } from '../../api_service/leaveApi';
+import { wfhApi } from '../../api_service/wfhApi';
+import { permissionApi } from '../../api_service/permissionApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -75,6 +78,43 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     INTERN: 'bg-teal-500/10 text-teal-500 border-teal-500/20',
   };
 
+  const queryClient = useQueryClient();
+
+  const isPendingAction = (id: string) => {
+    return id.startsWith('leave-pending-') || id.startsWith('wfh-pending-') || id.startsWith('perm-pending-');
+  };
+
+  const handleApproveReject = async (n: any, status: 'APPROVED' | 'REJECTED') => {
+    try {
+      const typeStr = (n.type || '').toUpperCase();
+      if (typeStr === 'LEAVE') {
+        const id = n._id.replace('leave-pending-', '');
+        await leaveApi.updateStatus(id, status);
+        queryClient.invalidateQueries({ queryKey: ['leaves'] });
+      } else if (typeStr === 'WFH') {
+        const id = n._id.replace('wfh-pending-', '');
+        await wfhApi.updateStatus(id, status);
+        queryClient.invalidateQueries({ queryKey: ['wfh'] });
+      } else if (typeStr === 'PERMISSION') {
+        const id = n._id.replace('perm-pending-', '');
+        await permissionApi.updateStatus(id, status);
+        queryClient.invalidateQueries({ queryKey: ['permissions'] });
+      }
+      markAsRead(n._id);
+      useNotificationStore.getState().addToast(
+        'Success',
+        `Request ${status.toLowerCase()} successfully.`,
+        'success'
+      );
+    } catch (error) {
+      useNotificationStore.getState().addToast(
+        'Error',
+        'Failed to process request.',
+        'error'
+      );
+    }
+  };
+
   const handleNotificationClick = (n: any) => {
     markAsRead(n._id);
     setShowNotifs(false);
@@ -92,6 +132,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
       navigate('/employees');
     } else if (typeStr === 'REPORT' || typeStr === 'TASK') {
       navigate('/reports');
+    } else if (typeStr === 'CHAT') {
+      const senderId = n.payload?.senderId;
+      navigate('/chat', { state: { selectedUser: senderId } });
     } else {
       navigate('/dashboard');
     }
@@ -127,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
               title="Notifications"
             >
               <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-              {userUnreadCount > 0 && (
+              {userUnreadCount > 0 && !showNotifs && (
                 <span className="absolute -top-1.5 -right-1.5 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-primary text-primary-foreground text-[9px] sm:text-[10px] font-bold flex items-center justify-center shadow-lg shadow-primary/30 animate-bounce">
                   {userUnreadCount}
                 </span>
@@ -184,6 +227,28 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                         </div>
                         <p className="text-sm font-semibold mb-0.5">{n.title}</p>
                         <p className="text-xs text-muted-foreground leading-snug">{n.message}</p>
+                        {isPendingAction(n._id) && !n.read && (
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApproveReject(n, 'APPROVED');
+                              }}
+                              className="flex-grow py-1 px-2.5 rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-bold transition-all shadow-sm flex items-center justify-center"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApproveReject(n, 'REJECTED');
+                              }}
+                              className="flex-grow py-1 px-2.5 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 text-xs font-bold hover:bg-destructive hover:text-white transition-all flex items-center justify-center"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
