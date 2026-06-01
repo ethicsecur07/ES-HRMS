@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'HR' | 'TEAM_LEAD' | 'EMPLOYEE';
+export type Role = 'ADMIN' | 'MANAGER' | 'HR' | 'TEAM_LEAD' | 'EMPLOYEE' | 'INTERN';
 export type AttendanceType = 'OFFICE' | 'WFH' | 'HALF_DAY' | 'LEAVE';
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export type LeaveType = 'Casual Leave' | 'Sick Leave' | 'WFH' | 'Permission';

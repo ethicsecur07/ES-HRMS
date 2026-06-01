@@ -95,7 +95,7 @@ export const RecruitmentPage: React.FC = () => {
     departmentId: '',
     designationId: '',
     joiningDate: new Date().toISOString().split('T')[0],
-    salary: 25000,
+    salary: 0,
     address: '2nd Floor, NV Arcade Building, Salem - 636004',
     emergencyName: 'Emergency Contact',
     emergencyRel: 'Guardian',
@@ -390,13 +390,6 @@ export const RecruitmentPage: React.FC = () => {
 
   const handleOpenOnboard = async (cand: Candidate) => {
     setHiredCandidate(cand);
-    let nextCode = `EMP-${Date.now().toString().slice(-4)}`;
-    try {
-      const code = await employeeApi.getNextEmployeeCode();
-      if (code) nextCode = code;
-    } catch (err) {
-      // fallback
-    }
 
     // Smart pre-select based on offer letter appliedRole
     let matchedDeptId = '';
@@ -425,19 +418,20 @@ export const RecruitmentPage: React.FC = () => {
       }
     }
 
-    // Intern stipend and code logic: if applied role or matched designation has "intern" keyword, default salary to 0 and prefix code with INT-
+    // Intern stipend and code logic: if applied role or matched designation has "intern" keyword, prefix code with INT-
     const matchedDesig = designations.find((d: any) => d._id === matchedDesigId);
     const isIntern = (cand.appliedRole && cand.appliedRole.toLowerCase().includes('intern')) ||
                      (matchedDesig && matchedDesig.name.toLowerCase().includes('intern'));
-    const defaultSalary = isIntern ? 0 : (cand.offerDetails?.salaryOffered || 25000);
+    
+    // Fetch details as per mentioned in offer letter for that candidate alone
+    const defaultSalary = cand.offerDetails?.salaryOffered || 0;
 
-    let finalCode = nextCode;
-    if (isIntern) {
-      if (finalCode.includes('-')) {
-        finalCode = `INT-${finalCode.split('-')[1]}`;
-      } else {
-        finalCode = `INT-${finalCode}`;
-      }
+    let finalCode = isIntern ? `INT-${Date.now().toString().slice(-4)}` : `EMP-${Date.now().toString().slice(-4)}`;
+    try {
+      const code = await employeeApi.getNextEmployeeCode(isIntern, matchedDeptId, matchedDesigId);
+      if (code) finalCode = code;
+    } catch (err) {
+      // fallback
     }
 
     setHiredFormData({
@@ -459,7 +453,7 @@ export const RecruitmentPage: React.FC = () => {
     setShowHiredModal(true);
   };
 
-  const handleHiredDeptChange = (deptId: string) => {
+  const handleHiredDeptChange = async (deptId: string) => {
     const filtered = designations.filter((d: any) => {
       const dId = typeof d.departmentId === 'object' && d.departmentId !== null ? d.departmentId._id : d.departmentId;
       return dId === deptId && d.isActive;
@@ -468,44 +462,41 @@ export const RecruitmentPage: React.FC = () => {
     const desig = designations.find((d: any) => d._id === desigId);
     const isIntern = desig?.name.toLowerCase().includes('intern');
 
-    setHiredFormData(p => {
-      let code = p.employeeCode;
-      if (isIntern) {
-        code = code.replace(/^(EMP|TEMP-EMP|TEMP)-/, 'INT-');
-        if (!code.startsWith('INT-')) code = `INT-${code}`;
-      } else {
-        code = code.replace(/^INT-/, 'EMP-');
-        if (!code.startsWith('EMP-')) code = `EMP-${code}`;
-      }
-      return {
-        ...p,
-        departmentId: deptId,
-        designationId: desigId,
-        employeeCode: code,
-        salary: isIntern ? 0 : (hiredCandidate?.offerDetails?.salaryOffered || 25000)
-      };
-    });
+    let nextCode = isIntern ? `INT-${Date.now().toString().slice(-4)}` : `EMP-${Date.now().toString().slice(-4)}`;
+    try {
+      const code = await employeeApi.getNextEmployeeCode(isIntern, deptId, desigId);
+      if (code) nextCode = code;
+    } catch (err) {
+      // fallback
+    }
+
+    setHiredFormData(p => ({
+      ...p,
+      departmentId: deptId,
+      designationId: desigId,
+      employeeCode: nextCode,
+      salary: hiredCandidate?.offerDetails?.salaryOffered || 0
+    }));
   };
 
-  const handleHiredDesignationChange = (desigId: string) => {
+  const handleHiredDesignationChange = async (desigId: string) => {
     const desig = designations.find((d: any) => d._id === desigId);
     const isIntern = desig?.name.toLowerCase().includes('intern');
-    setHiredFormData(p => {
-      let code = p.employeeCode;
-      if (isIntern) {
-        code = code.replace(/^(EMP|TEMP-EMP|TEMP)-/, 'INT-');
-        if (!code.startsWith('INT-')) code = `INT-${code}`;
-      } else {
-        code = code.replace(/^INT-/, 'EMP-');
-        if (!code.startsWith('EMP-')) code = `EMP-${code}`;
-      }
-      return {
-        ...p,
-        designationId: desigId,
-        employeeCode: code,
-        salary: isIntern ? 0 : (hiredCandidate?.offerDetails?.salaryOffered || 25000)
-      };
-    });
+
+    let nextCode = isIntern ? `INT-${Date.now().toString().slice(-4)}` : `EMP-${Date.now().toString().slice(-4)}`;
+    try {
+      const code = await employeeApi.getNextEmployeeCode(isIntern, hiredFormData.departmentId, desigId);
+      if (code) nextCode = code;
+    } catch (err) {
+      // fallback
+    }
+
+    setHiredFormData(p => ({
+      ...p,
+      designationId: desigId,
+      employeeCode: nextCode,
+      salary: hiredCandidate?.offerDetails?.salaryOffered || 0
+    }));
   };
 
   const handleOnboardingSubmit = async (e: React.FormEvent) => {
@@ -567,7 +558,11 @@ export const RecruitmentPage: React.FC = () => {
       setHiredCandidate(null);
     } catch (error: any) {
       console.error(error);
-      const errMsg = error.response?.data?.message || error.message || 'Failed to onboard candidate.';
+      let errMsg = error.response?.data?.message || error.message || 'Failed to onboard candidate.';
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        const details = error.response.data.errors.map((e: any) => `${e.field}: ${e.message}`).join(', ');
+        errMsg = `${errMsg} (${details})`;
+      }
       addToast('Onboarding Failed', errMsg, 'error');
     } finally {
       setIsOnboardingSubmit(false);
@@ -1221,20 +1216,12 @@ export const RecruitmentPage: React.FC = () => {
               Onboard this hired candidate into the general employee database. This will auto-provision their system access credentials for email login, attendance checkins, dashboard analytics, separate projects, and meetings.
             </p>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Full Name *"
-                value={hiredFormData.fullName}
-                onChange={(e) => setHiredFormData(p => ({ ...p, fullName: e.target.value }))}
-                required
-              />
-              <Input
-                label="Employee Code *"
-                value={hiredFormData.employeeCode}
-                onChange={(e) => setHiredFormData(p => ({ ...p, employeeCode: e.target.value }))}
-                required
-              />
-            </div>
+            <Input
+              label="Full Name *"
+              value={hiredFormData.fullName}
+              onChange={(e) => setHiredFormData(p => ({ ...p, fullName: e.target.value }))}
+              required
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <Input

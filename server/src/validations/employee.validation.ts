@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createEmployeeSchema = z.object({
   body: z.object({
-    employeeCode: z.string().min(2),
+    employeeCode: z.string().min(2).optional().or(z.literal('')),
     fullName: z.string().min(3),
     email: z.string().email(),
     phone: z.string().min(10),

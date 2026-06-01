@@ -154,7 +154,7 @@ export const TaskReportsPage: React.FC = () => {
             Task & Daily Reports
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {role === 'EMPLOYEE' 
+            {(role === 'EMPLOYEE' || role === 'INTERN') 
               ? 'Browse and search through your archived daily work summaries' 
               : 'Monitor employee check-out task logs, completed deliverables, and reported development blockers'}
           </p>
@@ -174,7 +174,7 @@ export const TaskReportsPage: React.FC = () => {
               />
             </div>
           )}
-          <div className={`${role === 'EMPLOYEE' ? 'flex-1' : 'w-full sm:w-64'}`}>
+          <div className={`${(role === 'EMPLOYEE' || role === 'INTERN') ? 'flex-1' : 'w-full sm:w-64'}`}>
             <Input
               type="date"
               value={dateFilter}
@@ -185,7 +185,7 @@ export const TaskReportsPage: React.FC = () => {
         </div>
 
         <TableWrapper
-          columns={role === 'EMPLOYEE' ? columns.filter(col => col.header !== 'Employee') : columns}
+          columns={(role === 'EMPLOYEE' || role === 'INTERN') ? columns.filter(col => col.header !== 'Employee') : columns}
           data={filteredReports}
         />
       </Card>

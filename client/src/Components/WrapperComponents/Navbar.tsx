@@ -72,6 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     HR: 'bg-foreground/10 text-foreground border-border',
     TEAM_LEAD: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
     EMPLOYEE: 'bg-muted text-muted-foreground border-border',
+    INTERN: 'bg-teal-500/10 text-teal-500 border-teal-500/20',
   };
 
   const handleNotificationClick = (n: any) => {

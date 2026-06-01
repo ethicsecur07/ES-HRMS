@@ -215,7 +215,12 @@ export const EmployeesPage: React.FC = () => {
 
   const handleGenerateCode = async () => {
     try {
-      const nextCode = await employeeApi.getNextEmployeeCode();
+      const deptId = watch('departmentId');
+      const desigId = watch('designationId');
+      const desig = designations.find((d: any) => d._id === desigId);
+      const isIntern = desig?.name?.toLowerCase().includes('intern');
+
+      const nextCode = await employeeApi.getNextEmployeeCode(isIntern, deptId, desigId);
       setValue('employeeCode', nextCode);
       addToast('Code Generated', `Suggested employee code: ${nextCode}`, 'success');
     } catch (error: any) {
@@ -320,7 +325,12 @@ export const EmployeesPage: React.FC = () => {
       setFormTab('general');
     },
     onError: (error: any) => {
-      addToast('Error', error.response?.data?.message || 'Failed to save employee data.', 'error');
+      let errMsg = error.response?.data?.message || 'Failed to save employee data.';
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        const details = error.response.data.errors.map((e: any) => `${e.field}: ${e.message}`).join(', ');
+        errMsg = `${errMsg} (${details})`;
+      }
+      addToast('Error', errMsg, 'error');
     },
   });
 
@@ -496,7 +506,7 @@ export const EmployeesPage: React.FC = () => {
       ),
     },
   ].filter((col) => {
-    if (col.header === 'Actions' && user?.role === 'EMPLOYEE') {
+    if (col.header === 'Actions' && (user?.role === 'EMPLOYEE' || user?.role === 'INTERN')) {
       return false;
     }
     return true;
@@ -719,23 +729,15 @@ export const EmployeesPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1 relative">
-                  <Input
-                    label="Employee Code *"
-                    {...register('employeeCode')}
-                    disabled={!!editingId}
-                    className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
-                    error={errors.employeeCode?.message}
-                  />
-                  {!editingId && (
-                    <button
-                      type="button"
-                      onClick={handleGenerateCode}
-                      className="absolute right-2 top-8 text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 text-[10px] font-bold"
-                      title="Auto-generate sequential code"
-                    >
-                      <Sparkles className="w-3 h-3" /> Auto Gen
-                    </button>
-                  )}
+                  <Input label="Employee Code *" {...register('employeeCode')} error={errors.employeeCode?.message} />
+                  <button
+                    type="button"
+                    onClick={handleGenerateCode}
+                    className="absolute right-2 top-8 text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 text-[10px] font-bold"
+                    title="Auto-generate sequential code"
+                  >
+                    <Sparkles className="w-3 h-3" /> Auto Gen
+                  </button>
                 </div>
 
                 <Input

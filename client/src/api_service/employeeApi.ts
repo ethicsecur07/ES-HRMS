@@ -38,8 +38,10 @@ export const employeeApi = {
     await axiosInstance.delete(`/employees/${id}`);
   },
 
-  getNextEmployeeCode: async () => {
-    const response = await axiosInstance.get<{ nextCode: string }>('/employees/next-code');
+  getNextEmployeeCode: async (isIntern?: boolean, departmentId?: string, designationId?: string) => {
+    const response = await axiosInstance.get<{ nextCode: string }>('/employees/next-code', {
+      params: { isIntern, departmentId, designationId }
+    });
     return response.data.nextCode;
   },
   

@@ -4,6 +4,7 @@ export const ROLES = {
   HR: 'HR',
   TEAM_LEAD: 'TEAM_LEAD',
   EMPLOYEE: 'EMPLOYEE',
+  INTERN: 'INTERN',
 } as const;
 
 export const ATTENDANCE_TYPES = {

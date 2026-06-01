@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.forceUserOffline = exports.getIO = exports.initSockets = exports.getOnlineUserIdsByOrg = void 0;
+exports.forceUserOffline = exports.forceUserOffline = exports.getIO = exports.initSockets = exports.getOnlineUserIdsByOrg = exports.getOnlineUserIdsByOrg = void 0;
 const socket_io_1 = require("socket.io");
 const logger_js_1 = require("../utils/logger.js");
 const jwt_js_1 = require("../utils/jwt.js");
@@ -33,13 +33,16 @@ const getOnlineUserIdsByOrg = (orgId) => {
     return ids;
 };
 exports.getOnlineUserIdsByOrg = getOnlineUserIdsByOrg;
+exports.getOnlineUserIdsByOrg = getOnlineUserIdsByOrg;
 const initSockets = (httpServer) => {
     const io = new socket_io_1.Server(httpServer, {
         cors: {
             // Must NOT combine credentials:true with origin:'*' — browsers reject it.
             // Socket auth uses Bearer tokens (not cookies), so credentials is not needed.
+            // Must NOT combine credentials:true with origin:'*' — browsers reject it.
+            // Socket auth uses Bearer tokens (not cookies), so credentials is not needed.
             origin: '*',
-            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PUT', 'DELETE', 'OPTIONS'],
         },
         allowEIO3: true,
         transports: ['websocket', 'polling'],
@@ -239,7 +242,7 @@ const initSockets = (httpServer) => {
                         logger_js_1.logger.info(`User ${user.email} is now OFFLINE (grace period elapsed).`);
                     }
                     disconnectTimeouts.delete(user.id);
-                }, 5000); // 5-second grace period — enough to survive page refresh, fast enough for real closes
+                }, 8000); // 8-second grace period
                 disconnectTimeouts.set(user.id, timeout);
             }
         });

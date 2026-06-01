@@ -119,7 +119,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const canEdit   = hasPermission('PROJECTS', 'edit') && userRole !== 'ADMIN';
   const canApprove= hasPermission('PROJECTS', 'approve') && ['TEAM_LEAD', 'MANAGER', 'HR'].includes(userRole);
-  const isEmployee= userRole === 'EMPLOYEE';
+  const isEmployee= userRole === 'EMPLOYEE' || userRole === 'INTERN';
 
   // Reset form and preload comments/activities when task changes
   useEffect(() => {

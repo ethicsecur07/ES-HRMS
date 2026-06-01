@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmployeeService = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
+const crypto_1 = __importDefault(require("crypto"));
 const Employee_js_1 = require("../models/Employee.js");
 const User_js_1 = require("../models/User.js");
 const Candidate_js_1 = require("../models/Candidate.js");
@@ -22,8 +23,21 @@ class EmployeeService {
         const session = await mongoose_1.default.startSession();
         session.startTransaction();
         try {
-            if (!employeeData.employeeCode) {
-                employeeData.employeeCode = await EmployeeService.generateNextEmployeeCode(orgId);
+            if (candidateId) {
+                // Onboarded candidates completely do not have an employee code
+                delete employeeData.employeeCode;
+            }
+            else if (!employeeData.employeeCode) {
+                const isIntern = employeeData.designation?.toLowerCase().includes('intern');
+                // Generate employee code based on department/designation unless intern
+                employeeData.employeeCode = await EmployeeService.generateEmployeeCode(orgId, employeeData.departmentId?.toString(), employeeData.designationId?.toString(), isIntern);
+                if (isIntern) {
+                    // Interns should not have an employeeCode field
+                    delete employeeData.employeeCode;
+                }
+                else if (!employeeData.employeeCode || employeeData.employeeCode.trim() === '') {
+                    employeeData.employeeCode = `EMP-${crypto_1.default.randomBytes(3).toString('hex').toUpperCase()}`;
+                }
             }
             // 1. Pre-flight check for duplicate employeeCode or email within organization
             if (employeeData.employeeCode) {
@@ -48,23 +62,27 @@ class EmployeeService {
             // 2. Hash Password for login account
             const defaultPassword = password || 'EthicSec@2026';
             const hashedPassword = await PasswordService_js_1.PasswordService.hashPassword(defaultPassword);
+            // Normalize email for consistency
+            const normalizedEmail = employeeData.email?.toLowerCase().trim();
+            if (normalizedEmail) {
+                employeeData.email = normalizedEmail;
+            }
             // 3. Create Employee record
             const [employee] = await Employee_js_1.Employee.create([{
                     ...employeeData,
                     isActive: true,
                     organizationId: orgId,
                 }], { session });
-            // 4. Create corresponding login account (User)
-            await User_js_1.User.create([{
-                    organizationId: orgId,
-                    name: employee.fullName,
-                    email: employee.email,
-                    password: hashedPassword,
-                    role: 'EMPLOYEE',
-                    employeeId: employee._id,
-                    isActive: true,
-                    isLoginApproved: true,
-                }], { session });
+            await User_js_1.User.findOneAndUpdate({ organizationId: orgId, email: employee.email }, {
+                organizationId: orgId,
+                name: employee.fullName,
+                email: employee.email,
+                password: hashedPassword,
+                role: 'EMPLOYEE',
+                employeeId: employee._id,
+                isActive: true,
+                isLoginApproved: true,
+            }, { upsert: true, session });
             // Apply lead assignment as primaryManagerId if provided
             if (leadId && mongoose_1.default.isValidObjectId(leadId)) {
                 employee.primaryManagerId = new mongoose_1.default.Types.ObjectId(leadId);
@@ -161,10 +179,7 @@ class EmployeeService {
             if (Object.keys(userUpdate).length > 0) {
                 userUpdate.employeeId = employee._id;
                 await User_js_1.User.findOneAndUpdate({
-                    $or: [
-                        { employeeId: employee._id },
-                        { email: employee.email.toLowerCase().trim() }
-                    ],
+                    employeeId: employee._id,
                     organizationId: orgId
                 }, userUpdate, { session });
             }
@@ -403,30 +418,51 @@ class EmployeeService {
         }
     }
     /**
-     * Generates the next sequential employee code for an organization.
+     * Generates a unique employee code based on organization, department, designation, and intern status.
+     * Prefix examples:
+     *   - Intern: "INT-"
+     *   - Department only: "DEP01-"
+     *   - Department + Designation: "DEP01-DSG02-"
+     *   - Default employee: "EMP-"
+     * The numeric suffix is zero‑padded to 4 digits to allow for many employees.
      */
-    static async generateNextEmployeeCode(orgId) {
-        const employees = await Employee_js_1.Employee.find({
+    static async generateEmployeeCode(orgId, departmentId, designationId, isIntern) {
+        if (isIntern) {
+            // Interns do not receive an employee code
+            return '';
+        }
+        let prefix = 'EMP-';
+        // If a department is provided, use its code (fallback to generic)
+        if (departmentId) {
+            const dept = await Department_js_1.Department.findById(departmentId).select('name');
+            const deptCode = dept?.name?.replace(/\s+/g, '').toUpperCase().slice(0, 4) || 'DEP';
+            prefix = `${deptCode}-`;
+            // If a designation is also provided, incorporate its abbreviation
+            if (designationId) {
+                const desig = await Designation_js_1.Designation.findById(designationId).select('name');
+                const desigCode = desig?.name?.replace(/\s+/g, '').toUpperCase().slice(0, 4) || 'DSG';
+                prefix = `${deptCode}-${desigCode}-`;
+            }
+        }
+        // Build a regex to find the highest existing numeric suffix for this prefix
+        const regex = new RegExp(`^${prefix}(\\d+)$`);
+        const latest = await Employee_js_1.Employee.findOne({
             organizationId: orgId,
+            employeeCode: { $regex: regex },
             $or: [{ isDeleted: true }, { isDeleted: false }, { isDeleted: { $exists: false } }]
-        }).select('employeeCode');
+        })
+            .select('employeeCode')
+            .sort({ employeeCode: -1 })
+            .limit(1);
         let maxNum = 0;
-        const prefix = 'EMP-';
-        for (const emp of employees) {
-            const code = emp.employeeCode;
-            if (!code)
-                continue;
-            // Match a suffix pattern of digits, e.g. EMP-003 -> 3 or EMP-12 -> 12
-            const match = code.match(/(\d+)$/);
+        if (latest && latest.employeeCode) {
+            const match = latest.employeeCode.match(regex);
             if (match) {
-                const num = parseInt(match[1], 10);
-                if (num > maxNum) {
-                    maxNum = num;
-                }
+                maxNum = parseInt(match[1], 10);
             }
         }
         const nextNum = maxNum + 1;
-        const padded = String(nextNum).padStart(3, '0');
+        const padded = String(nextNum).padStart(4, '0'); // 4‑digit padding for scalability
         return `${prefix}${padded}`;
     }
     /**

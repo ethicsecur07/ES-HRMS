@@ -37,7 +37,7 @@ exports.Employee = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const employeeSchema = new mongoose_1.Schema({
     organizationId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
-    employeeCode: { type: String, required: true },
+    employeeCode: { type: String, sparse: true },
     fullName: { type: String, required: true },
     email: { type: String, required: true, lowercase: true },
     phone: { type: String, required: true },

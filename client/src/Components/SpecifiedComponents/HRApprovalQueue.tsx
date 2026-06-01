@@ -175,7 +175,7 @@ export const HRApprovalQueue: React.FC = () => {
   };
 
   return (
-    <Card className="flex flex-col bg-card border border-border shadow-lg rounded-2xl p-6 h-full text-left transition-all duration-300">
+    <Card className="flex flex-col shadow-md border-l-4 border-l-primary h-full text-left transition-all duration-300">
       
       {/* Header Widget Description */}
       <div className="flex items-center justify-between pb-4 border-b border-border">
@@ -199,19 +199,19 @@ export const HRApprovalQueue: React.FC = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex bg-muted/40 p-1 rounded-xl border border-border/40 gap-1 my-4 text-xs font-bold">
+      <div className="flex bg-muted/40 p-1 rounded-xl border border-border/40 gap-1 my-4 text-xs font-bold overflow-x-auto scrollbar-none flex-nowrap w-full">
         <button
           onClick={() => { setActiveTab('feed'); setShowCreateForm(false); }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg transition-all ${
+          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'feed'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
           }`}
         >
-          <Bell className="w-3.5 h-3.5" />
-          Feed
+          <Bell className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>Feed</span>
           {announcements.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+            <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold flex-shrink-0">
               {announcements.length}
             </span>
           )}
@@ -219,16 +219,16 @@ export const HRApprovalQueue: React.FC = () => {
         
         <button
           onClick={() => { setActiveTab('meetings'); setShowCreateForm(false); }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg transition-all ${
+          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'meetings'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
           }`}
         >
-          <Calendar className="w-3.5 h-3.5" />
-          Meetings
+          <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>Meetings</span>
           {meetingsToday.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 text-[10px] font-bold">
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 text-[10px] font-bold flex-shrink-0">
               {meetingsToday.length}
             </span>
           )}
@@ -236,23 +236,23 @@ export const HRApprovalQueue: React.FC = () => {
 
         <button
           onClick={() => { setActiveTab('actions'); setShowCreateForm(false); }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg transition-all ${
+          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'actions'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
           }`}
         >
-          <ClipboardCheck className="w-3.5 h-3.5" />
-          Requests
+          <ClipboardCheck className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>Requests</span>
           {role === 'HR' || role === 'ADMIN' || role === 'MANAGER' ? (
             totalPending > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] font-bold">
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] font-bold flex-shrink-0">
                 {totalPending}
               </span>
             )
           ) : (
             totalMyApplied > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+              <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold flex-shrink-0">
                 {totalMyApplied}
               </span>
             )
@@ -261,16 +261,16 @@ export const HRApprovalQueue: React.FC = () => {
 
         <button
           onClick={() => { setActiveTab('work'); setShowCreateForm(false); }}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg transition-all ${
+          className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'work'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
           }`}
         >
-          <Briefcase className="w-3.5 h-3.5" />
-          Work
+          <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>Work</span>
           {myTasks.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 text-[10px] font-bold">
+            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 text-[10px] font-bold flex-shrink-0">
               {myTasks.length}
             </span>
           )}
@@ -278,7 +278,7 @@ export const HRApprovalQueue: React.FC = () => {
       </div>
 
       {/* Tabs Contents Container */}
-      <div className="flex-1 overflow-y-auto min-h-[360px] max-h-[500px] pr-1 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto min-h-0 pr-1 scrollbar-none">
         
         {/* ================= TAB 1: FEED ================= */}
         {activeTab === 'feed' && (
@@ -286,7 +286,7 @@ export const HRApprovalQueue: React.FC = () => {
             
             {/* Publisher Form Button (restricted to HR, MANAGER, ADMIN) */}
             {(role === 'ADMIN' || role === 'HR' || role === 'MANAGER') && (
-              <div className="border-b border-border/50 pb-3 mb-2 flex justify-between items-center">
+              <div className="border-b border-border/50 pb-3 mb-2 flex flex-wrap gap-2 justify-between items-center">
                 <span className="text-xs font-semibold text-muted-foreground">Announcements board</span>
                 <Button
                   size="sm"
@@ -324,8 +324,8 @@ export const HRApprovalQueue: React.FC = () => {
                     required
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <div className="flex flex-wrap items-center gap-3">
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                       <input
                         type="radio"
@@ -371,7 +371,7 @@ export const HRApprovalQueue: React.FC = () => {
                   const isPolicy = ann.type === 'POLICY_CHANGE';
                   return (
                     <div 
-                      key={ann._id} 
+                       key={ann._id} 
                       className={`p-4 rounded-xl border transition-all duration-200 relative group ${
                         isPolicy
                           ? 'border-indigo-500/25 bg-indigo-500/5 hover:border-indigo-500/40'
@@ -419,9 +419,9 @@ export const HRApprovalQueue: React.FC = () => {
                       </div>
 
                       {/* Publisher footer */}
-                      <div className="mt-3.5 pt-2.5 border-t border-border/50 flex items-center justify-between text-[10px] text-muted-foreground font-medium">
-                        <span>Shared by <strong className="text-foreground">{ann.createdByName}</strong> ({ann.createdByRole})</span>
-                        <span className="font-mono">{getTimeAgo(ann.createdAt)}</span>
+                      <div className="mt-3.5 pt-2.5 border-t border-border/50 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground font-medium">
+                        <span className="truncate max-w-[200px] sm:max-w-none">Shared by <strong className="text-foreground">{ann.createdByName}</strong> ({ann.createdByRole})</span>
+                        <span className="font-mono flex-shrink-0">{getTimeAgo(ann.createdAt)}</span>
                       </div>
                     </div>
                   );
@@ -450,20 +450,20 @@ export const HRApprovalQueue: React.FC = () => {
                   
                   return (
                     <div key={meeting._id} className="p-4 bg-card border border-border rounded-xl hover:border-emerald-500/35 hover:shadow-sm transition-all duration-200">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
                           <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                             {meeting.meetingType} MEETING
                           </span>
                           <h4 className="text-sm font-extrabold text-foreground mt-2 leading-tight">{meeting.title}</h4>
                           
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3 font-medium">
-                            <span className="flex items-center gap-1">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground mt-3 font-medium">
+                            <span className="flex items-center gap-1 flex-shrink-0">
                               <Clock className="w-3.5 h-3.5 text-primary" />
                               {startTime} – {endTime}
                             </span>
-                            <span>•</span>
-                            <span>Organizer: <strong className="text-foreground">{meeting.organizer}</strong></span>
+                            <span className="hidden xs:inline text-muted-foreground/60">•</span>
+                            <span className="truncate">Organizer: <strong className="text-foreground">{meeting.organizer}</strong></span>
                           </div>
                           
                           {meeting.notes && (
@@ -479,7 +479,7 @@ export const HRApprovalQueue: React.FC = () => {
                             href={meeting.teamsJoinUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex-shrink-0 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-primary rounded-lg shadow-sm shadow-primary/20 hover:bg-primary/95 transition-all"
+                            className="w-full sm:w-auto flex-shrink-0 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-primary rounded-lg shadow-sm shadow-primary/20 hover:bg-primary/95 transition-all text-center"
                           >
                             Join
                             <ExternalLink className="w-3 h-3" />
@@ -534,9 +534,9 @@ export const HRApprovalQueue: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="p-2.5 bg-muted/40 rounded-lg border border-border flex justify-between items-center text-xs">
-                          <span className="font-semibold text-muted-foreground">Duration: {item.totalDays} Day</span>
-                          <span className="font-medium text-foreground">{formatDate(item.startDate)} to {formatDate(item.endDate)}</span>
+                        <div className="p-2.5 bg-muted/40 rounded-lg border border-border flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="font-semibold text-muted-foreground flex-shrink-0">Duration: {item.totalDays} Day</span>
+                          <span className="font-medium text-foreground text-right">{formatDate(item.startDate)} to {formatDate(item.endDate)}</span>
                         </div>
 
                         {item.reason && (
@@ -589,9 +589,9 @@ export const HRApprovalQueue: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="p-2.5 bg-muted/40 rounded-lg border border-border flex justify-between items-center text-xs">
-                          <span className="font-semibold text-muted-foreground">Date:</span>
-                          <span className="font-medium text-foreground">{formatDate(item.startDate)} to {formatDate(item.endDate)} ({item.totalDays} days)</span>
+                        <div className="p-2.5 bg-muted/40 rounded-lg border border-border flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="font-semibold text-muted-foreground flex-shrink-0">Date:</span>
+                          <span className="font-medium text-foreground text-right">{formatDate(item.startDate)} to {formatDate(item.endDate)} ({item.totalDays} days)</span>
                         </div>
 
                         <div className="p-2.5 bg-primary/5 border border-primary/10 rounded-lg text-xs text-foreground space-y-1">
@@ -643,9 +643,9 @@ export const HRApprovalQueue: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="p-2.5 bg-muted/40 rounded-lg border border-border flex justify-between items-center text-xs">
-                          <span className="font-semibold text-muted-foreground">Date: {formatDate(item.date)}</span>
-                          <span className="font-medium text-foreground">{item.startTime} to {item.endTime} ({item.totalHours} hrs)</span>
+                        <div className="p-2.5 bg-muted/40 rounded-lg border border-border flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="font-semibold text-muted-foreground flex-shrink-0">Date: {formatDate(item.date)}</span>
+                          <span className="font-medium text-foreground text-right">{item.startTime} to {item.endTime} ({item.totalHours} hrs)</span>
                         </div>
 
                         {item.reason && (
@@ -697,17 +697,17 @@ export const HRApprovalQueue: React.FC = () => {
                     {myLeaves.map((l: any) => {
                       const statusColor = l.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : l.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20';
                       return (
-                        <div key={l._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex items-center justify-between text-xs hover:border-primary/20 transition-all">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-foreground">{l.leaveType}</span>
-                              <span className="text-[9px] text-muted-foreground">({l.totalDays} Days)</span>
+                        <div key={l._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex flex-col xs:flex-row gap-3 xs:items-center justify-between text-xs hover:border-primary/20 transition-all">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-foreground truncate">{l.leaveType}</span>
+                              <span className="text-[9px] text-muted-foreground flex-shrink-0">({l.totalDays} Days)</span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1.5 font-medium">{formatDate(l.startDate)} to {formatDate(l.endDate)}</p>
-                            {l.reason && <p className="text-[10px] text-muted-foreground/80 mt-1 italic">"{l.reason}"</p>}
+                            {l.reason && <p className="text-[10px] text-muted-foreground/80 mt-1 italic break-words">"{l.reason}"</p>}
                           </div>
                           
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${statusColor}`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border flex-shrink-0 w-max ${statusColor}`}>
                             {l.status}
                           </span>
                         </div>
@@ -718,17 +718,17 @@ export const HRApprovalQueue: React.FC = () => {
                     {myWFH.map((w: any) => {
                       const statusColor = w.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : w.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20';
                       return (
-                        <div key={w._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex items-center justify-between text-xs hover:border-primary/20 transition-all">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-foreground">WFH Request</span>
-                              <span className="text-[9px] text-muted-foreground">({w.totalDays} Days)</span>
+                        <div key={w._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex flex-col xs:flex-row gap-3 xs:items-center justify-between text-xs hover:border-primary/20 transition-all">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-foreground truncate">WFH Request</span>
+                              <span className="text-[9px] text-muted-foreground flex-shrink-0">({w.totalDays} Days)</span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1.5 font-medium">{formatDate(w.startDate)} to {formatDate(w.endDate)}</p>
-                            {w.reason && <p className="text-[10px] text-muted-foreground/80 mt-1 italic">"{w.reason}"</p>}
+                            {w.reason && <p className="text-[10px] text-muted-foreground/80 mt-1 italic break-words">"{w.reason}"</p>}
                           </div>
 
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${statusColor}`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border flex-shrink-0 w-max ${statusColor}`}>
                             {w.status}
                           </span>
                         </div>
@@ -739,17 +739,17 @@ export const HRApprovalQueue: React.FC = () => {
                     {myPermissions.map((p: any) => {
                       const statusColor = p.approvalStatus === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : p.approvalStatus === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20';
                       return (
-                        <div key={p._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex items-center justify-between text-xs hover:border-primary/20 transition-all">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-foreground">Permission Hours</span>
-                              <span className="text-[9px] text-muted-foreground">({p.totalHours} hrs)</span>
+                        <div key={p._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex flex-col xs:flex-row gap-3 xs:items-center justify-between text-xs hover:border-primary/20 transition-all">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-foreground truncate">Permission Hours</span>
+                              <span className="text-[9px] text-muted-foreground flex-shrink-0">({p.totalHours} hrs)</span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1.5 font-medium">{formatDate(p.date)} ({p.startTime} – {p.endTime})</p>
-                            {p.reason && <p className="text-[10px] text-muted-foreground/80 mt-1 italic">"{p.reason}"</p>}
+                            {p.reason && <p className="text-[10px] text-muted-foreground/80 mt-1 italic break-words">"{p.reason}"</p>}
                           </div>
 
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${statusColor}`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border flex-shrink-0 w-max ${statusColor}`}>
                             {p.approvalStatus}
                           </span>
                         </div>
@@ -774,12 +774,12 @@ export const HRApprovalQueue: React.FC = () => {
               ) : (
                 <div className="grid grid-cols-1 gap-2.5">
                   {myProjects.map((proj: any) => (
-                    <div key={proj._id} className="p-3.5 bg-muted/20 border border-border rounded-xl flex items-center justify-between hover:bg-muted/40 transition-colors">
-                      <div>
-                        <h5 className="text-xs font-bold text-foreground">{proj.name}</h5>
-                        <p className="text-[10px] text-muted-foreground mt-1 font-medium">Client: {proj.clientName}</p>
+                    <div key={proj._id} className="p-3.5 bg-muted/20 border border-border rounded-xl flex flex-col xs:flex-row gap-3 xs:items-center justify-between hover:bg-muted/40 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <h5 className="text-xs font-bold text-foreground truncate">{proj.name}</h5>
+                        <p className="text-[10px] text-muted-foreground mt-1 font-medium truncate">Client: {proj.clientName}</p>
                       </div>
-                      <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                      <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex-shrink-0 w-max">
                         {proj.status}
                       </span>
                     </div>
@@ -803,21 +803,21 @@ export const HRApprovalQueue: React.FC = () => {
                       : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
                     return (
                       <div key={task._id} className="p-3.5 bg-card border border-border rounded-xl hover:border-primary/20 hover:shadow-sm transition-all duration-200">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="flex items-center gap-2">
+                        <div className="flex flex-col xs:flex-row gap-3 xs:items-start justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <h5 className="text-xs font-bold text-foreground line-clamp-1">{task.title}</h5>
-                              <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-full border ${priorityColor}`}>
+                              <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-full border flex-shrink-0 ${priorityColor}`}>
                                 {task.priority}
                               </span>
                             </div>
                             
-                            <p className="text-[10px] text-muted-foreground mt-1.5 font-medium flex items-center gap-1.5">
-                              <span className="text-primary font-bold">Project:</span> {task.projectId?.name || 'Assigned'}
+                            <p className="text-[10px] text-muted-foreground mt-1.5 font-medium flex flex-wrap items-center gap-1.5">
+                              <span><span className="text-primary font-bold">Project:</span> {task.projectId?.name || 'Assigned'}</span>
                               {task.dueDate && (
                                 <>
-                                  <span>•</span>
-                                  <span className="text-rose-600 font-bold flex items-center gap-0.5">
+                                  <span className="hidden xs:inline">•</span>
+                                  <span className="text-rose-600 font-bold flex items-center gap-0.5 flex-shrink-0">
                                     Due: {task.dueDate}
                                   </span>
                                 </>
@@ -825,7 +825,7 @@ export const HRApprovalQueue: React.FC = () => {
                             </p>
                           </div>
                           
-                          <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
+                          <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 flex-shrink-0 w-max">
                             {task.status.replace('_', ' ')}
                           </span>
                         </div>
@@ -842,10 +842,10 @@ export const HRApprovalQueue: React.FC = () => {
       </div>
       
       {/* Widget Footer Links */}
-      <div className="pt-4 border-t border-border mt-4 flex items-center justify-between text-xs">
+      <div className="pt-4 border-t border-border mt-4 flex flex-wrap gap-3 items-center justify-between text-xs">
         <span className="text-muted-foreground font-medium">Automatic system sync active</span>
         <button
-          className="font-bold text-primary hover:underline flex items-center gap-0.5"
+          className="font-bold text-primary hover:underline flex items-center gap-0.5 flex-shrink-0"
           onClick={() => window.location.href = '/leave-wfh'}
         >
           View Request History

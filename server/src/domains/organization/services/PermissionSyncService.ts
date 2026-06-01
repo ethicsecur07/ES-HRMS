@@ -32,14 +32,16 @@ export class PermissionSyncService {
       let hrRole = roles.find((r) => r.code === 'HR');
       let teamLeadRole = roles.find((r) => r.code === 'TEAM_LEAD');
       let employeeRole = roles.find((r) => r.code === 'EMPLOYEE');
+      let internRole = roles.find((r) => r.code === 'INTERN');
 
-      // Ensure all 5 roles exist
+      // Ensure all 6 roles exist
       const rolesData = [
         { organizationId: orgId, name: 'System Administrator', code: 'ADMIN', slug: 'admin', description: 'Complete system dashboard management' },
         { organizationId: orgId, name: 'Operations Manager', code: 'MANAGER', slug: 'manager', description: 'Operations & Department Manager' },
         { organizationId: orgId, name: 'HR Manager', code: 'HR', slug: 'hr', description: 'Human Resource onboarding & payroll manager' },
         { organizationId: orgId, name: 'Team Lead', code: 'TEAM_LEAD', slug: 'team-lead', description: 'Team Lead for project operations' },
         { organizationId: orgId, name: 'General Employee', code: 'EMPLOYEE', slug: 'employee', description: 'Core work logs & self service' },
+        { organizationId: orgId, name: 'Intern', code: 'INTERN', slug: 'intern', description: 'Core attendance logs & task reports' },
       ];
 
       await Role.bulkWrite(
@@ -59,8 +61,9 @@ export class PermissionSyncService {
       hrRole = createdRoles.find((r) => r.code === 'HR');
       teamLeadRole = createdRoles.find((r) => r.code === 'TEAM_LEAD');
       employeeRole = createdRoles.find((r) => r.code === 'EMPLOYEE');
+      internRole = createdRoles.find((r) => r.code === 'INTERN');
 
-      if (!adminRole || !managerRole || !hrRole || !teamLeadRole || !employeeRole) {
+      if (!adminRole || !managerRole || !hrRole || !teamLeadRole || !employeeRole || !internRole) {
          throw new Error("Critical Failure: Core roles could not be provisioned.");
       }
 
@@ -93,6 +96,12 @@ export class PermissionSyncService {
         {
           updateOne: {
             filter: { _id: employeeRole._id },
+            update: { $set: { parentRoleId: internRole._id } }
+          }
+        },
+        {
+          updateOne: {
+            filter: { _id: internRole._id },
             update: { $set: { parentRoleId: null } }
           }
         }
@@ -319,6 +328,46 @@ export class PermissionSyncService {
         operations.push({
           updateOne: {
             filter: { organizationId: orgId, roleId: employeeRole._id, userId: null, module: moduleCode },
+            update: force ? {
+              $set: {
+                actions,
+                restrictedFields: [],
+                policyCondition: selfServicePolicy, 
+              },
+            } : {
+              $setOnInsert: {
+                actions,
+                restrictedFields: [],
+                policyCondition: selfServicePolicy, 
+              },
+            },
+            upsert: true,
+          }
+        });
+      }
+
+      // 6. INTERN permissions
+      for (const moduleCode of allModules) {
+        const isSelfService = employeeSelfServiceModules.includes(moduleCode);
+        const isExcluded = ['PROJECTS', 'EMPLOYEES', 'SELF_SERVICE'].includes(moduleCode);
+        
+        const actions = {
+          view: isSelfService && !isExcluded,
+          create: isSelfService && !isExcluded,
+          edit: isSelfService && !isExcluded,
+          delete: false,
+          approve: false,
+          assign: false,
+          export: false,
+        };
+
+        const selfServicePolicy = (isSelfService && !isExcluded) ? [
+          [ { attribute: "resource.employeeId", operator: "EQUALS", value: "user.employeeId" } ]
+        ] : null;
+
+        operations.push({
+          updateOne: {
+            filter: { organizationId: orgId, roleId: internRole._id, userId: null, module: moduleCode },
             update: force ? {
               $set: {
                 actions,

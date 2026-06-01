@@ -11,7 +11,16 @@ export const getNextEmployeeCode = async (req: AuthRequest, res: Response): Prom
       return;
     }
 
-    const nextCode = await EmployeeService.generateNextEmployeeCode(orgId);
+    const isIntern = req.query.isIntern === 'true';
+    const departmentId = req.query.departmentId as string || undefined;
+    const designationId = req.query.designationId as string || undefined;
+
+    const nextCode = await EmployeeService.generateEmployeeCode(
+      orgId,
+      departmentId,
+      designationId,
+      isIntern
+    );
     res.status(200).json({ nextCode });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

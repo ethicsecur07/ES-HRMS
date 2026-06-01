@@ -177,128 +177,144 @@ export const HolidayEnhancedCalendar: React.FC<HolidayEnhancedCalendarProps> = (
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [holidays, year, month]);
 
-  return (
-    <div className={`space-y-4 ${className}`}>
-      <Card className="p-5 bg-card shadow-md border border-border">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
-          <div>
-            <h4 className="font-extrabold text-base text-foreground">
-              {MONTH_NAMES[month]} {year}
-            </h4>
-            {upcomingHolidays.length > 0 && (
-              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
-                {upcomingHolidays.length} holiday{upcomingHolidays.length > 1 ? 's' : ''} this month
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={handlePrev} className="h-8 w-8 p-0">
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCalendarDate(new Date())} className="h-8 px-2 text-xs font-bold">
-              Today
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleNext} className="h-8 w-8 p-0">
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+  const renderCalendarContent = () => (
+    <>
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
+        <div>
+          <h4 className="font-extrabold text-base text-foreground">
+            {MONTH_NAMES[month]} {year}
+          </h4>
+          {upcomingHolidays.length > 0 && (
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+              {upcomingHolidays.length} holiday{upcomingHolidays.length > 1 ? 's' : ''} this month
+            </p>
+          )}
         </div>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={handlePrev} className="h-8 w-8 p-0">
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCalendarDate(new Date())} className="h-8 px-2 text-xs font-bold">
+            Today
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleNext} className="h-8 w-8 p-0">
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
 
-        {/* ── Day labels ── */}
-        <div className="grid grid-cols-7 text-center mb-1">
-          {DAY_LABELS.map((d, i) => (
-            <div
-              key={d}
-              className={`text-[10px] font-bold uppercase tracking-wider py-1 ${
-                !activeWorkdays.includes(d) ? 'text-rose-400 dark:text-rose-500' : 'text-muted-foreground'
-              }`}
+      {/* ── Day labels ── */}
+      <div className="grid grid-cols-7 text-center mb-1">
+        {DAY_LABELS.map((d, i) => (
+          <div
+            key={d}
+            className={`text-[10px] font-bold uppercase tracking-wider py-1 ${
+              !activeWorkdays.includes(d) ? 'text-rose-400 dark:text-rose-500' : 'text-muted-foreground'
+            }`}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Days grid ── */}
+      <div className="grid grid-cols-7 gap-1">
+        {calendarCells.map((cell, idx) => {
+          const colIndex = idx % 7;
+          const events   = getEventsForDate(cell.dateStr);
+          const isSelected = cell.dateStr === selectedDate;
+          const isToday    = cell.dateStr === todayStr;
+          const isWeekend  = !activeWorkdays.includes(DAY_LABELS[colIndex]);
+          const holiday    = holidayMap[cell.dateStr];
+
+          return (
+            <button
+              key={idx}
+              onClick={() => handleSelect(cell.dateStr)}
+              disabled={!cell.isCurrentMonth}
+              className={`
+                relative flex flex-col items-center justify-start pt-1 pb-1 px-0.5
+                rounded-xl border transition-all duration-150 text-xs min-h-[48px]
+                ${getCellBg(cell, colIndex)}
+                ${isSelected ? 'ring-2 ring-primary border-primary' : ''}
+                ${isToday && !isSelected ? 'ring-1 ring-primary/50' : ''}
+                ${!cell.isCurrentMonth ? 'opacity-25 cursor-default' : 'cursor-pointer'}
+              `}
             >
-              {d}
-            </div>
-          ))}
-        </div>
+              {/* Day number */}
+              <span className={`
+                text-[11px] font-bold leading-none mb-0.5
+                ${isToday ? 'bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-[10px]' : ''}
+                ${holiday && !isToday ? 'text-emerald-700 dark:text-emerald-400' : ''}
+                ${isWeekend && !holiday && !isToday ? 'text-rose-400 dark:text-rose-500' : ''}
+                ${!holiday && !isWeekend && !isToday ? 'text-foreground' : ''}
+              `}>
+                {cell.dayNum}
+              </span>
 
-        {/* ── Days grid ── */}
-        <div className="grid grid-cols-7 gap-1">
-          {calendarCells.map((cell, idx) => {
-            const colIndex = idx % 7;
-            const events   = getEventsForDate(cell.dateStr);
-            const isSelected = cell.dateStr === selectedDate;
-            const isToday    = cell.dateStr === todayStr;
-            const isWeekend  = !activeWorkdays.includes(DAY_LABELS[colIndex]);
-            const holiday    = holidayMap[cell.dateStr];
+              {/* Event dots */}
+              <div className="flex flex-wrap justify-center gap-0.5 mt-auto">
+                {events.leaves.length > 0 && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 flex-shrink-0" title="Leave" />
+                )}
+                {events.wfh.length > 0 && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500 flex-shrink-0" title="WFH" />
+                )}
+                {events.perms.length > 0 && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Permission" />
+                )}
+                {holiday && (
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                      holiday.isRestricted ? 'bg-orange-500' : 'bg-emerald-500'
+                    }`}
+                    title={holiday.name}
+                  />
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
-            return (
-              <button
-                key={idx}
-                onClick={() => handleSelect(cell.dateStr)}
-                disabled={!cell.isCurrentMonth}
-                className={`
-                  relative flex flex-col items-center justify-start pt-1 pb-1 px-0.5
-                  rounded-xl border transition-all duration-150 text-xs min-h-[48px]
-                  ${getCellBg(cell, colIndex)}
-                  ${isSelected ? 'ring-2 ring-primary border-primary' : ''}
-                  ${isToday && !isSelected ? 'ring-1 ring-primary/50' : ''}
-                  ${!cell.isCurrentMonth ? 'opacity-25 cursor-default' : 'cursor-pointer'}
-                `}
-              >
-                {/* Day number */}
-                <span className={`
-                  text-[11px] font-bold leading-none mb-0.5
-                  ${isToday ? 'bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-[10px]' : ''}
-                  ${holiday && !isToday ? 'text-emerald-700 dark:text-emerald-400' : ''}
-                  ${isWeekend && !holiday && !isToday ? 'text-rose-400 dark:text-rose-500' : ''}
-                  ${!holiday && !isWeekend && !isToday ? 'text-foreground' : ''}
-                `}>
-                  {cell.dayNum}
-                </span>
+      {/* ── Legend ── */}
+      <div className="mt-4 pt-3 border-t border-border flex flex-wrap gap-x-4 gap-y-1.5">
+        {[
+          { color: 'bg-rose-500',   label: 'Leave' },
+          { color: 'bg-blue-500',   label: 'WFH' },
+          { color: 'bg-amber-500',  label: 'Permission' },
+          { color: 'bg-emerald-500',label: 'Public Holiday' },
+          { color: 'bg-orange-500', label: 'Restricted Holiday' },
+        ].map(({ color, label }) => (
+          <span key={label} className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+            <span className={`h-2 w-2 rounded-full ${color} flex-shrink-0`} />
+            {label}
+          </span>
+        ))}
+      </div>
+    </>
+  );
 
-                {/* Event dots */}
-                <div className="flex flex-wrap justify-center gap-0.5 mt-auto">
-                  {events.leaves.length > 0 && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500 flex-shrink-0" title="Leave" />
-                  )}
-                  {events.wfh.length > 0 && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 flex-shrink-0" title="WFH" />
-                  )}
-                  {events.perms.length > 0 && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Permission" />
-                  )}
-                  {holiday && (
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
-                        holiday.isRestricted ? 'bg-orange-500' : 'bg-emerald-500'
-                      }`}
-                      title={holiday.name}
-                    />
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+  if (compact) {
+    return (
+      <Card className={`shadow-md ${className}`}>
+        {renderCalendarContent()}
+      </Card>
+    );
+  }
 
-        {/* ── Legend ── */}
-        <div className="mt-4 pt-3 border-t border-border flex flex-wrap gap-x-4 gap-y-1.5">
-          {[
-            { color: 'bg-rose-500',   label: 'Leave' },
-            { color: 'bg-blue-500',   label: 'WFH' },
-            { color: 'bg-amber-500',  label: 'Permission' },
-            { color: 'bg-emerald-500',label: 'Public Holiday' },
-            { color: 'bg-orange-500', label: 'Restricted Holiday' },
-          ].map(({ color, label }) => (
-            <span key={label} className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
-              <span className={`h-2 w-2 rounded-full ${color} flex-shrink-0`} />
-              {label}
-            </span>
-          ))}
-        </div>
+  return (
+    <div className={`grid grid-cols-1 lg:grid-cols-10 gap-6 items-start w-full ${className}`}>
+      {/* ── Left Column: Main Calendar (70% width) ── */}
+      <Card className="lg:col-span-7 shadow-md">
+        {renderCalendarContent()}
       </Card>
 
-      {/* ── Selected date detail panel ── */}
-      {!compact && (
-        <Card className="p-4 bg-muted/30 border border-border space-y-3">
+      {/* ── Right Column: Selected date detail + Holidays (30% width) ── */}
+      <div className="lg:col-span-3 space-y-4 flex flex-col h-full">
+        {/* Selected date detail panel */}
+        <Card className="p-4 shadow-md bg-muted/30 space-y-3">
           <h5 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border/60 pb-2">
             <Calendar className="w-3.5 h-3.5 text-primary" />
             {formatDate(selectedDate)}
@@ -392,28 +408,30 @@ export const HolidayEnhancedCalendar: React.FC<HolidayEnhancedCalendarProps> = (
             </div>
           )}
         </Card>
-      )}
 
-      {/* ── Upcoming holidays list for this month ── */}
-      {!compact && upcomingHolidays.length > 0 && (
-        <Card className="p-4 border border-emerald-200/50 dark:border-emerald-800/30 bg-emerald-500/5">
-          <h5 className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+        {/* Upcoming holidays list for this month */}
+        <Card className="p-4 shadow-md border-emerald-200/50 dark:border-emerald-800/30 bg-emerald-500/5">
+          <h5 className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 mb-3 border-b border-emerald-200/30 pb-2">
             <Info className="w-3.5 h-3.5" />
             Holidays in {MONTH_NAMES[month]}
           </h5>
-          <div className="space-y-2">
-            {upcomingHolidays.map(h => (
-              <div key={h._id} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full flex-shrink-0 ${h.isRestricted ? 'bg-orange-500' : 'bg-emerald-500'}`} />
-                  <span className="font-semibold text-foreground">{h.name}</span>
+          {upcomingHolidays.length > 0 ? (
+            <div className="space-y-2">
+              {upcomingHolidays.map(h => (
+                <div key={h._id} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full flex-shrink-0 ${h.isRestricted ? 'bg-orange-500' : 'bg-emerald-500'}`} />
+                    <span className="font-semibold text-foreground">{h.name}</span>
+                  </div>
+                  <span className="font-mono text-muted-foreground text-[10px]">{formatDate(h.date)}</span>
                 </div>
-                <span className="font-mono text-muted-foreground text-[10px]">{formatDate(h.date)}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic py-1">No holidays listed this month.</p>
+          )}
         </Card>
-      )}
+      </div>
     </div>
   );
 };
