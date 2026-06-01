@@ -160,19 +160,27 @@ export const Layout: React.FC = () => {
     if (!socket) return;
 
     const handleUnload = () => {
-      // 1. Send hard offline event over socket (best effort)
-      try { socket.emit('user_offline_hard'); } catch (_) {}
+      /**
+       * Build the API base URL the same way axiosInstance does —
+       * fall back to window.location.hostname so Device B on the LAN
+       * still reaches the correct server, not its own localhost.
+       */
+      const getApiBaseUrl = () => {
+        const envApiUrl = import.meta.env.VITE_API_URL;
+        if (envApiUrl && !envApiUrl.includes('localhost')) return envApiUrl;
+        return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+      };
+      const apiBase = getApiBaseUrl();
 
-      // 2. Send fetch with keepalive: true to ensure the server gets the offline signal even if the socket closes first
+      // 1. sendBeacon — most reliable on tab/browser close (fire-and-forget,
+      //    survives page destruction, works cross-device).
+      //    We encode the auth header as a URL param because Beacon can't set headers.
+      //    The server endpoint reads from Authorization header; use fetch+keepalive
+      //    as the primary and Beacon as secondary.
       if (token) {
-        const getApiUrl = () => {
-          const envApiUrl = import.meta.env.VITE_API_URL;
-          if (envApiUrl) return envApiUrl;
-          return `${window.location.protocol}//${window.location.hostname}:5000/api`;
-        };
-        const apiUrl = getApiUrl();
+        // Primary: keepalive fetch (carries Authorization header properly)
         try {
-          fetch(`${apiUrl}/chat/offline-hard`, {
+          fetch(`${apiBase}/chat/offline-hard`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -181,7 +189,16 @@ export const Layout: React.FC = () => {
             keepalive: true
           });
         } catch (_) {}
+
+        // Secondary: sendBeacon fallback (no headers, so we pass token as query param)
+        // The server should accept ?token= as well for beacon requests
+        try {
+          navigator.sendBeacon(`${apiBase}/chat/offline-hard?token=${encodeURIComponent(token)}`);
+        } catch (_) {}
       }
+
+      // 2. Best-effort socket signal
+      try { socket.emit('user_offline_hard'); } catch (_) {}
 
       // 3. Disconnect socket
       socket.disconnect();

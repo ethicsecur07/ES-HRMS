@@ -77,12 +77,13 @@ export const useAuthStore = create<AuthState>()(
         }),
 
       logout: () => {
-        // Clear offline status first via API
+        // Clear offline status first via API — use hostname-based URL so Device B
+        // on the LAN hits the server, not its own localhost.
         const token = get().token;
         if (token) {
           const getApiUrl = () => {
             const envApiUrl = import.meta.env.VITE_API_URL;
-            if (envApiUrl) return envApiUrl;
+            if (envApiUrl && !envApiUrl.includes('localhost')) return envApiUrl;
             return `${window.location.protocol}//${window.location.hostname}:5000/api`;
           };
           const apiUrl = getApiUrl();

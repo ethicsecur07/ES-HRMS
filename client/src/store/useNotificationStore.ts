@@ -85,11 +85,22 @@ export const useNotificationStore = create<NotificationState>()(
           return;
         }
 
+        /**
+         * getSocketUrl — mirrors the same logic as axiosInstance.getBaseUrl() so
+         * Device B on the LAN correctly points to the server machine's IP rather
+         * than its own localhost.
+         *
+         * Priority:
+         *   1. VITE_API_URL set to a real host (prod/staging) → strip "/api"
+         *   2. Fallback → use window.location.hostname (works cross-device)
+         */
         const getSocketUrl = () => {
           const envApiUrl = import.meta.env.VITE_API_URL;
           if (envApiUrl && !envApiUrl.includes('localhost')) {
-            return envApiUrl.replace('/api', '');
+            return envApiUrl.replace('/api', '').replace(/\/$/, '');
           }
+          // Use the actual hostname the browser used — resolves correctly from
+          // any device that can reach this Vite dev server.
           return `${window.location.protocol}//${window.location.hostname}:5000`;
         };
 
@@ -112,6 +123,7 @@ export const useNotificationStore = create<NotificationState>()(
 
         socket.on('connect', () => {
           console.log('[Socket] Connected to EthicSec real-time server:', socket.id);
+
         });
 
         socket.on('disconnect', (reason) => {
