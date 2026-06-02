@@ -11,6 +11,7 @@ import { Announcement } from '../models/Announcement.js';
 import { AuthRequest } from '../types/index.js';
 import { createAuditLog } from '../services/auditLog.service.js';
 import { logger } from '../utils/logger.js';
+import { LeaveBalanceService } from '../domains/leave-engine/services/LeaveBalanceService.js';
 
 const VALID_LEAVE_TYPES = [
   'Casual Leave',
@@ -71,6 +72,7 @@ export const createPolicy = async (req: AuthRequest, res: Response): Promise<voi
       applicableGender,
       probationExempt,
       permissionAutoConvert,
+      applicableTo,
     } = req.body;
 
     if (!leaveType || monthlyAllowance === undefined) {
@@ -101,8 +103,12 @@ export const createPolicy = async (req: AuthRequest, res: Response): Promise<voi
       applicableGender: applicableGender ?? 'All',
       probationExempt: probationExempt ?? false,
       permissionAutoConvert: permissionAutoConvert ?? false,
+      applicableTo: applicableTo ?? 'ALL',
       isActive: true,
     });
+
+    // Sync newly created policy with LeaveBalances for employees immediately
+    await LeaveBalanceService.syncBalancesForPolicy(policy);
 
     await createAuditLog(
       'LEAVE_POLICY_CREATED',
@@ -164,7 +170,7 @@ export const updatePolicy = async (req: AuthRequest, res: Response): Promise<voi
       'sandwichLeaveRule', 'holidayOverlapRule', 'latePenaltyCount',
       'permissionConversionHours', 'halfDayEnabled', 'advanceNoticeDays',
       'maxConsecutiveDays', 'applicableGender', 'probationExempt',
-      'permissionAutoConvert', 'isActive',
+      'permissionAutoConvert', 'applicableTo', 'isActive',
     ];
 
     for (const field of updatableFields) {
@@ -188,6 +194,9 @@ export const updatePolicy = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     await policy.save();
+
+    // Trigger dynamic synchronization of LeaveBalance records across matching employees
+    await LeaveBalanceService.syncBalancesForPolicy(policy);
 
     await createAuditLog(
       'LEAVE_POLICY_UPDATED',
@@ -241,6 +250,9 @@ export const togglePolicyStatus = async (req: AuthRequest, res: Response): Promi
 
     policy.isActive = !policy.isActive;
     await policy.save();
+
+    // Trigger dynamic synchronization of LeaveBalance records across matching employees
+    await LeaveBalanceService.syncBalancesForPolicy(policy);
 
     await createAuditLog(
       'LEAVE_POLICY_TOGGLE',

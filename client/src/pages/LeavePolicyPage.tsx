@@ -89,6 +89,16 @@ const PolicyForm: React.FC<PolicyFormProps> = ({ policy, onChange }) => {
           value={policy.monthlyAllowance ?? 0}
           onChange={(e) => set('monthlyAllowance', parseFloat(e.target.value))}
         />
+        <Select
+          label="Applicable User Group"
+          value={policy.applicableTo ?? 'ALL'}
+          onChange={(e) => set('applicableTo', e.target.value)}
+          options={[
+            { value: 'ALL', label: 'All Employees & Interns' },
+            { value: 'EMPLOYEE', label: 'General Employees Only' },
+            { value: 'INTERN', label: 'Interns Only' },
+          ]}
+        />
         <Input
           label="Advance Notice (days)"
           type="number"
@@ -564,9 +574,20 @@ export const LeavePolicyPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className={meta.color}>{meta.icon}</span>
                         <div>
-                          <p className="font-black text-sm text-foreground">{policy.leaveType}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono">{policy.monthlyAllowance} {policy.leaveType === 'Permission' ? 'hrs' : 'days'}/month</p>
-                        </div>
+                           <p className="font-black text-sm text-foreground">{policy.leaveType}</p>
+                           <p className="text-[10px] text-muted-foreground font-mono flex items-center gap-1.5 mt-0.5">
+                             <span>{policy.monthlyAllowance} {policy.leaveType === 'Permission' ? 'hrs' : 'days'}/month</span>
+                             <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${
+                               policy.applicableTo === 'INTERN' 
+                                 ? 'bg-teal-500/10 text-teal-600 border-teal-500/20' 
+                                 : policy.applicableTo === 'EMPLOYEE'
+                                   ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                   : 'bg-muted text-muted-foreground border-border'
+                             }`}>
+                               {policy.applicableTo || 'ALL'}
+                             </span>
+                           </p>
+                         </div>
                       </div>
                       <div className="flex items-center gap-1">
                         {hasPermission('LEAVE_POLICY', 'edit') && (

@@ -10,6 +10,7 @@ import { LeavePolicy, ILeavePolicy } from '../../../models/LeavePolicy.js';
 import { LeaveBalance } from '../../../models/LeaveBalance.js';
 import { HolidayCalendar } from '../../../models/HolidayCalendar.js';
 import { Organization } from '../../../models/Organization.js';
+import { Employee } from '../../../models/Employee.js';
 
 export interface PolicyViolation {
   code: string;
@@ -34,16 +35,21 @@ export interface BalanceCheckResult {
 }
 
 export class LeavePolicyEngine {
-  /**
-   * Load policy for a given leave type and organization.
-   * Throws if policy not found or inactive.
-   */
-  static async getPolicy(organizationId: string, leaveType: string): Promise<ILeavePolicy> {
-    const policy = await LeavePolicy.findOne({
+  static async getPolicy(organizationId: string, leaveType: string, isIntern = false): Promise<ILeavePolicy> {
+    let policy = await LeavePolicy.findOne({
       organizationId,
       leaveType,
       isActive: true,
+      applicableTo: isIntern ? 'INTERN' : 'EMPLOYEE'
     });
+    if (!policy) {
+      policy = await LeavePolicy.findOne({
+        organizationId,
+        leaveType,
+        isActive: true,
+        applicableTo: 'ALL'
+      });
+    }
     if (!policy) {
       throw new Error(`No active leave policy found for type '${leaveType}' in this organization.`);
     }
@@ -86,10 +92,18 @@ export class LeavePolicyEngine {
     organizationId: string,
     leaveType: string,
     startDate: string,
-    endDate: string
+    endDate: string,
+    employeeId?: string
   ): Promise<DateCalculationResult> {
-    // Load policy and org settings
-    const policy = await LeavePolicy.findOne({ organizationId, leaveType, isActive: true });
+    // Check if the employee is an intern
+    let isIntern = false;
+    if (employeeId) {
+      const employee = await Employee.findById(employeeId);
+      isIntern = !!(employee?.isIntern || employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
+    }
+
+    // Load policy and org settings using getPolicy helper
+    const policy = await this.getPolicy(organizationId, leaveType, isIntern).catch(() => null);
     const org = await Organization.findById(organizationId);
     const activeWorkdays = org?.settings?.activeWorkdays ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     const sandwichApplies = policy?.sandwichLeaveRule ?? false;
@@ -177,7 +191,10 @@ export class LeavePolicyEngine {
     }
 
     // 2. Policy check
-    const policy = await LeavePolicy.findOne({ organizationId, leaveType, isActive: true });
+    const employee = await Employee.findById(employeeId);
+    const isIntern = !!(employee?.isIntern || employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
+    const policy = await this.getPolicy(organizationId, leaveType, isIntern).catch(() => null);
+
     if (!policy) {
       violations.push({ code: 'NO_POLICY', message: `No active policy found for leave type '${leaveType}'.` });
       return violations;
@@ -217,11 +234,9 @@ export class LeavePolicyEngine {
     employeeId: string,
     requestedHours: number
   ): Promise<{ allowed: boolean; usedHours: number; limitHours: number; remainingHours: number }> {
-    const policy = await LeavePolicy.findOne({
-      organizationId,
-      leaveType: 'Permission',
-      isActive: true,
-    });
+    const employee = await Employee.findById(employeeId);
+    const isIntern = !!(employee?.isIntern || employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
+    const policy = await this.getPolicy(organizationId, 'Permission', isIntern).catch(() => null);
 
     // Fallback to org settings, then hardcoded default
     const org = await Organization.findById(organizationId);

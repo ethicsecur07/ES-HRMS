@@ -22,6 +22,16 @@ import { PasswordService } from '../domains/auth-engine/services/PasswordService
 
 export const seedDatabase = async (): Promise<void> => {
   try {
+    // Programmatically drop legacy single-field unique index on leavepolicies if it exists
+    try {
+      if (mongoose.connection.db) {
+        await mongoose.connection.db.collection('leavepolicies').dropIndex('organizationId_1_leaveType_1');
+        logger.info('Dropped legacy unique index organizationId_1_leaveType_1 from leavepolicies collection.');
+      }
+    } catch (_) {
+      // Index might not exist, ignore
+    }
+
     const orgId = new mongoose.Types.ObjectId('605c72ef1f77bcf86cd79000');
     const adminExists = await User.findOne({ email: /official@ethicsecur\.co\.in/i, organizationId: orgId });
 
@@ -60,6 +70,26 @@ export const seedDatabase = async (): Promise<void> => {
       if (!teamLeadExists) {
         await User.create({ _id: new mongoose.Types.ObjectId('605c72ef1f77bcf86cd79505'), organizationId: orgId, name: 'Karthik', email: 'karthik@ethicsecur.com', password: await PasswordService.hashPassword('EthicSec@2026'), role: ROLES.TEAM_LEAD, isActive: true });
         logger.info('Seeded missing Team Lead user.');
+      }
+
+      // Ensure default leave policies exist for both EMPLOYEE and INTERN groups
+      const policyCount = await LeavePolicy.countDocuments({ organizationId: orgId });
+      if (policyCount < 8 || !await LeavePolicy.findOne({ organizationId: orgId, applicableTo: 'INTERN' })) {
+        logger.info('Leave policies missing or incomplete in already-seeded database. Seeding...');
+        const leavePoliciesData = [
+          { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 2, carryForward: true, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+          { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+          { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+          { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 3, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+          
+          { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 0, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+          { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+          { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+          { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 2, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+        ];
+        await LeavePolicy.deleteMany({ organizationId: orgId });
+        await LeavePolicy.insertMany(leavePoliciesData);
+        logger.info('✅ Successfully seeded/re-seeded default leave policies.');
       }
 
       await seedOfferTemplate(orgId);
@@ -137,13 +167,18 @@ export const seedDatabase = async (): Promise<void> => {
 
     // 5. Seed Leave Policies
     const leavePoliciesData = [
-      { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 2, carryForward: true, latePenaltyCount: 3 },
-      { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3 },
-      { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3 },
-      { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 3, carryForward: false, latePenaltyCount: 3 },
+      { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 2, carryForward: true, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+      { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+      { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+      { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 3, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+      
+      { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 0, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+      { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+      { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+      { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 2, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
     ];
     await LeavePolicy.insertMany(leavePoliciesData);
-    logger.info('✅ Seeded Organization Leave Policies.');
+    logger.info('✅ Seeded Organization Employee & Intern Leave Policies.');
 
     // Note: Employee records are populated exclusively via Microsoft Directory Sync.
     // No static employee seed data is inserted — use the 'Sync Microsoft' button in the Employee Directory.

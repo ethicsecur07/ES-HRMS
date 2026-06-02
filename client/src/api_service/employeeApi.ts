@@ -56,4 +56,9 @@ export const employeeApi = {
     }>('/employees/sync-microsoft');
     return response.data;
   },
+
+  approveIntern: async (id: string, rating: number, notes: string) => {
+    const response = await axiosInstance.patch<{ employee: Employee; message: string }>(`/employees/${id}/approve-intern`, { rating, notes });
+    return response.data;
+  },
 };

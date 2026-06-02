@@ -36,6 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   COMPLETED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   CANCELLED: 'bg-red-500/10 text-red-400 border-red-500/20',
+  ENDED: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -213,11 +214,17 @@ export const MeetingsPage: React.FC = () => {
             const isCreator = isCurrentUserCreator(meeting);
             const canCancel = isCreator || isAdmin;
             const secureJoinUrl = `${getApiBase()}/api/meetings/join/${meeting._id}`;
+            const isEnded = meeting.status === 'COMPLETED' || (meeting.status === 'SCHEDULED' && new Date(meeting.endDateTime) < new Date());
+            const displayStatus = meeting.status === 'SCHEDULED' && isEnded ? 'ENDED' : meeting.status;
 
             return (
               <div
                 key={meeting._id}
-                className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 text-left group relative"
+                className={`bg-card border rounded-2xl p-5 shadow-sm transition-all duration-200 text-left group relative ${
+                  isEnded || meeting.status === 'CANCELLED'
+                    ? 'border-border/60 opacity-65'
+                    : 'border-border hover:shadow-md hover:border-primary/20'
+                }`}
               >
                 {/* Organizer badge */}
                 {isCreator && (
@@ -229,16 +236,20 @@ export const MeetingsPage: React.FC = () => {
                 {/* Card Header */}
                 <div className="flex items-start mb-3">
                   <div className="flex-1 min-w-0 pr-16">
-                    <h3 className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                    <h3 className={`text-sm font-bold truncate transition-colors ${
+                      isEnded || meeting.status === 'CANCELLED' 
+                        ? 'text-muted-foreground' 
+                        : 'text-foreground group-hover:text-primary'
+                    }`}>
                       {meeting.title}
                     </h3>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full border ${TYPE_COLORS[meeting.meetingType] || ''}`}>
                         {TYPE_LABELS[meeting.meetingType] || meeting.meetingType}
                       </span>
-                      <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full border ${STATUS_COLORS[meeting.status] || ''}`}>
-                        {meeting.status === 'SCHEDULED' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-1 animate-pulse" />}
-                        {meeting.status}
+                      <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full border ${STATUS_COLORS[displayStatus] || ''}`}>
+                        {displayStatus === 'SCHEDULED' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-1 animate-pulse" />}
+                        {displayStatus}
                       </span>
                     </div>
                   </div>
@@ -304,7 +315,7 @@ export const MeetingsPage: React.FC = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 pt-3 border-t border-border flex-wrap">
-                  {meeting.status === 'SCHEDULED' && (
+                  {meeting.status === 'SCHEDULED' && !isEnded && (
                     <a
                       href={secureJoinUrl}
                       target="_blank"
@@ -322,7 +333,7 @@ export const MeetingsPage: React.FC = () => {
                     <Copy className="w-3 h-3" /> Copy
                   </button>
 
-                  {meeting.status === 'SCHEDULED' && canCancel && (
+                  {meeting.status === 'SCHEDULED' && !isEnded && canCancel && (
                     <button
                       onClick={() => {
                         if (confirm('Cancel this meeting? All attendees will be notified by email.')) {
@@ -337,7 +348,7 @@ export const MeetingsPage: React.FC = () => {
                     </button>
                   )}
 
-                  {meeting.status === 'SCHEDULED' && !canCancel && (
+                  {meeting.status === 'SCHEDULED' && !isEnded && !canCancel && (
                     <span
                       className="flex items-center gap-1 text-xs text-muted-foreground/40 ml-auto font-medium cursor-default"
                       title="Only the meeting organizer or an admin can cancel"
@@ -346,9 +357,11 @@ export const MeetingsPage: React.FC = () => {
                     </span>
                   )}
 
-                  {meeting.status === 'COMPLETED' && (
-                    <span className="flex items-center gap-1 text-xs text-emerald-500 font-semibold ml-auto">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Completed
+                  {isEnded && (
+                    <span className={`flex items-center gap-1 text-xs font-semibold ml-auto ${
+                      meeting.status === 'COMPLETED' ? 'text-emerald-500' : 'text-zinc-500'
+                    }`}>
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {meeting.status === 'COMPLETED' ? 'Completed' : 'Ended'}
                     </span>
                   )}
                 </div>

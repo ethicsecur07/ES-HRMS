@@ -24,7 +24,7 @@ import { logger } from '../utils/logger.js';
 
 async function resolveEmployeeId(req: AuthRequest): Promise<string | null> {
   if (!req.user) return null;
-  if (req.user.role !== 'EMPLOYEE') return req.body.employeeId || null;
+  if (req.user.role !== 'EMPLOYEE' && req.user.role !== 'INTERN') return req.body.employeeId || null;
 
   const user = await User.findOne({ _id: req.user.id, organizationId: req.user.organizationId });
   if (user?.employeeId) return user.employeeId.toString();
@@ -61,6 +61,11 @@ export const applyWFH = async (req: AuthRequest, res: Response): Promise<void> =
     const employee = await Employee.findOne({ _id: employeeId, organizationId: orgId });
     if (!employee) {
       res.status(400).json({ message: 'Employee not found in this organization.' });
+      return;
+    }
+
+    if (employee.isIntern || req.user?.role === 'INTERN') {
+      res.status(403).json({ message: 'Interns are not allowed to request WFH.' });
       return;
     }
 

@@ -76,14 +76,25 @@ export class EmployeeService {
         employeeData.email = normalizedEmail;
       }
 
+      const isInternRole = employeeData.isIntern !== undefined
+        ? !!employeeData.isIntern
+        : !!(employeeData.designation?.toLowerCase().includes('intern') || employeeData.department?.toLowerCase().includes('intern') || employeeData.departmentId === '605c72ef1f77bcf86cd79777'); // Fallback department checks
+
       // 3. Create Employee record
       const [employee] = await Employee.create([{
         ...employeeData,
         isActive: true,
         organizationId: orgId,
+        isIntern: isInternRole,
+        ...(isInternRole ? {
+          internshipDurationMonths: 6,
+          internshipUnpaidMonths: 3,
+          internshipPaidMonths: 3,
+          internshipStatus: 'UNPAID',
+          internshipPerformanceApproved: false,
+        } : {}),
       }], { session });
 
-      const isInternRole = (employee.designation?.toLowerCase().includes('intern') || employee.department?.toLowerCase().includes('intern'));
       await User.findOneAndUpdate(
         { organizationId: orgId, email: employee.email },
         {
@@ -467,13 +478,13 @@ export class EmployeeService {
       }
 
       // 1. Soft-delete the Employee (this updates isDeleted and deletedAt)
-      await (employee as any).softDelete();
+      await (employee as any).softDelete({ session });
 
       // 2. Revoke User login (soft-delete the user if it supports it, otherwise deactivate)
       const user = await User.findOne({ employeeId: employee._id, organizationId: orgId }).session(session);
       if (user) {
         if (typeof (user as any).softDelete === 'function') {
-          await (user as any).softDelete();
+          await (user as any).softDelete({ session });
         } else {
           user.isActive = false;
           await user.save({ session });
@@ -818,4 +829,41 @@ export class EmployeeService {
       errors
     };
   }
+
+  /**
+   * Approves paid internship phase for an intern based on performance.
+   */
+  static async approveInternPerformance(
+    id: string,
+    rating: number,
+    notes: string,
+    orgId: mongoose.Types.ObjectId | string,
+    emailForAudit: string
+  ) {
+    const employee = await Employee.findOne({ _id: id, organizationId: orgId });
+    if (!employee) {
+      throw new Error('Intern not found or unauthorized.');
+    }
+    if (!employee.isIntern) {
+      throw new Error('This employee is not registered as an Intern.');
+    }
+
+    employee.internshipPerformanceApproved = true;
+    employee.internshipPerformanceRating = rating;
+    employee.internshipPerformanceReviewNotes = notes;
+    employee.internshipStatus = 'PAID';
+    await employee.save();
+
+    await createAuditLog(
+      'INTERN_PERFORMANCE_APPROVED',
+      emailForAudit,
+      'EMPLOYEE',
+      employee.employeeCode,
+      `Approved paid phase for intern ${employee.fullName}. Rating: ${rating}/5`,
+      orgId
+    );
+
+    return employee;
+  }
 }
+

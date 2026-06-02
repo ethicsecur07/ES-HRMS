@@ -99,6 +99,14 @@ export interface Employee {
   bankDetails?: BankDetails;
   taxDetails?: TaxDetails;
   isLoginApproved?: boolean;
+  isIntern?: boolean;
+  internshipDurationMonths?: number;
+  internshipUnpaidMonths?: number;
+  internshipPaidMonths?: number;
+  internshipStatus?: 'UNPAID' | 'PAID' | 'COMPLETED' | 'TERMINATED';
+  internshipPerformanceApproved?: boolean;
+  internshipPerformanceRating?: number;
+  internshipPerformanceReviewNotes?: string;
 }
 
 export interface Attendance {

@@ -137,6 +137,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     }));
 
   const filteredItems = compiledItems.filter((item) => {
+    if (role === 'INTERN') {
+      const allowedInternModules = ['DASHBOARD', 'ATTENDANCE', 'DOCUMENTS', 'CHAT', 'NOTIFICATIONS'];
+      return allowedInternModules.includes(item.moduleCode) && hasPermission(item.moduleCode, 'view');
+    }
     if (item.moduleCode === 'PAYROLL') {
       return role === 'ADMIN' || role === 'HR';
     }

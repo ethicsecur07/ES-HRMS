@@ -284,3 +284,34 @@ export const syncMicrosoftEmployees = async (req: AuthRequest, res: Response): P
     res.status(500).json({ message: error.message });
   }
 };
+
+export const approveInternPerformance = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { rating, notes } = req.body;
+    const orgId = req.user?.organizationId;
+    const emailForAudit = req.user?.email || 'System';
+    const role = req.user?.role;
+
+    if (role !== 'ADMIN' && role !== 'HR') {
+      res.status(403).json({ message: 'Forbidden. Only HR and Admins can approve intern paid phase.' });
+      return;
+    }
+
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
+      return;
+    }
+
+    if (!rating) {
+      res.status(400).json({ message: 'Performance rating is required.' });
+      return;
+    }
+
+    const employee = await EmployeeService.approveInternPerformance(id, Number(rating), notes || '', orgId, emailForAudit);
+    res.status(200).json({ employee, message: 'Intern paid phase approved successfully.' });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+

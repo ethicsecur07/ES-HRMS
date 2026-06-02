@@ -25,6 +25,7 @@ export interface ILeavePolicy extends Document {
   applicableGender: 'All' | 'Male' | 'Female';
   probationExempt: boolean;
   permissionAutoConvert: boolean;
+  applicableTo?: 'ALL' | 'EMPLOYEE' | 'INTERN';
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -60,11 +61,12 @@ const leavePolicySchema = new Schema<ILeavePolicy>(
     applicableGender: { type: String, enum: ['All', 'Male', 'Female'], default: 'All' },
     probationExempt: { type: Boolean, default: false },
     permissionAutoConvert: { type: Boolean, default: false },
+    applicableTo: { type: String, enum: ['ALL', 'EMPLOYEE', 'INTERN'], default: 'ALL' },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
 
-leavePolicySchema.index({ organizationId: 1, leaveType: 1 }, { unique: true });
+leavePolicySchema.index({ organizationId: 1, leaveType: 1, applicableTo: 1 }, { unique: true });
 
 export const LeavePolicy = mongoose.model<ILeavePolicy>('LeavePolicy', leavePolicySchema);

@@ -38,6 +38,7 @@ export const OfferLetterModal: React.FC<OfferLetterModalProps> = ({ isOpen, onCl
   const [customPdfName, setCustomPdfName] = useState('');
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [customPdfBase64, setCustomPdfBase64] = useState('');
+  const [offerType, setOfferType] = useState<'FULL_TIME' | 'INTERN_6M'>('INTERN_6M');
 
   // Store both the editable copy and the raw template body loaded from DB
   const [rawTemplateBody, setRawTemplateBody] = useState('');
@@ -111,33 +112,63 @@ export const OfferLetterModal: React.FC<OfferLetterModalProps> = ({ isOpen, onCl
     }
   };
 
-  // Pre-populate form data when candidate or templateData changes
+  // Auto-detect default Offer Type based on candidate's appliedRole
+  useEffect(() => {
+    if (candidate) {
+      const isIntern = candidate.appliedRole?.toLowerCase().includes('intern');
+      setOfferType(isIntern ? 'INTERN_6M' : 'FULL_TIME');
+    }
+  }, [candidate]);
+
+  // Pre-populate form data when candidate, templateData, or offerType changes
   useEffect(() => {
     if (candidate && templateData?.template) {
       const name = `${candidate.firstName} ${candidate.lastName}`;
       const t = templateData.template;
+      const roleName = candidate.appliedRole;
+      const salary = candidate.offerDetails?.salaryOffered || 0;
       
-      setRawTemplateBody(t.bodyText);
-      setRawTemplateSubject(t.subject || 'Intern Offer letter- {{appliedRole}}');
-      setRawTemplateEmailBody(t.emailBody || '');
-      setRawTemplatePdfSubject(t.pdfSubject || 'Subject: Intern Offer letter- {{appliedRole}}');
-      setRawTemplatePdfTitle(t.pdfTitle || 'Internship Offer Letter');
-
       const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const dur = t.duration || '3 months';
-      const end = calculateEndDate(start, dur);
+
+      let durationVal = '6 months';
+      let stipendVal = 'unpaid first 3 months, then paid based on performance';
+      let pdfTitleVal = 'Internship Offer Letter';
+      let pdfSubjectVal = 'Subject: Intern Offer letter- {{appliedRole}}';
+      let emailSubjectVal = 'Internship Offer letter- {{appliedRole}}';
+      let emailBodyVal = `Dear {{candidateName}},\n\nWe are pleased to extend a formal offer for a 6-Month Internship at ES EthicSecur SofTec Pvt Ltd. Please find the attached PDF containing details of your internship terms, starting date, and unpaid/paid structure.\n\nTo accept this offer, please sign the letter and return it by replying to this email.`;
+      
+      let bodyTextVal = `We are pleased to offer you an opportunity to join ES EthicSecur SofTec Pvt Ltd., as an Intern for a period of {{duration}} (6 months total) from {{startDate}} to {{endDate}}.\n\nYour internship will follow our 6-month timeline structure:\n- Unpaid Phase (Months 1-3): Focuses on practical skill development, technical training, and department task execution. No stipend or monetary allowance is paid.\n- Paid Phase (Months 4-6): Transition is performance-based. Upon successful HR evaluation and approval at month 3, you will receive a monthly stipend of {{stipendDetails}}.\n\nThis internship does not guarantee permanent employment. You must follow company hours, code of conduct, and disciplinary policies at all times.`;
+
+      if (offerType === 'FULL_TIME') {
+        durationVal = 'Permanent';
+        stipendVal = salary > 0 ? `Rs. ${salary.toLocaleString('en-IN')}` : 'competitive market salary';
+        pdfTitleVal = 'Offer of Employment';
+        pdfSubjectVal = 'Subject: Offer of Employment - {{appliedRole}}';
+        emailSubjectVal = 'Job Offer: {{appliedRole}} - ES EthicSecur SofTec';
+        emailBodyVal = `Dear {{candidateName}},\n\nWe are pleased to extend a formal offer of employment for the position of {{appliedRole}} at ES EthicSecur SofTec Pvt Ltd. Please find the attached PDF containing details of your employment terms, base salary, and joining date.\n\nTo accept this offer, please sign the letter and return it by replying to this email.`;
+        
+        bodyTextVal = `We are pleased to extend a formal offer of employment to you for the position of {{appliedRole}} at ES EthicSecur SofTec Pvt Ltd. Your employment will commence on {{startDate}}.\n\nYou will receive a monthly base salary of {{stipendDetails}} payable in monthly installments, subject to standard taxes and deductions. Your salary details and CTC breakup are managed securely in the HRMS.\n\nThis offer is contingent upon successful reference checks and background verification. You are required to follow all company regulations, office hours, and code of professional conduct.\n\nPlease sign and return the duplicate copy of this letter as a token of your acceptance of this offer.`;
+      }
+
+      setRawTemplateBody(bodyTextVal);
+      setRawTemplateSubject(emailSubjectVal);
+      setRawTemplateEmailBody(emailBodyVal);
+      setRawTemplatePdfSubject(pdfSubjectVal);
+      setRawTemplatePdfTitle(pdfTitleVal);
+
+      const end = calculateEndDate(start, durationVal);
 
       const initialForm = {
         date: new Date().toISOString().split('T')[0],
         candidateName: name,
         address: candidate.notes || 'Door no: 1/5-9-1 Thanda main road\nmarriyappan (ST), Kolathur (PO),\nMettur (TK), Salem (DT) - 636303',
         appliedRole: candidate.appliedRole,
-        duration: dur,
+        duration: durationVal,
         startDate: start,
         endDate: end,
-        stipendDetails: t.stipendDetails || 'non-stipend',
+        stipendDetails: stipendVal,
         technologies: t.technologies || 'MongoDB, Express.js, React.js, and Node.js',
-        pdfTitle: t.pdfTitle || 'Internship Offer Letter',
+        pdfTitle: pdfTitleVal,
         pdfSubject: '',
         emailSubject: '',
         emailBody: '',
@@ -151,17 +182,16 @@ export const OfferLetterModal: React.FC<OfferLetterModalProps> = ({ isOpen, onCl
         customPdfUrl: '',
         customPdfBase64: '',
         customPdfName: '',
-        salaryOffered: candidate.offerDetails?.salaryOffered || 0
+        salaryOffered: salary
       };
 
-      // Substitute variables dynamically in the letter content
-      initialForm.bodyText = replacePlaceholders(t.bodyText, initialForm);
-      initialForm.pdfSubject = replacePlaceholders(t.pdfSubject || 'Subject: Intern Offer letter- {{appliedRole}}', initialForm);
-      initialForm.emailSubject = replacePlaceholders(t.subject || 'Intern Offer letter- {{appliedRole}}', initialForm);
-      initialForm.emailBody = replacePlaceholders(t.emailBody || '', initialForm);
+      initialForm.bodyText = replacePlaceholders(bodyTextVal, initialForm);
+      initialForm.pdfSubject = replacePlaceholders(pdfSubjectVal, initialForm);
+      initialForm.emailSubject = replacePlaceholders(emailSubjectVal, initialForm);
+      initialForm.emailBody = replacePlaceholders(emailBodyVal, initialForm);
       setFormData(initialForm);
     }
-  }, [candidate, templateData]);
+  }, [candidate, templateData, offerType]);
 
   // 2. Mutation to send the final generated PDF offer letter via email
   const sendOfferMutation = useMutation({
@@ -466,6 +496,18 @@ export const OfferLetterModal: React.FC<OfferLetterModalProps> = ({ isOpen, onCl
                       </button>
                     </div>
 
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-muted-foreground mb-1">Employment / Offer Type</label>
+                      <select 
+                        value={offerType}
+                        onChange={(e) => setOfferType(e.target.value as any)}
+                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary font-semibold"
+                      >
+                        <option value="FULL_TIME">💼 Full-time with Salary</option>
+                        <option value="INTERN_6M">🎓 6-Month Internship (3m Unpaid + 3m Performance-based Paid)</option>
+                      </select>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-muted-foreground mb-1">Candidate Name</label>
@@ -564,7 +606,9 @@ export const OfferLetterModal: React.FC<OfferLetterModalProps> = ({ isOpen, onCl
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-muted-foreground mb-1">Salary/Stipend Amount (CTC or Monthly)</label>
+                        <label className="block text-xs font-bold text-muted-foreground mb-1">
+                          {offerType === 'FULL_TIME' ? 'Base Salary Offered (INR)' : 'Monthly Stipend Offered (Paid Phase) (INR)'}
+                        </label>
                         <input 
                           type="number" 
                           value={formData.salaryOffered}

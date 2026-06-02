@@ -68,6 +68,18 @@ export const applyLeave = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
+    // Validate employee profile and block interns
+    const employee = await Employee.findOne({ _id: employeeId, organizationId: orgId });
+    if (!employee) {
+      res.status(400).json({ message: 'Employee profile not found.' });
+      return;
+    }
+
+    if (employee.isIntern || req.user?.role === 'INTERN') {
+      res.status(403).json({ message: 'Interns are not allowed to request leaves.' });
+      return;
+    }
+
     const { leaveType, startDate, endDate, reason, expectedTasks } = req.body;
 
     // Delegate all business logic to service
