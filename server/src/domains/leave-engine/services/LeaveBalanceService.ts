@@ -36,13 +36,16 @@ export class LeaveBalanceService {
     }
 
     const isIntern = employee.isIntern || !!(employee.designation?.toLowerCase().includes('intern') || employee.department?.toLowerCase().includes('intern'));
+    if (isIntern) {
+      return [];
+    }
 
     const [balances, policies] = await Promise.all([
       LeaveBalance.find({ organizationId, employeeId }).session(session ?? null),
       LeavePolicy.find({
         organizationId,
         isActive: true,
-        applicableTo: isIntern ? { $in: ['INTERN', 'ALL'] } : { $in: ['EMPLOYEE', 'ALL'] }
+        applicableTo: { $in: ['EMPLOYEE', 'ALL'] }
       }).session(session ?? null),
     ]);
 
@@ -313,7 +316,7 @@ export class LeaveBalanceService {
 
     // Find all active employees matching the policy's applicability
     const query: any = { organizationId: orgId, isActive: true };
-    if (policy.applicableTo === 'EMPLOYEE') {
+    if (policy.applicableTo === 'EMPLOYEE' || policy.applicableTo === 'ALL') {
       query.isIntern = { $ne: true };
     } else if (policy.applicableTo === 'INTERN') {
       query.isIntern = true;

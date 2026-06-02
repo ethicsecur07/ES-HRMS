@@ -283,6 +283,11 @@ export const getMyLeaveBalances = async (req: RBACRequest, res: Response, next: 
     const employee = await Employee.findById(empId);
     const isIntern = employee?.isIntern || !!(employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
 
+    if (isIntern) {
+      res.json({ balances: [], employeeId: empId });
+      return;
+    }
+
     const [balances, policies] = await Promise.all([
       LeaveBalanceService.ensureBalancesExist(orgId, empId),
       LeavePolicy.find({

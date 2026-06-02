@@ -421,8 +421,8 @@ export const RecruitmentPage: React.FC = () => {
 
     // Intern stipend and code logic: if applied role or matched designation has "intern" keyword, prefix code with INT-
     const matchedDesig = designations.find((d: any) => d._id === matchedDesigId);
-    const isIntern = (cand.appliedRole && cand.appliedRole.toLowerCase().includes('intern')) ||
-                     (matchedDesig && matchedDesig.name.toLowerCase().includes('intern'));
+    const isIntern = !!((cand.appliedRole && cand.appliedRole.toLowerCase().includes('intern')) ||
+                     (matchedDesig && matchedDesig.name.toLowerCase().includes('intern')));
     
     // Fetch details as per mentioned in offer letter for that candidate alone
     const defaultSalary = cand.offerDetails?.salaryOffered || 0;

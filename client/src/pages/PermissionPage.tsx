@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authPermissionApi, type PermissionActions, type MatrixUpdateRequest } from '../api_service/authPermissionApi';
 import { useNotificationStore } from '../store/useNotificationStore';
@@ -61,11 +61,24 @@ export const PermissionPage: React.FC = () => {
 
   const selectedRole = matrixData?.roles.find(r => r._id === selectedRoleId);
 
+  const visibleModules = useMemo(() => {
+    if (!matrixData) return [];
+    return matrixData.modules.filter((mod) => {
+      if (selectedRole?.code === 'INTERN') {
+        return mod !== 'LEAVES' && mod !== 'LEAVE_POLICY';
+      }
+      return true;
+    });
+  }, [matrixData, selectedRole]);
+
   const hasRoleUnsavedChanges = (roleId: string): boolean => {
     if (!matrixData || !matrixState[roleId]) return false;
     const roleState = matrixState[roleId];
+    const roleObj = matrixData.roles.find((r) => r._id === roleId);
+    const isInternRole = roleObj?.code === 'INTERN';
     
     return matrixData.modules.some((mod) => {
+      if (isInternRole && (mod === 'LEAVES' || mod === 'LEAVE_POLICY')) return false;
       const currentActions = roleState[mod];
       if (!currentActions) return false;
       
@@ -105,7 +118,7 @@ export const PermissionPage: React.FC = () => {
     const rolePerms = matrixState[selectedRoleId];
     if (!rolePerms) return false;
     
-    return matrixData.modules.every((mod) => !!rolePerms[mod]?.[action]);
+    return visibleModules.every((mod) => !!rolePerms[mod]?.[action]);
   };
 
   const handleActionColumnToggle = (action: keyof PermissionActions) => {
@@ -116,7 +129,7 @@ export const PermissionPage: React.FC = () => {
       const rolePerms = prev[selectedRoleId] || {};
       const updatedRolePerms = { ...rolePerms };
       
-      matrixData.modules.forEach((mod) => {
+      visibleModules.forEach((mod) => {
         const modActions = updatedRolePerms[mod] || { view: false, create: false, edit: false, delete: false, approve: false, assign: false, export: false };
         updatedRolePerms[mod] = { ...modActions, [action]: !allChecked };
       });
@@ -218,10 +231,15 @@ export const PermissionPage: React.FC = () => {
         const roleState = matrixState[roleId];
         if (roleState) {
           Object.entries(roleState).forEach(([moduleCode, actions]) => {
+            const isInternRole = role.code === 'INTERN';
+            let finalActions = { ...actions };
+            if (isInternRole && (moduleCode === 'LEAVES' || moduleCode === 'LEAVE_POLICY')) {
+              finalActions = { view: false, create: false, edit: false, delete: false, approve: false, assign: false, export: false };
+            }
             updates.push({
               roleId,
               module: moduleCode,
-              actions,
+              actions: finalActions,
             });
           });
         }
@@ -419,7 +437,7 @@ export const PermissionPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border text-xs">
-                        {matrixData?.modules.map((moduleCode) => {
+                        {visibleModules.map((moduleCode) => {
                           const rolePerms = matrixState[selectedRoleId] || {};
                           const modActions = rolePerms[moduleCode] || { view: false, create: false, edit: false, delete: false, approve: false, assign: false, export: false };
 

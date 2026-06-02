@@ -94,9 +94,8 @@ const PolicyForm: React.FC<PolicyFormProps> = ({ policy, onChange }) => {
           value={policy.applicableTo ?? 'ALL'}
           onChange={(e) => set('applicableTo', e.target.value)}
           options={[
-            { value: 'ALL', label: 'All Employees & Interns' },
+            { value: 'ALL', label: 'All Employees' },
             { value: 'EMPLOYEE', label: 'General Employees Only' },
-            { value: 'INTERN', label: 'Interns Only' },
           ]}
         />
         <Input

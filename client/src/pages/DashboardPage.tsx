@@ -22,6 +22,7 @@ import { wfhApi } from '../api_service/wfhApi';
 import { permissionApi } from '../api_service/permissionApi';
 import { projectApi } from '../api_service/projectApi';
 import { Users, CalendarCheck, Palmtree, BarChart3, ListTodo, Network, UserPlus } from 'lucide-react';
+import { formatDate } from '../utils/formatters';
 
 export const DashboardPage: React.FC = () => {
   const { user, role } = useAuthStore();

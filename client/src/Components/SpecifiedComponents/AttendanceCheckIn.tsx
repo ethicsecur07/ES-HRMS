@@ -345,8 +345,7 @@ export const AttendanceCheckIn: React.FC = () => {
 
   const activeWorkdays = companySettings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const isNonWorkingDay = !activeWorkdays.includes(currentDayLabel);
-  const todayHoliday = holidays?.find((h) => h.date === localTodayStr && !h.isRestricted);
-
+  const todayHoliday = holidays?.find((h) => h.date === localTodayStr);
   const isBefore9AM = !isSunday && currentTime.getHours() < 9;
   const isCheckInLocked = isSunday || isNonWorkingDay || !!todayHoliday || isBefore9AM;
   let lockReason = '';
@@ -402,6 +401,28 @@ export const AttendanceCheckIn: React.FC = () => {
           <div className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 flex-shrink-0">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
             On Leave Duty-Free
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (todayHoliday) {
+    return (
+      <Card className="relative overflow-hidden border-l-4 border-emerald-500 shadow-xl bg-card">
+        <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+          <Palmtree className="w-36 h-36 text-emerald-500" />
+        </div>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10 p-2">
+          <div className="space-y-2 text-left">
+            <h3 className="text-xl font-bold text-foreground">Today is a Company Holiday: {todayHoliday.name}</h3>
+            <p className="text-xs text-muted-foreground">
+              Enjoy your day off! The check-in and checkout system is disabled today due to the {todayHoliday.isRestricted ? 'restricted ' : ''}holiday.
+            </p>
+          </div>
+          <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 flex-shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Company Holiday
           </div>
         </div>
       </Card>
