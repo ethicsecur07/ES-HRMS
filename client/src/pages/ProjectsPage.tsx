@@ -200,8 +200,8 @@ export const ProjectsPage = () => {
       </div>
 
       {/* New Project Modal */}
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Create New Project" maxWidth="max-w-xl">
-        <form onSubmit={handleCreateProject} className="space-y-4 text-left">
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Create New Project" maxWidth="max-w-2xl">
+        <form onSubmit={handleCreateProject} className="space-y-4 px-4 text-left">
           <Input 
             label="Project Name *"
             value={name}

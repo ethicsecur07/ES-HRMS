@@ -199,6 +199,7 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
         department: authResult.profile.department || undefined,
         lastSyncedAt: new Date()
       };
+      user.isLoginApproved = true;
       await user.save();
     } else if (provider.autoProvision) {
       user = await User.create({
@@ -207,6 +208,7 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
         email: authResult.profile.email,
         role: (resolvedRole || provider.defaultRoleCode || 'EMPLOYEE') as any,
         isActive: true,
+        isLoginApproved: true,
         profileImage: authResult.profile.avatar,
         ssoData: {
           provider: providerType,

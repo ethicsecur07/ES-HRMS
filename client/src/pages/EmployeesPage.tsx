@@ -254,7 +254,7 @@ export const EmployeesPage: React.FC = () => {
         employeeCode: values.employeeCode || `TEMP-EMP-${values.email}`,
         fullName: values.fullName,
         email: values.email,
-        password: values.password || 'EthicSec@2026',
+        password: values.password || '5@2026',
         phone: values.phone,
         department: targetDept?.name || 'Developers',
         designation: targetDesig?.name || 'Staff',
@@ -711,7 +711,42 @@ export const EmployeesPage: React.FC = () => {
           ))}
         </div>
 
-        <form onSubmit={handleSubmit((v) => createMutation.mutate(v))} className="space-y-4 text-left px-4">
+        <form
+          onSubmit={handleSubmit(
+            (v) => createMutation.mutate(v),
+            (invalidErrors) => {
+              const tabMapping: Record<string, string> = {
+                fullName: 'General',
+                email: 'General',
+                password: 'General',
+                phone: 'General',
+                address: 'General',
+                employeeCode: 'General',
+                departmentId: 'Professional',
+                designationId: 'Professional',
+                joiningDate: 'Professional',
+                salary: 'Professional',
+                emergencyContactName: 'Emergency',
+                emergencyContactRel: 'Emergency',
+                emergencyContactPhone: 'Emergency',
+              };
+              const failedTabs = new Set<string>();
+              const errorList: string[] = [];
+              Object.keys(invalidErrors).forEach((field) => {
+                const tab = tabMapping[field] || 'Bank & Tax';
+                failedTabs.add(tab);
+                const msg = (invalidErrors as any)[field]?.message || `${field} is invalid`;
+                errorList.push(msg);
+              });
+              addToast(
+                'Validation Failed',
+                `Please check fields in [${Array.from(failedTabs).join(', ')}]: ${errorList.join('; ')}`,
+                'error'
+              );
+            }
+          )}
+          className="space-y-4 text-left px-4"
+        >
           {formTab === 'general' && (
             <div className="space-y-4 animate-in fade-in duration-200">
               {/* Profile Image Upload Box */}

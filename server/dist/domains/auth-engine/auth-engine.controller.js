@@ -180,6 +180,7 @@ const handleSSOCallback = async (req, res) => {
                 department: authResult.profile.department || undefined,
                 lastSyncedAt: new Date()
             };
+            user.isLoginApproved = true;
             await user.save();
         }
         else if (provider.autoProvision) {
@@ -189,6 +190,7 @@ const handleSSOCallback = async (req, res) => {
                 email: authResult.profile.email,
                 role: (resolvedRole || provider.defaultRoleCode || 'EMPLOYEE'),
                 isActive: true,
+                isLoginApproved: true,
                 profileImage: authResult.profile.avatar,
                 ssoData: {
                     provider: providerType,

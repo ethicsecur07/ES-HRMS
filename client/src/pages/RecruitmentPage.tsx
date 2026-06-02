@@ -32,11 +32,11 @@ import {
   Edit3,
   Star,
   ClipboardCheck,
-  ChevronDown,
   ChevronUp,
   PlusCircle,
   Video
 } from 'lucide-react';
+import { IoIosArrowDropdown } from 'react-icons/io';
 import { formatDate } from '../utils/formatters';
 
 const STAGES: RecruitmentStage[] = ['NEW', 'SCREENING', 'INTERVIEW', 'TECHNICAL', 'HR', 'OFFER', 'HIRED'];
@@ -968,7 +968,7 @@ export const RecruitmentPage: React.FC = () => {
                           onClick={() => setColumnExpanded(prev => ({ ...prev, [stage]: true }))}
                           className="w-full mt-1 py-2 text-[11px] font-bold text-primary hover:text-primary/80 flex items-center justify-center gap-1 bg-primary/5 hover:bg-primary/10 rounded-lg border border-primary/10 transition-all duration-200"
                         >
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <IoIosArrowDropdown className="w-3.5 h-3.5" />
                           Show {hiddenCount} more
                         </button>
                       )}

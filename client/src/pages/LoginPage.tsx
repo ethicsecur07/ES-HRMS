@@ -17,7 +17,6 @@ import {
   Building2,
   KeyRound,
   Chrome,
-  Terminal,
   ChevronRight,
   Fingerprint
 } from 'lucide-react';
@@ -251,7 +250,12 @@ export const LoginPage: React.FC = () => {
                         {provider === 'GOOGLE' ? (
                           <Chrome className="w-4 h-4 mr-2 text-red-400" />
                         ) : provider === 'MICROSOFT' ? (
-                          <Terminal className="w-4 h-4 mr-2 text-[#F75F0A]" />
+                          <svg className="w-4 h-4 mr-2 flex-shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="0" y="0" width="10" height="10" fill="#F25022"/>
+                            <rect x="11" y="0" width="10" height="10" fill="#7FBA00"/>
+                            <rect x="0" y="11" width="10" height="10" fill="#00A4EF"/>
+                            <rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
+                          </svg>
                         ) : (
                           <KeyRound className="w-4 h-4 mr-2 text-[#F75F0A]" />
                         )}
@@ -350,40 +354,6 @@ export const LoginPage: React.FC = () => {
               </div>
             )}
           </form>
-
-          {/* Developer Sandbox Quick Access */}
-          <div className="mt-6 pt-5 border-t border-slate-850 text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <p className="text-[9px] uppercase font-black text-[#F75F0A] tracking-wider mb-3">
-              Developer Sandbox • One-Click Role Switcher
-            </p>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-              {(['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD', 'EMPLOYEE', 'INTERN'] as Role[]).map((r) => {
-                const colors: Record<Role, string> = {
-                  ADMIN: 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 hover:border-red-500/40',
-                  MANAGER: 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-500/20 hover:border-indigo-500/40',
-                  HR: 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20 hover:border-emerald-500/40',
-                  TEAM_LEAD: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20 hover:border-amber-500/40',
-                  EMPLOYEE: 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-750 hover:border-slate-650',
-                  INTERN: 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border-teal-500/20 hover:border-teal-500/40',
-                };
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => {
-                      useAuthStore.getState().setDemoUser(r);
-                      addToast('Sandbox Access', `Logged in as Demo ${r}`, 'success');
-                      navigate('/dashboard');
-                    }}
-                    className={`py-2 px-1 text-[9px] font-black tracking-tight rounded-lg border transition-all duration-200 uppercase active:scale-95 ${colors[r]}`}
-                    title={`Log in as ${r}`}
-                  >
-                    {r.replace('_', ' ')}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           <div className="mt-4 text-center text-xs text-slate-400">
             Need a secure workspace for your business?{' '}

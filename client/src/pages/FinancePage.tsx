@@ -33,7 +33,7 @@ export const FinancePage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['financeSummary'] });
       addToast(
         modalType === 'ALLOCATION' ? 'Budget Allocated' : 'Expense Logged',
-        `Successfully recorded $${amount} for ${categoryOrReason}.`,
+        `Successfully recorded ₹${amount} for ${categoryOrReason}.`,
         'success'
       );
       setShowModal(false);
@@ -235,7 +235,7 @@ export const FinancePage: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-4 px-4 font-black text-base text-foreground tracking-tight">
-                      ${r.amount.toLocaleString()}
+                      ₹{r.amount.toLocaleString()}
                     </td>
                     <td className="py-4 px-4 font-bold text-foreground">
                       {r.categoryOrReason}
@@ -291,7 +291,7 @@ export const FinancePage: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <Input
-                label="Amount ($)"
+                label="Amount (₹)"
                 type="number"
                 placeholder="e.g. 1500"
                 value={amount}
@@ -312,7 +312,7 @@ export const FinancePage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-foreground mb-1.5 uppercase tracking-wider">
-                  Detailed Description (Optional)
+                  Detailed Description 
                 </label>
                 <textarea
                   className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all min-h-[100px] resize-none"

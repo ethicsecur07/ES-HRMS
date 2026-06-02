@@ -12,13 +12,13 @@ import {
   Loader2,
   Clock,
   AlertCircle,
-  ChevronDown,
   ChevronUp,
   CalendarDays,
   ArrowRight,
   ClipboardList,
   TrendingUp,
 } from 'lucide-react';
+import { IoIosArrowDropdown } from 'react-icons/io';
 
 // ─── Stat Card ─────────────────────────────────────────────────────────────────
 const StatPill: React.FC<{
@@ -68,7 +68,7 @@ const ReportRow: React.FC<{ report: TaskReport }> = ({ report }) => {
           {expanded ? (
             <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+            <IoIosArrowDropdown className="w-3.5 h-3.5 text-muted-foreground" />
           )}
         </div>
       </button>
