@@ -176,6 +176,10 @@ class AttendanceService {
             if (isSunday) {
                 throw new Error('Check-in is disabled on Sundays.');
             }
+            // Enforce 9:00 AM check-in constraint (not applicable on Sundays)
+            if (!isSunday && todayDate.getHours() < 9) {
+                throw new Error('Check-in is only permitted after 9:00 AM.');
+            }
             // Enforce Active Workdays check
             const org = await Organization_js_1.Organization.findOne({ _id: orgId })
                 .session(session)
@@ -186,17 +190,16 @@ class AttendanceService {
             if (!activeWorkdays.includes(currentDayLabel)) {
                 throw new Error(`Check-in is not allowed on non-working days (${currentDayLabel}).`);
             }
-            // Enforce Public Holiday check
+            // Enforce Company Holiday check
             const publicHoliday = await HolidayCalendar_js_1.HolidayCalendar.findOne({
                 organizationId: orgId,
-                date: today,
-                isRestricted: false
+                date: today
             }).session(session);
             if (publicHoliday) {
-                throw new Error(`Check-in is disabled today due to the public holiday: ${publicHoliday.name}.`);
+                throw new Error(`Check-in is disabled today due to the holiday: ${publicHoliday.name}.`);
             }
             // 3. Verify location (Office IP Range or GPS GeoFence)
-            const isOfficeIP = ipAddress.includes('192.168.29.') || ipAddress === '127.0.0.1' || ipAddress === '::1';
+            const isOfficeIP = ipAddress.includes('192.168.29') || ipAddress === '127.0.0.1' || ipAddress === '::1';
             let withinGeoFence = false;
             let matchedFence = null;
             let distanceFromCenter = 0;
@@ -212,8 +215,8 @@ class AttendanceService {
                     }
                 }
             }
-            const locationVerified = isOfficeIP || withinGeoFence || !!overrideReason;
-            const status = isOfficeIP ? 'OFFICE' : (withinGeoFence ? 'OFFICE' : 'WFH');
+            const status = isOfficeIP ? 'OFFICE' : 'WFH';
+            const locationVerified = isOfficeIP || status === 'WFH' || withinGeoFence || !!overrideReason;
             let isLate = false;
             let lateReason = '';
             // 4. Resolve shift and evaluate late-in check

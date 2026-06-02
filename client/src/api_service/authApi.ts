@@ -34,4 +34,16 @@ export const authApi = {
     });
     return response.data.url;
   },
+
+  signup: async (data: {
+    name: string;
+    email: string;
+    password?: string;
+    organizationName: string;
+    organizationSlug: string;
+    organizationSector: string;
+  }) => {
+    const response = await axiosInstance.post<{ success: boolean; message: string; organizationId: string; slug: string }>('/auth/signup', data);
+    return response.data;
+  },
 };

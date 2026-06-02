@@ -130,7 +130,7 @@ async function createSessionAndRespond(
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
@@ -463,7 +463,7 @@ export const logout = async (req: AuthRequest, res: Response): Promise<void> => 
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
     });
 
     res.status(200).json({ message: 'Logged out successfully' });
@@ -521,7 +521,7 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
         res.clearCookie('refreshToken', {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
         });
         res.status(401).json({
           message: 'Suspicious session usage detected. Access revoked. Please log in again.',
@@ -566,7 +566,7 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -819,3 +819,127 @@ export const updateMe = async (req: AuthRequest, res: Response): Promise<void> =
     res.status(500).json({ message: error.message });
   }
 };
+
+export const signup = async (req: Request, res: Response): Promise<void> => {
+  const { name, email, password, organizationName, organizationSlug, organizationSector } = req.body;
+
+  if (!name || !email || !password || !organizationName || !organizationSlug || !organizationSector) {
+    res.status(400).json({ message: 'All registration fields are required.' });
+    return;
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedSlug = organizationSlug
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  if (!normalizedSlug) {
+    res.status(400).json({ message: 'Invalid organization slug format.' });
+    return;
+  }
+
+  try {
+    // 1. Password Strength Validation
+    const strength = PasswordService.validateStrength(password);
+    if (!strength.isValid) {
+      res.status(400).json({ message: strength.message });
+      return;
+    }
+
+    // 2. Check if Org Slug is already taken
+    const existingOrg = await Organization.findOne({ slug: normalizedSlug });
+    if (existingOrg) {
+      res.status(400).json({ message: 'This organization slug is already registered. Please choose a different one.' });
+      return;
+    }
+
+    // 3. Perform Signup Transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Create Organization
+      const organization = new Organization({
+        name: organizationName,
+        slug: normalizedSlug,
+        sector: organizationSector,
+        isActive: true,
+        settings: {
+          adminEmail: normalizedEmail,
+          theme: 'dark',
+        },
+      });
+      await organization.save({ session });
+
+      // Hash Password using Argon2
+      const hashedPassword = await PasswordService.hashPassword(password);
+
+      // Create Admin User
+      const adminUser = new User({
+        organizationId: organization._id,
+        name,
+        email: normalizedEmail,
+        password: hashedPassword,
+        role: 'ADMIN',
+        isActive: true,
+        isLoginApproved: true,
+      });
+      await adminUser.save({ session });
+
+      // Create initial operational Employee profile for Admin
+      const employee = new Employee({
+        organizationId: organization._id,
+        employeeCode: 'EMP-1001',
+        fullName: name,
+        email: normalizedEmail,
+        phone: '0000000000',
+        department: 'HR',
+        designation: 'HR Manager',
+        joiningDate: new Date(),
+        salary: 0,
+        address: 'Office Address',
+        emergencyContact: {
+          name: 'Self',
+          relationship: 'Self',
+          phone: '0000000000',
+        },
+        isActive: true,
+      });
+      await employee.save({ session });
+
+      // Link User to Employee
+      adminUser.employeeId = employee._id as any;
+      await adminUser.save({ session });
+
+      // Audit log creation
+      await createAuditLog(
+        'ORGANIZATION_SIGNUP',
+        normalizedEmail,
+        'AUTH',
+        'Organization',
+        `Registered new organization "${organizationName}" with slug "${normalizedSlug}" and administrator "${name}"`,
+        organization._id
+      );
+
+      await session.commitTransaction();
+
+      res.status(201).json({
+        success: true,
+        message: 'Organization and administrator account successfully registered!',
+        organizationId: organization._id,
+        slug: normalizedSlug,
+      });
+    } catch (transactionError) {
+      await session.abortTransaction();
+      throw transactionError;
+    } finally {
+      session.endSession();
+    }
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+

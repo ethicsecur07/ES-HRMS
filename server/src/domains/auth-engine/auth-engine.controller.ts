@@ -72,7 +72,8 @@ export const initiateSSO = async (req: Request, res: Response): Promise<void> =>
     }
 
     const adapter = ProviderRegistry.createAdapter(provider);
-    const state = crypto.randomUUID(); // In production: store in session/Redis
+    // Encode org.slug and providerKey in the state to allow stateless context recovery
+    const state = `${crypto.randomUUID()}_${org.slug}_${providerKey}`;
 
     const authUrl = adapter.getAuthorizationUrl(state);
 
@@ -368,7 +369,7 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 

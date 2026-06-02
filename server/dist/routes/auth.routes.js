@@ -7,6 +7,7 @@ const router = (0, express_1.Router)();
 router.get('/tenant-config', auth_controller_js_1.getTenantConfig);
 router.get('/tenant-config/:slug', auth_controller_js_1.getTenantConfig);
 router.post('/login', auth_controller_js_1.login);
+router.post('/signup', auth_controller_js_1.signup);
 router.post('/refresh', auth_controller_js_1.refreshToken);
 router.post('/logout', auth_middleware_js_1.authenticate, auth_controller_js_1.logout);
 router.get('/me', auth_middleware_js_1.authenticate, auth_controller_js_1.getMe);

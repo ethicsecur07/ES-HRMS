@@ -34,6 +34,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         HR: { role: 'HR', email: 'oviya@ethicsecur.com' },
         TEAM_LEAD: { role: 'TEAM_LEAD', email: 'karthik@ethicsecur.com' },
         EMPLOYEE: { role: 'EMPLOYEE', email: 'logapriyan@ethicsec.com' },
+        INTERN: { role: 'INTERN', email: 'dhinakaranr@ethicsecur.co.in' },
       };
       
       const targetUser = mockUsers[demoRole] || mockUsers.EMPLOYEE;

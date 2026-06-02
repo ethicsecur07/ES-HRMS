@@ -32,6 +32,7 @@ const authenticate = async (req, res, next) => {
                 HR: { role: 'HR', email: 'oviya@ethicsecur.com' },
                 TEAM_LEAD: { role: 'TEAM_LEAD', email: 'karthik@ethicsecur.com' },
                 EMPLOYEE: { role: 'EMPLOYEE', email: 'logapriyan@ethicsec.com' },
+                INTERN: { role: 'INTERN', email: 'dhinakaranr@ethicsecur.co.in' },
             };
             const targetUser = mockUsers[demoRole] || mockUsers.EMPLOYEE;
             const dbUser = await User_js_1.User.findOne({ email: new RegExp('^' + targetUser.email + '$', 'i') });

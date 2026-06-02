@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.syncMicrosoftEmployees = exports.deleteEmployee = exports.updateEmployee = exports.createEmployee = exports.getEmployeeById = exports.getEmployees = exports.getNextEmployeeCode = void 0;
+exports.approveInternPerformance = exports.syncMicrosoftEmployees = exports.deleteEmployee = exports.updateEmployee = exports.createEmployee = exports.getEmployeeById = exports.getEmployees = exports.getNextEmployeeCode = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const employee_service_js_1 = require("../services/employee.service.js");
 const getNextEmployeeCode = async (req, res) => {
@@ -257,3 +257,30 @@ const syncMicrosoftEmployees = async (req, res) => {
     }
 };
 exports.syncMicrosoftEmployees = syncMicrosoftEmployees;
+const approveInternPerformance = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rating, notes } = req.body;
+        const orgId = req.user?.organizationId;
+        const emailForAudit = req.user?.email || 'System';
+        const role = req.user?.role;
+        if (role !== 'ADMIN' && role !== 'HR') {
+            res.status(403).json({ message: 'Forbidden. Only HR and Admins can approve intern paid phase.' });
+            return;
+        }
+        if (!orgId) {
+            res.status(400).json({ message: 'Organization context is missing.' });
+            return;
+        }
+        if (!rating) {
+            res.status(400).json({ message: 'Performance rating is required.' });
+            return;
+        }
+        const employee = await employee_service_js_1.EmployeeService.approveInternPerformance(id, Number(rating), notes || '', orgId, emailForAudit);
+        res.status(200).json({ employee, message: 'Intern paid phase approved successfully.' });
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+exports.approveInternPerformance = approveInternPerformance;

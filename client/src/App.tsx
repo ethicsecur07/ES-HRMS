@@ -7,6 +7,7 @@ import { ProtectedRoute } from './Components/WrapperComponents/ProtectedRoute';
 
 // Code splitting (Lazy Loading)
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const SignupPage = lazy(() => import('./pages/SignupPage').then(m => ({ default: m.SignupPage }))); // signup route configuration
 const SsoCallbackPage = lazy(() => import('./pages/SsoCallbackPage').then(m => ({ default: m.SsoCallbackPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage').then(m => ({ default: m.EmployeesPage })));
@@ -151,6 +152,7 @@ export const App: React.FC = () => {
             <Routes>
               {/* Public Route */}
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
               <Route path="/sso/callback" element={<SsoCallbackPage />} />
 
               {/* Protected Routes wrapped in Layout */}

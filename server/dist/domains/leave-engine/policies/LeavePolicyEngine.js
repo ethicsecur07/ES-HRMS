@@ -12,17 +12,23 @@ const LeavePolicy_js_1 = require("../../../models/LeavePolicy.js");
 const LeaveBalance_js_1 = require("../../../models/LeaveBalance.js");
 const HolidayCalendar_js_1 = require("../../../models/HolidayCalendar.js");
 const Organization_js_1 = require("../../../models/Organization.js");
+const Employee_js_1 = require("../../../models/Employee.js");
 class LeavePolicyEngine {
-    /**
-     * Load policy for a given leave type and organization.
-     * Throws if policy not found or inactive.
-     */
-    static async getPolicy(organizationId, leaveType) {
-        const policy = await LeavePolicy_js_1.LeavePolicy.findOne({
+    static async getPolicy(organizationId, leaveType, isIntern = false) {
+        let policy = await LeavePolicy_js_1.LeavePolicy.findOne({
             organizationId,
             leaveType,
             isActive: true,
+            applicableTo: isIntern ? 'INTERN' : 'EMPLOYEE'
         });
+        if (!policy) {
+            policy = await LeavePolicy_js_1.LeavePolicy.findOne({
+                organizationId,
+                leaveType,
+                isActive: true,
+                applicableTo: 'ALL'
+            });
+        }
         if (!policy) {
             throw new Error(`No active leave policy found for type '${leaveType}' in this organization.`);
         }
@@ -52,9 +58,15 @@ class LeavePolicyEngine {
      * - Organization holidays from HolidayCalendar
      * - Sandwich leave rule from policy
      */
-    static async calculateLeaveDuration(organizationId, leaveType, startDate, endDate) {
-        // Load policy and org settings
-        const policy = await LeavePolicy_js_1.LeavePolicy.findOne({ organizationId, leaveType, isActive: true });
+    static async calculateLeaveDuration(organizationId, leaveType, startDate, endDate, employeeId) {
+        // Check if the employee is an intern
+        let isIntern = false;
+        if (employeeId) {
+            const employee = await Employee_js_1.Employee.findById(employeeId);
+            isIntern = !!(employee?.isIntern || employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
+        }
+        // Load policy and org settings using getPolicy helper
+        const policy = await this.getPolicy(organizationId, leaveType, isIntern).catch(() => null);
         const org = await Organization_js_1.Organization.findById(organizationId);
         const activeWorkdays = org?.settings?.activeWorkdays ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
         const sandwichApplies = policy?.sandwichLeaveRule ?? false;
@@ -123,7 +135,9 @@ class LeavePolicyEngine {
             violations.push({ code: 'DATE_RANGE_ERROR', message: 'End date must be on or after start date.' });
         }
         // 2. Policy check
-        const policy = await LeavePolicy_js_1.LeavePolicy.findOne({ organizationId, leaveType, isActive: true });
+        const employee = await Employee_js_1.Employee.findById(employeeId);
+        const isIntern = !!(employee?.isIntern || employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
+        const policy = await this.getPolicy(organizationId, leaveType, isIntern).catch(() => null);
         if (!policy) {
             violations.push({ code: 'NO_POLICY', message: `No active policy found for leave type '${leaveType}'.` });
             return violations;
@@ -155,11 +169,9 @@ class LeavePolicyEngine {
      * Check if employee has exceeded monthly permission hours.
      */
     static async checkMonthlyPermissionLimit(organizationId, employeeId, requestedHours) {
-        const policy = await LeavePolicy_js_1.LeavePolicy.findOne({
-            organizationId,
-            leaveType: 'Permission',
-            isActive: true,
-        });
+        const employee = await Employee_js_1.Employee.findById(employeeId);
+        const isIntern = !!(employee?.isIntern || employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
+        const policy = await this.getPolicy(organizationId, 'Permission', isIntern).catch(() => null);
         // Fallback to org settings, then hardcoded default
         const org = await Organization_js_1.Organization.findById(organizationId);
         const limitHours = policy?.permissionConversionHours ?? org?.settings?.monthlyPermissionHours ?? 3;

@@ -75,6 +75,14 @@ const employeeSchema = new mongoose_1.Schema({
         panNumber: { type: String, default: '' },
         taxRegime: { type: String, enum: ['OLD', 'NEW', ''], default: '' },
     },
+    isIntern: { type: Boolean, default: false },
+    internshipDurationMonths: { type: Number, default: 6 },
+    internshipUnpaidMonths: { type: Number, default: 3 },
+    internshipPaidMonths: { type: Number, default: 3 },
+    internshipStatus: { type: String, enum: ['UNPAID', 'PAID', 'COMPLETED', 'TERMINATED'], default: 'UNPAID' },
+    internshipPerformanceApproved: { type: Boolean, default: false },
+    internshipPerformanceRating: { type: Number, default: 0 },
+    internshipPerformanceReviewNotes: { type: String, default: '' },
 }, { timestamps: true });
 employeeSchema.index({ organizationId: 1, email: 1 }, { unique: true });
 const softDeletePlugin_js_1 = require("../utils/softDeletePlugin.js");
@@ -83,9 +91,10 @@ employeeSchema.plugin(softDeletePlugin_js_1.softDeletePlugin);
 // Cascade Soft Delete: When an Employee is soft-deleted, their User login is revoked
 employeeSchema.pre('save', async function (next) {
     if (this.isModified('isDeleted') && this.isDeleted === true) {
-        const user = await User_js_1.User.findOne({ employeeId: this._id });
+        const session = this.$session();
+        const user = await User_js_1.User.findOne({ employeeId: this._id }).session(session);
         if (user && typeof user.softDelete === 'function') {
-            await user.softDelete();
+            await user.softDelete({ session });
         }
     }
     next();

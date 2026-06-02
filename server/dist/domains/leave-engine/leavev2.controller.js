@@ -95,10 +95,17 @@ const checkSandwichRule = async (req, res, next) => {
             res.status(400).json({ message: 'organizationId, startDate, endDate, and leaveType are required' });
             return;
         }
-        // Use LeavePolicyEngine which now includes org holidays
+        // Resolve employeeId from user
+        const user = await User_js_1.User.findOne({ _id: req.user?.id, organizationId: orgId });
+        let empId = user?.employeeId?.toString();
+        if (!empId && user?.email) {
+            const emp = await Employee_js_1.Employee.findOne({ email: user.email, organizationId: orgId });
+            empId = emp?._id.toString();
+        }
+        // Use LeavePolicyEngine which now includes org holidays and intern-aware policy loading
         let durationResult;
         try {
-            durationResult = await LeavePolicyEngine_js_1.LeavePolicyEngine.calculateLeaveDuration(orgId, leaveType, startDate, endDate);
+            durationResult = await LeavePolicyEngine_js_1.LeavePolicyEngine.calculateLeaveDuration(orgId, leaveType, startDate, endDate, empId);
         }
         catch (err) {
             res.status(400).json({ message: err.message });
@@ -237,9 +244,19 @@ const getMyLeaveBalances = async (req, res, next) => {
             res.json({ data: { balances: [], employeeId: null }, message: 'Employee profile not found.' });
             return;
         }
+        const employee = await Employee_js_1.Employee.findById(empId);
+        const isIntern = employee?.isIntern || !!(employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
+        if (isIntern) {
+            res.json({ balances: [], employeeId: empId });
+            return;
+        }
         const [balances, policies] = await Promise.all([
             LeaveBalanceService_js_1.LeaveBalanceService.ensureBalancesExist(orgId, empId),
-            LeavePolicy_js_1.LeavePolicy.find({ organizationId: orgId, isActive: true }),
+            LeavePolicy_js_1.LeavePolicy.find({
+                organizationId: orgId,
+                isActive: true,
+                applicableTo: isIntern ? { $in: ['INTERN', 'ALL'] } : { $in: ['EMPLOYEE', 'ALL'] }
+            }),
         ]);
         // Enrich each balance with policy data for the frontend
         const enriched = balances.map((b) => {

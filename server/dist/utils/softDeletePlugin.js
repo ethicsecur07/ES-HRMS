@@ -18,15 +18,15 @@ function softDeletePlugin(schema) {
         });
     });
     // Custom softDelete method
-    schema.methods.softDelete = async function () {
+    schema.methods.softDelete = async function (options) {
         this.isDeleted = true;
         this.deletedAt = new Date();
-        return this.save();
+        return this.save(options);
     };
     // Custom restore method
-    schema.methods.restore = async function () {
+    schema.methods.restore = async function (options) {
         this.isDeleted = false;
         this.deletedAt = null;
-        return this.save();
+        return this.save(options);
     };
 }

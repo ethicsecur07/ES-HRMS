@@ -11,6 +11,7 @@ const User_js_1 = require("../models/User.js");
 const Announcement_js_1 = require("../models/Announcement.js");
 const auditLog_service_js_1 = require("../services/auditLog.service.js");
 const logger_js_1 = require("../utils/logger.js");
+const LeaveBalanceService_js_1 = require("../domains/leave-engine/services/LeaveBalanceService.js");
 const VALID_LEAVE_TYPES = [
     'Casual Leave',
     'Sick Leave',
@@ -51,7 +52,7 @@ const createPolicy = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized.' });
             return;
         }
-        const { leaveType, monthlyAllowance, carryForward, carryForwardLimit, sandwichLeaveRule, holidayOverlapRule, compensatoryOffEligibility, encashmentRule, latePenaltyCount, permissionConversionHours, halfDayEnabled, advanceNoticeDays, maxConsecutiveDays, applicableGender, probationExempt, permissionAutoConvert, } = req.body;
+        const { leaveType, monthlyAllowance, carryForward, carryForwardLimit, sandwichLeaveRule, holidayOverlapRule, compensatoryOffEligibility, encashmentRule, latePenaltyCount, permissionConversionHours, halfDayEnabled, advanceNoticeDays, maxConsecutiveDays, applicableGender, probationExempt, permissionAutoConvert, applicableTo, } = req.body;
         if (!leaveType || monthlyAllowance === undefined) {
             res.status(400).json({ message: 'leaveType and monthlyAllowance are required.' });
             return;
@@ -78,8 +79,11 @@ const createPolicy = async (req, res) => {
             applicableGender: applicableGender ?? 'All',
             probationExempt: probationExempt ?? false,
             permissionAutoConvert: permissionAutoConvert ?? false,
+            applicableTo: applicableTo ?? 'ALL',
             isActive: true,
         });
+        // Sync newly created policy with LeaveBalances for employees immediately
+        await LeaveBalanceService_js_1.LeaveBalanceService.syncBalancesForPolicy(policy);
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_POLICY_CREATED', req.user.email, 'LEAVE_POLICY', policy.id, `Created ${leaveType} policy (${monthlyAllowance} days/month)`, orgId);
         try {
             const creator = await User_js_1.User.findById(req.user.id);
@@ -131,7 +135,7 @@ const updatePolicy = async (req, res) => {
             'sandwichLeaveRule', 'holidayOverlapRule', 'latePenaltyCount',
             'permissionConversionHours', 'halfDayEnabled', 'advanceNoticeDays',
             'maxConsecutiveDays', 'applicableGender', 'probationExempt',
-            'permissionAutoConvert', 'isActive',
+            'permissionAutoConvert', 'applicableTo', 'isActive',
         ];
         for (const field of updatableFields) {
             if (req.body[field] !== undefined) {
@@ -152,6 +156,8 @@ const updatePolicy = async (req, res) => {
             };
         }
         await policy.save();
+        // Trigger dynamic synchronization of LeaveBalance records across matching employees
+        await LeaveBalanceService_js_1.LeaveBalanceService.syncBalancesForPolicy(policy);
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_POLICY_UPDATED', req.user.email, 'LEAVE_POLICY', policy.id, `Updated ${policy.leaveType} policy`, orgId);
         try {
             const creator = await User_js_1.User.findById(req.user.id);
@@ -195,6 +201,8 @@ const togglePolicyStatus = async (req, res) => {
         }
         policy.isActive = !policy.isActive;
         await policy.save();
+        // Trigger dynamic synchronization of LeaveBalance records across matching employees
+        await LeaveBalanceService_js_1.LeaveBalanceService.syncBalancesForPolicy(policy);
         await (0, auditLog_service_js_1.createAuditLog)('LEAVE_POLICY_TOGGLE', req.user.email, 'LEAVE_POLICY', policy.id, `${policy.leaveType} policy set to ${policy.isActive ? 'ACTIVE' : 'INACTIVE'}`, orgId);
         try {
             const creator = await User_js_1.User.findById(req.user.id);
