@@ -27,6 +27,16 @@ const index_js_1 = require("../constants/index.js");
 const PasswordService_js_1 = require("../domains/auth-engine/services/PasswordService.js");
 const seedDatabase = async () => {
     try {
+        // Programmatically drop legacy single-field unique index on leavepolicies if it exists
+        try {
+            if (mongoose_1.default.connection.db) {
+                await mongoose_1.default.connection.db.collection('leavepolicies').dropIndex('organizationId_1_leaveType_1');
+                logger_js_1.logger.info('Dropped legacy unique index organizationId_1_leaveType_1 from leavepolicies collection.');
+            }
+        }
+        catch (_) {
+            // Index might not exist, ignore
+        }
         const orgId = new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79000');
         const adminExists = await User_js_1.User.findOne({ email: /official@ethicsecur\.co\.in/i, organizationId: orgId });
         if (adminExists) {
@@ -62,6 +72,24 @@ const seedDatabase = async () => {
             if (!teamLeadExists) {
                 await User_js_1.User.create({ _id: new mongoose_1.default.Types.ObjectId('605c72ef1f77bcf86cd79505'), organizationId: orgId, name: 'Karthik', email: 'karthik@ethicsecur.com', password: await PasswordService_js_1.PasswordService.hashPassword('EthicSec@2026'), role: index_js_1.ROLES.TEAM_LEAD, isActive: true });
                 logger_js_1.logger.info('Seeded missing Team Lead user.');
+            }
+            // Ensure default leave policies exist for both EMPLOYEE and INTERN groups
+            const policyCount = await LeavePolicy_js_1.LeavePolicy.countDocuments({ organizationId: orgId });
+            if (policyCount < 8 || !await LeavePolicy_js_1.LeavePolicy.findOne({ organizationId: orgId, applicableTo: 'INTERN' })) {
+                logger_js_1.logger.info('Leave policies missing or incomplete in already-seeded database. Seeding...');
+                const leavePoliciesData = [
+                    { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 2, carryForward: true, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+                    { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+                    { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+                    { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 3, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+                    { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 0, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+                    { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+                    { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+                    { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 2, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+                ];
+                await LeavePolicy_js_1.LeavePolicy.deleteMany({ organizationId: orgId });
+                await LeavePolicy_js_1.LeavePolicy.insertMany(leavePoliciesData);
+                logger_js_1.logger.info('✅ Successfully seeded/re-seeded default leave policies.');
             }
             await seedOfferTemplate(orgId);
             await (0, exports.syncRolePermissions)(orgId);
@@ -129,13 +157,17 @@ const seedDatabase = async () => {
         logger_js_1.logger.info('✅ Seeded Core Roles (ADMIN, MANAGER, HR, TEAM_LEAD, EMPLOYEE).');
         // 5. Seed Leave Policies
         const leavePoliciesData = [
-            { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 2, carryForward: true, latePenaltyCount: 3 },
-            { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3 },
-            { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3 },
-            { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 3, carryForward: false, latePenaltyCount: 3 },
+            { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 2, carryForward: true, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+            { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+            { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+            { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 3, carryForward: false, latePenaltyCount: 3, applicableTo: 'EMPLOYEE' },
+            { organizationId: orgId, leaveType: 'Casual Leave', monthlyAllowance: 0, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+            { organizationId: orgId, leaveType: 'Sick Leave', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+            { organizationId: orgId, leaveType: 'WFH', monthlyAllowance: 1, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
+            { organizationId: orgId, leaveType: 'Permission', monthlyAllowance: 2, carryForward: false, latePenaltyCount: 3, applicableTo: 'INTERN' },
         ];
         await LeavePolicy_js_1.LeavePolicy.insertMany(leavePoliciesData);
-        logger_js_1.logger.info('✅ Seeded Organization Leave Policies.');
+        logger_js_1.logger.info('✅ Seeded Organization Employee & Intern Leave Policies.');
         // Note: Employee records are populated exclusively via Microsoft Directory Sync.
         // No static employee seed data is inserted — use the 'Sync Microsoft' button in the Employee Directory.
         // 7. Seed System Users (Admin & HR only — employees come from Microsoft Sync)

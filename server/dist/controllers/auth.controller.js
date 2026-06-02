@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateMe = exports.getMe = exports.impersonate = exports.revokeSession = exports.getUserSessions = exports.disableMfa = exports.enableMfa = exports.setupMfa = exports.refreshToken = exports.logout = exports.verifyMfa = exports.login = exports.getTenantConfig = void 0;
+exports.signup = exports.updateMe = exports.getMe = exports.impersonate = exports.revokeSession = exports.getUserSessions = exports.disableMfa = exports.enableMfa = exports.setupMfa = exports.refreshToken = exports.logout = exports.verifyMfa = exports.login = exports.getTenantConfig = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const crypto_1 = __importDefault(require("crypto"));
 const User_js_1 = require("../models/User.js");
@@ -114,7 +114,7 @@ async function createSessionAndRespond(user, org, req, res, risk) {
     res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     const userObj = user.toObject();
@@ -396,7 +396,7 @@ const logout = async (req, res) => {
         res.clearCookie('refreshToken', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
         });
         res.status(200).json({ message: 'Logged out successfully' });
     }
@@ -441,7 +441,7 @@ const refreshToken = async (req, res) => {
                 res.clearCookie('refreshToken', {
                     httpOnly: true,
                     secure: process.env.NODE_ENV === 'production',
-                    sameSite: 'strict',
+                    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
                 });
                 res.status(401).json({
                     message: 'Suspicious session usage detected. Access revoked. Please log in again.',
@@ -479,7 +479,7 @@ const refreshToken = async (req, res) => {
         res.cookie('refreshToken', newRefreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
         res.status(200).json({ token: accessToken });
@@ -691,3 +691,108 @@ const updateMe = async (req, res) => {
     }
 };
 exports.updateMe = updateMe;
+const signup = async (req, res) => {
+    const { name, email, password, organizationName, organizationSlug, organizationSector } = req.body;
+    if (!name || !email || !password || !organizationName || !organizationSlug || !organizationSector) {
+        res.status(400).json({ message: 'All registration fields are required.' });
+        return;
+    }
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedSlug = organizationSlug
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    if (!normalizedSlug) {
+        res.status(400).json({ message: 'Invalid organization slug format.' });
+        return;
+    }
+    try {
+        // 1. Password Strength Validation
+        const strength = PasswordService_js_1.PasswordService.validateStrength(password);
+        if (!strength.isValid) {
+            res.status(400).json({ message: strength.message });
+            return;
+        }
+        // 2. Check if Org Slug is already taken
+        const existingOrg = await Organization_js_1.Organization.findOne({ slug: normalizedSlug });
+        if (existingOrg) {
+            res.status(400).json({ message: 'This organization slug is already registered. Please choose a different one.' });
+            return;
+        }
+        // 3. Perform Signup Transaction
+        const session = await mongoose_1.default.startSession();
+        session.startTransaction();
+        try {
+            // Create Organization
+            const organization = new Organization_js_1.Organization({
+                name: organizationName,
+                slug: normalizedSlug,
+                sector: organizationSector,
+                isActive: true,
+                settings: {
+                    adminEmail: normalizedEmail,
+                    theme: 'dark',
+                },
+            });
+            await organization.save({ session });
+            // Hash Password using Argon2
+            const hashedPassword = await PasswordService_js_1.PasswordService.hashPassword(password);
+            // Create Admin User
+            const adminUser = new User_js_1.User({
+                organizationId: organization._id,
+                name,
+                email: normalizedEmail,
+                password: hashedPassword,
+                role: 'ADMIN',
+                isActive: true,
+                isLoginApproved: true,
+            });
+            await adminUser.save({ session });
+            // Create initial operational Employee profile for Admin
+            const employee = new Employee_js_1.Employee({
+                organizationId: organization._id,
+                employeeCode: 'EMP-1001',
+                fullName: name,
+                email: normalizedEmail,
+                phone: '0000000000',
+                department: 'HR',
+                designation: 'HR Manager',
+                joiningDate: new Date(),
+                salary: 0,
+                address: 'Office Address',
+                emergencyContact: {
+                    name: 'Self',
+                    relationship: 'Self',
+                    phone: '0000000000',
+                },
+                isActive: true,
+            });
+            await employee.save({ session });
+            // Link User to Employee
+            adminUser.employeeId = employee._id;
+            await adminUser.save({ session });
+            // Audit log creation
+            await (0, auditLog_service_js_1.createAuditLog)('ORGANIZATION_SIGNUP', normalizedEmail, 'AUTH', 'Organization', `Registered new organization "${organizationName}" with slug "${normalizedSlug}" and administrator "${name}"`, organization._id);
+            await session.commitTransaction();
+            res.status(201).json({
+                success: true,
+                message: 'Organization and administrator account successfully registered!',
+                organizationId: organization._id,
+                slug: normalizedSlug,
+            });
+        }
+        catch (transactionError) {
+            await session.abortTransaction();
+            throw transactionError;
+        }
+        finally {
+            session.endSession();
+        }
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+exports.signup = signup;

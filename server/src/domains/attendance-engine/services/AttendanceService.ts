@@ -234,7 +234,7 @@ export class AttendanceService {
       }
 
       // 3. Verify location (Office IP Range or GPS GeoFence)
-      const isOfficeIP = ipAddress.includes('192.168.29.') || ipAddress === '127.0.0.1' || ipAddress === '::1';
+      const isOfficeIP = ipAddress.includes('192.168.29') || ipAddress === '127.0.0.1' || ipAddress === '::1';
       let withinGeoFence = false;
       let matchedFence = null;
       let distanceFromCenter = 0;
@@ -252,8 +252,8 @@ export class AttendanceService {
         }
       }
 
-      const locationVerified = isOfficeIP || withinGeoFence || !!overrideReason;
-      const status = isOfficeIP ? 'OFFICE' : (withinGeoFence ? 'OFFICE' : 'WFH');
+      const status = isOfficeIP ? 'OFFICE' : 'WFH';
+      const locationVerified = isOfficeIP || status === 'WFH' || withinGeoFence || !!overrideReason;
       let isLate = false;
       let lateReason = '';
 

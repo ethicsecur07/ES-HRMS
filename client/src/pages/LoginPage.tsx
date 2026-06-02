@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useTenantStore } from '../store/useTenantStore';
@@ -383,6 +383,13 @@ export const LoginPage: React.FC = () => {
                 );
               })}
             </div>
+          </div>
+
+          <div className="mt-4 text-center text-xs text-slate-400">
+            Need a secure workspace for your business?{' '}
+            <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline">
+              Register Organization
+            </Link>
           </div>
 
           <div className="mt-6 pt-5 border-t border-slate-850 text-center text-xs text-slate-500">

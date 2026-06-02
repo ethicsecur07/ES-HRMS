@@ -65,7 +65,8 @@ const initiateSSO = async (req, res) => {
             return;
         }
         const adapter = ProviderRegistry_js_1.ProviderRegistry.createAdapter(provider);
-        const state = crypto_1.default.randomUUID(); // In production: store in session/Redis
+        // Encode org.slug and providerKey in the state to allow stateless context recovery
+        const state = `${crypto_1.default.randomUUID()}_${org.slug}_${providerKey}`;
         const authUrl = adapter.getAuthorizationUrl(state);
         res.status(200).json({
             success: true,
@@ -334,7 +335,7 @@ const handleSSOCallback = async (req, res) => {
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
         // Issue full session token

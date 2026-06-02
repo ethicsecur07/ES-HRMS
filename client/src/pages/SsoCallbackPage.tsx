@@ -30,6 +30,15 @@ export const SsoCallbackPage: React.FC = () => {
         sessionStorage.removeItem('es-hrms-sso-context');
       }
 
+      // Recover organization slug and provider type from the state parameter if sessionStorage was lost (e.g. cross-port redirect)
+      if ((!parsedContext.orgSlug || !parsedContext.providerType) && state) {
+        const parts = state.split('_');
+        if (parts.length >= 3) {
+          parsedContext.orgSlug = parts[1];
+          parsedContext.providerType = parts[2];
+        }
+      }
+
       if (!code && !samlResponse) {
         addToast('SSO Error', 'Authorization code or SAML assertion was not received.', 'error');
         navigate('/login');

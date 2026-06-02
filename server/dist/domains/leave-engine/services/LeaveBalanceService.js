@@ -22,16 +22,24 @@ class LeaveBalanceService {
      * If any are missing, they are initialized with the policy allowance (or employee defaults).
      */
     static async ensureBalancesExist(organizationId, employeeId, session) {
+        const employee = await Employee_js_1.Employee.findOne({ _id: employeeId, organizationId }).session(session ?? null);
+        if (!employee) {
+            return [];
+        }
+        const isIntern = employee.isIntern || !!(employee.designation?.toLowerCase().includes('intern') || employee.department?.toLowerCase().includes('intern'));
+        if (isIntern) {
+            return [];
+        }
         const [balances, policies] = await Promise.all([
             LeaveBalance_js_1.LeaveBalance.find({ organizationId, employeeId }).session(session ?? null),
-            LeavePolicy_js_1.LeavePolicy.find({ organizationId, isActive: true }).session(session ?? null),
+            LeavePolicy_js_1.LeavePolicy.find({
+                organizationId,
+                isActive: true,
+                applicableTo: { $in: ['EMPLOYEE', 'ALL'] }
+            }).session(session ?? null),
         ]);
         const missingPolicies = policies.filter(p => !balances.some(b => b.leaveType === p.leaveType));
         if (missingPolicies.length === 0) {
-            return balances;
-        }
-        const employee = await Employee_js_1.Employee.findOne({ _id: employeeId, organizationId }).session(session ?? null);
-        if (!employee) {
             return balances;
         }
         const newBalances = [];
@@ -208,6 +216,87 @@ class LeaveBalanceService {
         }));
         const result = await LeaveBalance_js_1.LeaveBalance.bulkWrite(bulkOps);
         return result.modifiedCount + result.upsertedCount;
+    }
+    /**
+     * Sync LeaveBalance records when a LeavePolicy is created, updated, or toggled.
+     * Keeps employee leave balances dynamically updated with policy changes.
+     */
+    static async syncBalancesForPolicy(policy, session) {
+        const orgId = policy.organizationId;
+        const leaveType = policy.leaveType;
+        const newAllowance = policy.monthlyAllowance;
+        // Find all active employees matching the policy's applicability
+        const query = { organizationId: orgId, isActive: true };
+        if (policy.applicableTo === 'EMPLOYEE' || policy.applicableTo === 'ALL') {
+            query.isIntern = { $ne: true };
+        }
+        else if (policy.applicableTo === 'INTERN') {
+            query.isIntern = true;
+        }
+        const employees = await Employee_js_1.Employee.find(query).session(session ?? null);
+        if (employees.length === 0)
+            return;
+        const bulkOps = [];
+        for (const emp of employees) {
+            // Find the current balance record to calculate adjustment
+            const currentBalance = await LeaveBalance_js_1.LeaveBalance.findOne({
+                organizationId: orgId,
+                employeeId: emp._id,
+                leaveType
+            }).session(session ?? null);
+            if (currentBalance) {
+                // If it exists, adjust allocated to newAllowance.
+                // Also update the remaining balance: newBalance = newAllowance - used
+                const newBal = Math.max(0, newAllowance - currentBalance.used);
+                bulkOps.push({
+                    updateOne: {
+                        filter: { _id: currentBalance._id },
+                        update: {
+                            $set: {
+                                allocated: newAllowance,
+                                balance: newBal
+                            }
+                        }
+                    }
+                });
+            }
+            else {
+                // If no balance record exists yet, initialize it
+                bulkOps.push({
+                    updateOne: {
+                        filter: { organizationId: orgId, employeeId: emp._id, leaveType },
+                        update: {
+                            $setOnInsert: {
+                                organizationId: orgId,
+                                employeeId: emp._id,
+                                leaveType,
+                                allocated: newAllowance,
+                                balance: newAllowance,
+                                used: 0
+                            }
+                        },
+                        upsert: true
+                    }
+                });
+            }
+            // Also update static employee balance fields if they exist and are applicable
+            const updateFields = {};
+            if (leaveType === 'Casual Leave') {
+                updateFields.leaveBalance = newAllowance;
+            }
+            else if (leaveType === 'WFH') {
+                updateFields.wfhBalance = newAllowance;
+            }
+            else if (leaveType === 'Permission') {
+                updateFields.permissionHoursBalance = newAllowance;
+            }
+            if (Object.keys(updateFields).length > 0) {
+                await Employee_js_1.Employee.updateOne({ _id: emp._id }, { $set: updateFields }).session(session ?? null);
+            }
+        }
+        if (bulkOps.length > 0) {
+            await LeaveBalance_js_1.LeaveBalance.bulkWrite(bulkOps, { ordered: false, session: session ?? undefined });
+        }
     }
 }
 exports.LeaveBalanceService = LeaveBalanceService;

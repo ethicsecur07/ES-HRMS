@@ -64,7 +64,8 @@ const leavePolicySchema = new mongoose_1.Schema({
     applicableGender: { type: String, enum: ['All', 'Male', 'Female'], default: 'All' },
     probationExempt: { type: Boolean, default: false },
     permissionAutoConvert: { type: Boolean, default: false },
+    applicableTo: { type: String, enum: ['ALL', 'EMPLOYEE', 'INTERN'], default: 'ALL' },
     isActive: { type: Boolean, default: true },
 }, { timestamps: true });
-leavePolicySchema.index({ organizationId: 1, leaveType: 1 }, { unique: true });
+leavePolicySchema.index({ organizationId: 1, leaveType: 1, applicableTo: 1 }, { unique: true });
 exports.LeavePolicy = mongoose_1.default.model('LeavePolicy', leavePolicySchema);

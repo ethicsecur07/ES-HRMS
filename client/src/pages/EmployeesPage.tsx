@@ -12,6 +12,7 @@ import { authApi } from '../api_service/authApi';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { usePermission } from '../hooks/usePermission';
 import { useAuthStore } from '../store/useAuthStore';
+import { useTenantStore } from '../store/useTenantStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Textarea } from '../Components/WrapperComponents/Input';
@@ -102,6 +103,8 @@ type EmployeeFormValues = z.infer<typeof baseEmployeeSchema>;
 export const EmployeesPage: React.FC = () => {
   const { hasPermission } = usePermission();
   const { user } = useAuthStore();
+  const tenantConfig = useTenantStore((state) => state.tenantConfig);
+  const isMicrosoftSsoEnabled = tenantConfig?.authProviders?.includes('MICROSOFT');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string>('');
@@ -543,18 +546,20 @@ export const EmployeesPage: React.FC = () => {
         </div>
         {hasPermission('EMPLOYEES', 'create') && (
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={handleSyncMicrosoft}
-              disabled={isSyncingMS}
-              className="bg-muted hover:bg-muted/80 text-foreground font-bold tracking-wider shadow-lg flex items-center border border-border"
-            >
-              {isSyncingMS ? (
-                <Loader2 className="w-5 h-5 mr-2 animate-spin text-primary" />
-              ) : (
-                <Sparkles className="w-5 h-5 mr-2 text-primary" />
-              )}
-              {isSyncingMS ? 'SYNCING...' : 'SYNC MICROSOFT'}
-            </Button>
+            {isMicrosoftSsoEnabled && (
+              <Button
+                onClick={handleSyncMicrosoft}
+                disabled={isSyncingMS}
+                className="bg-muted hover:bg-muted/80 text-foreground font-bold tracking-wider shadow-lg flex items-center border border-border"
+              >
+                {isSyncingMS ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin text-primary" />
+                ) : (
+                  <Sparkles className="w-5 h-5 mr-2 text-primary" />
+                )}
+                {isSyncingMS ? 'SYNCING...' : 'SYNC MICROSOFT'}
+              </Button>
+            )}
 
             <Button
               onClick={() => {

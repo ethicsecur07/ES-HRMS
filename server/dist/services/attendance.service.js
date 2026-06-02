@@ -54,7 +54,7 @@ class AttendanceService {
         const existing = await Attendance_js_1.Attendance.findOne({ employeeId, date: today, organizationId });
         if (existing)
             throw new Error('Attendance already recorded for today');
-        const isOfficeIP = ipAddress.includes('192.168.29.') || ipAddress === '127.0.0.1' || ipAddress === '::1';
+        const isOfficeIP = ipAddress.includes('192.168.29') || ipAddress === '127.0.0.1' || ipAddress === '::1';
         const now = new Date();
         let loginTime = now;
         let status = isOfficeIP ? 'OFFICE' : 'WFH';

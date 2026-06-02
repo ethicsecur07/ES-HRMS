@@ -26,7 +26,7 @@ const LeaveBalance_js_1 = require("../models/LeaveBalance.js");
 async function resolveEmployeeId(req) {
     if (!req.user)
         return null;
-    if (req.user.role !== 'EMPLOYEE')
+    if (req.user.role !== 'EMPLOYEE' && req.user.role !== 'INTERN')
         return req.body.employeeId || null;
     const user = await User_js_1.User.findOne({ _id: req.user.id, organizationId: req.user.organizationId });
     if (user?.employeeId)
@@ -58,6 +58,10 @@ const applyPermission = async (req, res) => {
         const employee = await Employee_js_1.Employee.findOne({ _id: employeeId, organizationId: orgId });
         if (!employee) {
             res.status(403).json({ message: 'Employee not found in this organization.' });
+            return;
+        }
+        if (employee.isIntern || req.user?.role === 'INTERN') {
+            res.status(403).json({ message: 'Interns are not allowed to request permissions.' });
             return;
         }
         // SERVER-SIDE: Calculate hours from times (do NOT trust client-sent totalHours)

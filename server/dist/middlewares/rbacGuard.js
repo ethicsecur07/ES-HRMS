@@ -24,6 +24,14 @@ const rbacGuard = (moduleCode, action) => {
             }
             const orgId = user.organizationId;
             const userId = user.id;
+            // Force block Interns from accessing LEAVES or LEAVE_POLICY
+            if (user.role === 'INTERN' && (moduleCode === 'LEAVES' || moduleCode === 'LEAVE_POLICY')) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden. Interns do not have access to leaves or leave policies.',
+                    traceId: req.headers['x-trace-id'] || '',
+                });
+            }
             // 1. Check for Active Temporary Grant overrides
             const activeGrant = await TemporaryGrant_js_1.TemporaryGrant.findOne({
                 organizationId: orgId,

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   login,
+  signup,
   logout,
   refreshToken,
   getMe,
@@ -21,6 +22,7 @@ const router = Router();
 router.get('/tenant-config', getTenantConfig as any);
 router.get('/tenant-config/:slug', getTenantConfig as any);
 router.post('/login', login as any);
+router.post('/signup', signup as any);
 router.post('/refresh', refreshToken as any);
 router.post('/logout', authenticate as any, logout as any);
 router.get('/me', authenticate as any, getMe as any);

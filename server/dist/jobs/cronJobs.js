@@ -37,7 +37,7 @@ const initCronJobs = () => {
             for (const att of unclosed) {
                 const loginTime = new Date(att.loginTime);
                 const logoutTime = new Date(loginTime);
-                logoutTime.setHours(19, 0, 0, 0); // 7:00 PM local time
+                logoutTime.setHours(18, 0, 0, 0); // 6:00 PM local time
                 let workingHours = parseFloat(((logoutTime.getTime() - loginTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
                 if (workingHours <= 0) {
                     logoutTime.setTime(loginTime.getTime() + 9 * 60 * 60 * 1000);
