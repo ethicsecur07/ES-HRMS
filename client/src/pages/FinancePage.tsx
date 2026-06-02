@@ -7,7 +7,7 @@ import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input } from '../Components/WrapperComponents/Input';
-import { Wallet, TrendingDown, DollarSign, PlusCircle, ArrowUpRight, ArrowDownLeft, Calendar, UserCheck, FileText } from 'lucide-react';
+import { Wallet, TrendingDown, IndianRupee, PlusCircle, ArrowUpRight, ArrowDownLeft, Calendar, UserCheck, FileText } from 'lucide-react';
 
 export const FinancePage: React.FC = () => {
   const { role } = useAuthStore();
@@ -130,7 +130,7 @@ export const FinancePage: React.FC = () => {
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Allocated Budget</p>
-              <p className="text-2xl font-black text-foreground mt-0.5">${summary.totalAllocated.toLocaleString()}</p>
+              <p className="text-2xl font-black text-foreground mt-0.5">₹{summary.totalAllocated.toLocaleString()}</p>
             </div>
           </div>
           <div className="text-xs text-muted-foreground border-t border-border/50 pt-3 flex items-center justify-between">
@@ -149,7 +149,7 @@ export const FinancePage: React.FC = () => {
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Maintenance Expenses</p>
-              <p className="text-2xl font-black text-foreground mt-0.5">${summary.totalSpent.toLocaleString()}</p>
+              <p className="text-2xl font-black text-foreground mt-0.5">₹{summary.totalSpent.toLocaleString()}</p>
             </div>
           </div>
           <div className="text-xs text-muted-foreground border-t border-border/50 pt-3 flex items-center justify-between">
@@ -160,16 +160,16 @@ export const FinancePage: React.FC = () => {
 
         <Card className="p-6 bg-card border-2 border-primary/40 shadow-lg hover:shadow-xl transition-shadow relative overflow-hidden text-left bg-gradient-to-tr from-card to-primary/5">
           <div className="absolute top-0 right-0 p-6 opacity-10">
-            <DollarSign className="w-10 h-10 text-primary" />
+            <IndianRupee className="w-10 h-10 text-primary" />
           </div>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
-              <DollarSign className="w-6 h-6" />
+              <IndianRupee className="w-6 h-6" />
             </div>
             <div>
               <p className="text-xs font-bold text-primary uppercase tracking-wider">Remaining Available Balance</p>
               <p className={`text-3xl font-black mt-0.5 ${summary.remainingBalance < 0 ? 'text-red-500' : 'text-foreground'}`}>
-                ${summary.remainingBalance.toLocaleString()}
+                ₹{summary.remainingBalance.toLocaleString()}
               </p>
             </div>
           </div>

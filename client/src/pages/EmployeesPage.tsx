@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { TableSkeleton } from '../Components/WrapperComponents/Skeleton';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,7 +18,7 @@ import { Input, Textarea } from '../Components/WrapperComponents/Input';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import { Modal } from '../Components/WrapperComponents/Modal';
 import type { Employee } from '../types';
-import { Edit, Trash2, Eye, Camera, Loader2, Sparkles, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Edit, Trash2, Eye, Camera, Loader2, Sparkles, ChevronLeft, ChevronRight, Search, Plus } from 'lucide-react';
 
 const baseEmployeeSchema = z.object({
   id: z.string().optional(),
@@ -129,6 +129,7 @@ export const EmployeesPage: React.FC = () => {
   };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
 
@@ -172,6 +173,18 @@ export const EmployeesPage: React.FC = () => {
   } = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeSchema),
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'add' && hasPermission('EMPLOYEES', 'create')) {
+      reset();
+      setEditingId(null);
+      setProfileImage('');
+      setFormTab('general');
+      setShowModal(true);
+      navigate('/employees', { replace: true });
+    }
+  }, [location.search, hasPermission, reset, navigate]);
 
   const selectedDeptIdWatch = watch('departmentId');
 
@@ -543,6 +556,19 @@ export const EmployeesPage: React.FC = () => {
               {isSyncingMS ? 'SYNCING...' : 'SYNC MICROSOFT'}
             </Button>
 
+            <Button
+              onClick={() => {
+                reset();
+                setEditingId(null);
+                setProfileImage('');
+                setFormTab('general');
+                setShowModal(true);
+              }}
+              className="bg-primary hover:bg-primary/90 text-white font-bold tracking-wider shadow-lg flex items-center gap-1.5"
+            >
+              <Plus className="w-5 h-5" />
+              ONBOARD STAFF
+            </Button>
           </div>
         )}
       </div>

@@ -21,7 +21,7 @@ import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
 import { permissionApi } from '../api_service/permissionApi';
 import { projectApi } from '../api_service/projectApi';
-import { Users, CalendarCheck, Palmtree, BarChart3, ListTodo, Network } from 'lucide-react';
+import { Users, CalendarCheck, Palmtree, BarChart3, ListTodo, Network, UserPlus } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const { user, role } = useAuthStore();
@@ -360,7 +360,17 @@ export const DashboardPage: React.FC = () => {
                   iconBg: 'bg-cyan-500/15 text-cyan-600',
                   icon: <Network className="w-6 h-6" />,
                 },
-              ].map(({ label, desc, path, gradient, border, iconBg, icon }) => (
+                {
+                  label: 'Add Employee',
+                  desc: 'Onboard Staff',
+                  path: '/employees?action=add',
+                  gradient: 'from-teal-500/20 to-emerald-600/10',
+                  border: 'border-teal-500/30',
+                  iconBg: 'bg-teal-500/15 text-teal-600',
+                  icon: <UserPlus className="w-6 h-6" />,
+                  hidden: role !== 'HR',
+                },
+              ].filter(item => !item.hidden).map(({ label, desc, path, gradient, border, iconBg, icon }) => (
                 <button
                   key={path}
                   onClick={() => navigate(path)}
@@ -474,6 +484,15 @@ export const DashboardPage: React.FC = () => {
                   icon: (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                   ),
+                },
+                {
+                  label: 'Add Employee',
+                  desc: 'Onboard Staff',
+                  path: '/employees?action=add',
+                  gradient: 'from-teal-500/20 to-emerald-600/10',
+                  border: 'border-teal-500/30',
+                  iconBg: 'bg-teal-500/15 text-teal-600',
+                  icon: <UserPlus className="w-6 h-6" />,
                 },
               ].map(({ label, desc, path, gradient, border, iconBg, icon }) => (
                 <button

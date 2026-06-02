@@ -4,7 +4,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { employeeApi } from '../../api_service/employeeApi';
 import { analyticsApi } from '../../api_service/analyticsApi';
 import { Card } from '../WrapperComponents/Card';
-import { Users, TrendingUp, DollarSign, FolderKanban, Building2 } from 'lucide-react';
+import { Users, TrendingUp, IndianRupee, FolderKanban, Building2 } from 'lucide-react';
 
 import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -269,7 +269,7 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
             <h3 className="text-3xl font-extrabold text-foreground font-mono">{formatCurrency(stats.monthlyPayrollCost ?? 0)}</h3>
             <p className="text-xs text-muted-foreground font-medium mt-2">Status: Disbursed</p>
           </div>
-          <div className="p-4 rounded-2xl bg-primary/10 text-primary"><DollarSign className="w-7 h-7" /></div>
+          <div className="p-4 rounded-2xl bg-primary/10 text-primary"><IndianRupee className="w-7 h-7" /></div>
         </Card>
       </div>
 

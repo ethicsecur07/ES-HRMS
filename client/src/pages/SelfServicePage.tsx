@@ -406,17 +406,6 @@ export const SelfServicePage: React.FC = () => {
           <Receipt className="w-4 h-4" />
           Reimbursements
         </button>
-        <button
-          onClick={() => { setActiveTab('attendance'); setStatusFilter(''); }}
-          className={`flex items-center gap-2 px-5 py-3 border-b-2 font-semibold text-sm transition-all duration-200 ${
-            activeTab === 'attendance'
-              ? 'border-primary text-primary bg-primary/5'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'
-          }`}
-        >
-          <CalendarDays className="w-4 h-4" />
-          Attendance Corrections
-        </button>
       </div>
 
       {/* Main card panel with filters */}
