@@ -18,6 +18,7 @@ export interface LeavePolicy {
   applicableGender: 'All' | 'Male' | 'Female';
   probationExempt: boolean;
   permissionAutoConvert: boolean;
+  applicableTo?: 'ALL' | 'EMPLOYEE' | 'INTERN';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

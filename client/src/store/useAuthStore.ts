@@ -58,6 +58,14 @@ const DEMO_USERS: Record<Role, User> = {
     isActive: true,
     lastLogin: new Date().toISOString(),
   },
+  INTERN: {
+    _id: '605c72ef1f77bcf86cd79606',
+    name: 'Dhinakaran Ravi',
+    email: 'dhinakaranr@ethicsecur.co.in',
+    role: 'INTERN',
+    isActive: true,
+    lastLogin: new Date().toISOString(),
+  },
 };
 
 export const useAuthStore = create<AuthState>()(

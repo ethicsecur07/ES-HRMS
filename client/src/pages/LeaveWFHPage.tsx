@@ -54,6 +54,8 @@ export const LeaveWFHPage: React.FC = () => {
     enabled: !!user?.employeeId,
   });
 
+  const isUserIntern = role === 'INTERN' || user?.role === 'INTERN' || employeeProfile?.isIntern || employeeProfile?.role === 'INTERN';
+
   // Helper to find balance for a type
   const getBalance = (type: string) => leaveBalances.find(b => b.leaveType === type);
 
@@ -334,146 +336,164 @@ export const LeaveWFHPage: React.FC = () => {
     <div className="space-y-6 text-left animate-in fade-in duration-300">
       {/* Title Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border shadow-sm">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Palmtree className="w-6 h-6 text-primary" />
-            Leave, WFH & Permission Management
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Track company absence allowances, remote work productivity plans, and monthly permission limits
-          </p>
-        </div>
-
-        {(role === 'EMPLOYEE' || role === 'INTERN') && (
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <Button size="sm" onClick={() => setShowLeaveModal(true)} className="bg-primary text-white font-bold tracking-wider shadow-md shadow-primary/20">
-              <Plus className="w-4 h-4 mr-1.5" /> Apply Leave
-            </Button>
-            <Button size="sm" onClick={() => setShowWFHModal(true)} className="bg-foreground text-background hover:bg-foreground/90 font-bold tracking-wider shadow-md">
-              <Laptop className="w-4 h-4 mr-1.5" /> Request WFH
-            </Button>
-            <Button size="sm" onClick={() => setShowPermModal(true)} className="bg-muted-foreground text-white hover:bg-muted-foreground/90 font-bold tracking-wider shadow-md">
-              <Clock className="w-4 h-4 mr-1.5" /> Request Permission
-            </Button>
+        {isUserIntern ? (
+          <div>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
+              <Calendar className="w-6 h-6 text-primary" />
+              Holiday & Company Calendar
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              View upcoming national holidays, festivals, and restricted off days
+            </p>
           </div>
+        ) : (
+          <>
+            <div>
+              <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
+                <Palmtree className="w-6 h-6 text-primary" />
+                Leave, WFH & Permission Management
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Track company absence allowances, remote work productivity plans, and monthly permission limits
+              </p>
+            </div>
+
+            {(role === 'EMPLOYEE') && (
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <Button size="sm" onClick={() => setShowLeaveModal(true)} className="bg-primary text-white font-bold tracking-wider shadow-md shadow-primary/20">
+                  <Plus className="w-4 h-4 mr-1.5" /> Apply Leave
+                </Button>
+                <Button size="sm" onClick={() => setShowWFHModal(true)} className="bg-foreground text-background hover:bg-foreground/90 font-bold tracking-wider shadow-md">
+                  <Laptop className="w-4 h-4 mr-1.5" /> Request WFH
+                </Button>
+                <Button size="sm" onClick={() => setShowPermModal(true)} className="bg-muted-foreground text-white hover:bg-muted-foreground/90 font-bold tracking-wider shadow-md">
+                  <Clock className="w-4 h-4 mr-1.5" /> Request Permission
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Exactly 2 Primary Tabs: Dashboard and Logs */}
-      <div className="flex items-center gap-2 border-b border-border pb-3">
-        <button
-          onClick={() => setActivePageTab('DASHBOARD')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-            activePageTab === 'DASHBOARD' 
-              ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-          }`}
-        >
-          <Calendar className="w-4 h-4" /> Calendar & Balances
-        </button>
-        <button
-          onClick={() => setActivePageTab('HISTORY')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-            activePageTab === 'HISTORY' 
-              ? 'bg-foreground text-background shadow-md' 
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-          }`}
-        >
-          <FileText className="w-4 h-4" /> Request History Logs
-        </button>
-      </div>
+      {!isUserIntern && (
+        <div className="flex items-center gap-2 border-b border-border pb-3">
+          <button
+            onClick={() => setActivePageTab('DASHBOARD')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              activePageTab === 'DASHBOARD' 
+                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <Calendar className="w-4 h-4" /> Calendar & Balances
+          </button>
+          <button
+            onClick={() => setActivePageTab('HISTORY')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              activePageTab === 'HISTORY' 
+                ? 'bg-foreground text-background shadow-md' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <FileText className="w-4 h-4" /> Request History Logs
+          </button>
+        </div>
+      )}
 
       {/* Render selected primary tab */}
       {activePageTab === 'DASHBOARD' ? (
         <div className="space-y-6 animate-in fade-in duration-250">
           {/* Balances (Full Width, Horizontal Cards Grid) */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Info className="w-4 h-4 text-primary" />
-              Your Balance Allowances
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Casual Leave Balance */}
-              {(() => {
-                const b = getBalance('Casual Leave');
-                return (
-                  <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-                    <div className="absolute right-3 top-3 opacity-10">
-                      <Palmtree className="w-12 h-12 text-primary" />
-                    </div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Casual / Sick Leaves</p>
-                    <h4 className="text-3xl font-black text-foreground">
-                      {b ? b.balance : (employeeProfile?.leaveBalance ?? 0)}{' '}
-                      <span className="text-xs font-semibold text-muted-foreground">days left</span>
-                    </h4>
-                    {b && (
-                      <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-                        <span>Allocated: <strong>{b.allocated}</strong></span>
-                        <span>Used: <strong>{b.used}</strong></span>
+          {!isUserIntern && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-primary" />
+                Your Balance Allowances
+              </h3>
+              <div className={`grid grid-cols-1 ${isUserIntern ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-6`}>
+                {/* Casual Leave Balance */}
+                {!isUserIntern && (() => {
+                  const b = getBalance('Casual Leave');
+                  return (
+                    <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+                      <div className="absolute right-3 top-3 opacity-10">
+                        <Palmtree className="w-12 h-12 text-primary" />
                       </div>
-                    )}
-                    <p className="text-[10px] text-muted-foreground mt-2">Resets monthly ({b?.monthlyAllowance ?? 2} days/month)</p>
-                  </Card>
-                );
-              })()}
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Casual / Sick Leaves</p>
+                      <h4 className="text-3xl font-black text-foreground">
+                        {b ? b.balance : (employeeProfile?.leaveBalance ?? 0)}{' '}
+                        <span className="text-xs font-semibold text-muted-foreground">days left</span>
+                      </h4>
+                      {b && (
+                        <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
+                          <span>Allocated: <strong>{b.allocated}</strong></span>
+                          <span>Used: <strong>{b.used}</strong></span>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-2">Resets monthly ({b?.monthlyAllowance ?? 2} days/month)</p>
+                    </Card>
+                  );
+                })()}
 
-              {/* WFH Balance */}
-              {(() => {
-                const b = getBalance('WFH');
-                return (
-                  <Card className="border-l-4 border-l-foreground p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-                    <div className="absolute right-3 top-3 opacity-10">
-                      <Laptop className="w-12 h-12 text-foreground" />
-                    </div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Work From Home (WFH)</p>
-                    <h4 className="text-3xl font-black text-foreground">
-                      {b ? b.balance : (employeeProfile?.wfhBalance ?? 0)}{' '}
-                      <span className="text-xs font-semibold text-muted-foreground">days left</span>
-                    </h4>
-                    {b && (
-                      <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-                        <span>Allocated: <strong>{b.allocated}</strong></span>
-                        <span>Used: <strong>{b.used}</strong></span>
+                {/* WFH Balance */}
+                {(() => {
+                  const b = getBalance('WFH');
+                  return (
+                    <Card className="border-l-4 border-l-foreground p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+                      <div className="absolute right-3 top-3 opacity-10">
+                        <Laptop className="w-12 h-12 text-foreground" />
                       </div>
-                    )}
-                    <p className="text-[10px] text-muted-foreground mt-2">Resets monthly ({b?.monthlyAllowance ?? 1} day/month)</p>
-                  </Card>
-                );
-              })()}
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Work From Home (WFH)</p>
+                      <h4 className="text-3xl font-black text-foreground">
+                        {b ? b.balance : (employeeProfile?.wfhBalance ?? 0)}{' '}
+                        <span className="text-xs font-semibold text-muted-foreground">days left</span>
+                      </h4>
+                      {b && (
+                        <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
+                          <span>Allocated: <strong>{b.allocated}</strong></span>
+                          <span>Used: <strong>{b.used}</strong></span>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-2">Resets monthly ({b?.monthlyAllowance ?? 1} day/month)</p>
+                    </Card>
+                  );
+                })()}
 
-              {/* Permission Balance */}
-              {(() => {
-                const b = getBalance('Permission');
-                const limit = b?.permissionConversionHours ?? 3;
-                const used = b?.used ?? (employeeProfile?.permissionHoursBalance !== undefined ? limit - employeeProfile.permissionHoursBalance : 0);
-                const remaining = b ? b.balance : (employeeProfile?.permissionHoursBalance ?? limit);
-                const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-                return (
-                  <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-                    <div className="absolute right-3 top-3 opacity-10">
-                      <Clock className="w-12 h-12 text-primary" />
-                    </div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Permission Hours</p>
-                    <h4 className="text-3xl font-black text-foreground">
-                      {remaining.toFixed ? remaining.toFixed(1) : remaining}{' '}
-                      <span className="text-xs font-semibold text-muted-foreground">hrs left</span>
-                    </h4>
-                    {/* Progress bar */}
-                    <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-rose-500' : pct >= 75 ? 'bg-amber-500' : 'bg-primary'}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-1">{pct}% used of {limit} hr monthly limit</p>
-                    {pct >= 100 && (
-                      <p className="text-[10px] text-rose-600 font-bold mt-1">⚠ Limit reached — next approval may trigger half-day deduction</p>
-                    )}
-                  </Card>
-                );
-              })()}
+                {/* Permission Balance */}
+                {(() => {
+                  const b = getBalance('Permission');
+                  const limit = b?.permissionConversionHours ?? 3;
+                  const used = b?.used ?? (employeeProfile?.permissionHoursBalance !== undefined ? limit - employeeProfile.permissionHoursBalance : 0);
+                  const remaining = b ? b.balance : (employeeProfile?.permissionHoursBalance ?? limit);
+                  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+                  return (
+                    <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
+                      <div className="absolute right-3 top-3 opacity-10">
+                        <Clock className="w-12 h-12 text-primary" />
+                      </div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Permission Hours</p>
+                      <h4 className="text-3xl font-black text-foreground">
+                        {remaining.toFixed ? remaining.toFixed(1) : remaining}{' '}
+                        <span className="text-xs font-semibold text-muted-foreground">hrs left</span>
+                      </h4>
+                      {/* Progress bar */}
+                      <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-rose-500' : pct >= 75 ? 'bg-amber-500' : 'bg-primary'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">{pct}% used of {limit} hr monthly limit</p>
+                      {pct >= 100 && (
+                        <p className="text-[10px] text-rose-600 font-bold mt-1">⚠ Limit reached — next approval may trigger half-day deduction</p>
+                      )}
+                    </Card>
+                  );
+                })()}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Interactive Calendar (Full Width) — powered by HolidayEnhancedCalendar */}
           <div className="space-y-4">
@@ -528,7 +548,7 @@ export const LeaveWFHPage: React.FC = () => {
 
             {/* Simple Search/Filters */}
             <div className="flex items-center gap-3">
-              {(role !== 'EMPLOYEE' && role !== 'INTERN') && (
+              {(role !== 'EMPLOYEE' && !isUserIntern) && (
                 <div className="w-48 sm:w-64">
                   <Input
                     placeholder="Search name..."
@@ -553,13 +573,13 @@ export const LeaveWFHPage: React.FC = () => {
           </div>
 
           {activeHistoryTab === 'LEAVE' && (
-            <TableWrapper columns={(role === 'EMPLOYEE' || role === 'INTERN') ? leaveColumns.filter(c => c.header !== 'Employee') : leaveColumns} data={filteredLeaves} />
+            <TableWrapper columns={(role === 'EMPLOYEE' || isUserIntern) ? leaveColumns.filter(c => c.header !== 'Employee') : leaveColumns} data={filteredLeaves} />
           )}
           {activeHistoryTab === 'WFH' && (
-            <TableWrapper columns={(role === 'EMPLOYEE' || role === 'INTERN') ? wfhColumns.filter(c => c.header !== 'Employee') : wfhColumns} data={filteredWFH} />
+            <TableWrapper columns={(role === 'EMPLOYEE' || isUserIntern) ? wfhColumns.filter(c => c.header !== 'Employee') : wfhColumns} data={filteredWFH} />
           )}
           {activeHistoryTab === 'PERMISSION' && (
-            <TableWrapper columns={(role === 'EMPLOYEE' || role === 'INTERN') ? permColumns.filter(c => c.header !== 'Employee') : permColumns} data={filteredPerms} />
+            <TableWrapper columns={(role === 'EMPLOYEE' || isUserIntern) ? permColumns.filter(c => c.header !== 'Employee') : permColumns} data={filteredPerms} />
           )}
         </Card>
       )}

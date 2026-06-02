@@ -223,15 +223,14 @@ export class AttendanceService {
         throw new Error(`Check-in is not allowed on non-working days (${currentDayLabel}).`);
       }
 
-      // Enforce Public Holiday check
+      // Enforce Company Holiday check
       const publicHoliday = await HolidayCalendar.findOne({
         organizationId: orgId,
-        date: today,
-        isRestricted: false
+        date: today
       }).session(session);
 
       if (publicHoliday) {
-        throw new Error(`Check-in is disabled today due to the public holiday: ${publicHoliday.name}.`);
+        throw new Error(`Check-in is disabled today due to the holiday: ${publicHoliday.name}.`);
       }
 
       // 3. Verify location (Office IP Range or GPS GeoFence)

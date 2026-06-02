@@ -356,14 +356,15 @@ export const LoginPage: React.FC = () => {
             <p className="text-[9px] uppercase font-black text-[#F75F0A] tracking-wider mb-3">
               Developer Sandbox • One-Click Role Switcher
             </p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {(['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD', 'EMPLOYEE'] as Role[]).map((r) => {
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+              {(['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD', 'EMPLOYEE', 'INTERN'] as Role[]).map((r) => {
                 const colors: Record<Role, string> = {
                   ADMIN: 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 hover:border-red-500/40',
                   MANAGER: 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-500/20 hover:border-indigo-500/40',
                   HR: 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20 hover:border-emerald-500/40',
                   TEAM_LEAD: 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20 hover:border-amber-500/40',
                   EMPLOYEE: 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-750 hover:border-slate-650',
+                  INTERN: 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border-teal-500/20 hover:border-teal-500/40',
                 };
                 return (
                   <button
