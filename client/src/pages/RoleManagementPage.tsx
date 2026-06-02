@@ -8,7 +8,8 @@ import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input } from '../Components/WrapperComponents/Input';
 import { Modal } from '../Components/WrapperComponents/Modal';
-import { Settings, Plus, Edit2, Trash2, Network, Lock, ShieldAlert, ArrowRight, Users, ShieldCheck, ChevronDown, Check, X, Search, Calendar } from 'lucide-react';
+import { Settings, Plus, Edit2, Trash2, Network, Lock, ShieldAlert, ArrowRight, Users, ShieldCheck, Check, X, Search, Calendar } from 'lucide-react';
+import { IoIosArrowDropdown } from 'react-icons/io';
 import { NavLink } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
 
@@ -428,20 +429,23 @@ export const RoleManagementPage: React.FC = () => {
           />
           <div className="space-y-1.5 text-left">
             <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Parent Role (Inherits From)</label>
-            <select
-              value={parentRoleId || ''}
-              onChange={(e) => setParentRoleId(e.target.value || null)}
-              disabled={!!editingRole && ['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD', 'EMPLOYEE'].includes(editingRole.code)}
-              className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <option value="">None (Base Level)</option>
-              {roles
-                .filter(r => !editingRole || (r._id !== editingRole._id && !wouldCreateCycle(editingRole._id, r._id)))
-                .map(r => (
-                  <option key={r._id} value={r._id}>{r.name} ({r.code})</option>
-                ))
-              }
-            </select>
+            <div className="relative w-full">
+              <select
+                value={parentRoleId || ''}
+                onChange={(e) => setParentRoleId(e.target.value || null)}
+                disabled={!!editingRole && ['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD', 'EMPLOYEE'].includes(editingRole.code)}
+                className="w-full px-4 py-2.5 pr-9 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed appearance-none cursor-pointer"
+              >
+                <option value="">None (Base Level)</option>
+                {roles
+                  .filter(r => !editingRole || (r._id !== editingRole._id && !wouldCreateCycle(editingRole._id, r._id)))
+                  .map(r => (
+                    <option key={r._id} value={r._id}>{r.name} ({r.code})</option>
+                  ))
+                }
+              </select>
+              <IoIosArrowDropdown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+            </div>
             <p className="text-[10px] text-muted-foreground mt-1">This role will inherit all permission credentials from the chosen parent.</p>
           </div>
 
@@ -481,7 +485,7 @@ export const RoleManagementPage: React.FC = () => {
                     ? 'Select employees to assign...'
                     : `${selectedUserIds.length} employee(s) selected`}
                 </span>
-                <ChevronDown className="w-4 h-4 opacity-60 flex-shrink-0" />
+                <IoIosArrowDropdown className="w-5 h-5 opacity-60 flex-shrink-0" />
               </button>
 
               {isDropdownOpen && (

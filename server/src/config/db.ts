@@ -9,15 +9,7 @@ export const connectDB = async (): Promise<void> => {
     });
     logger.info('MongoDB Atlas connected successfully');
   } catch (error) {
-    logger.error('MongoDB connection failed. Attempting fallback to In-Memory MongoDB...', { error });
-    try {
-      const { MongoMemoryServer } = await import('mongodb-memory-server');
-      const mongoServer = await MongoMemoryServer.create();
-      const uri = mongoServer.getUri();
-      await mongoose.connect(uri);
-      logger.info('In-Memory MongoDB connected successfully as fallback');
-    } catch (fallbackError) {
-      logger.error('In-Memory MongoDB fallback failed', { fallbackError });
-    }
+    logger.error('MongoDB connection failed.', { error });
+    process.exit(1);
   }
 };

@@ -21,7 +21,6 @@ const FinancePage = lazy(() => import('./pages/FinancePage').then(m => ({ defaul
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
-const OrganizationPage = lazy(() => import('./pages/OrganizationPage').then(m => ({ default: m.OrganizationPage })));
 const SelfServicePage = lazy(() => import('./pages/SelfServicePage').then(m => ({ default: m.SelfServicePage })));
 const DocumentPage = lazy(() => import('./pages/DocumentPage').then(m => ({ default: m.DocumentPage })));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
@@ -179,7 +178,6 @@ export const App: React.FC = () => {
                   <Route path="/employees/:id" element={<EmployeeDetailsPage />} />
                   <Route path="/reports" element={<ReportsPage />} />
                   <Route path="/finance" element={<FinancePage />} />
-                  <Route path="/organization" element={<OrganizationPage />} />
                   <Route path="/settings/roles" element={<RoleManagementPage />} />
                   <Route path="/settings/permissions" element={<PermissionPage />} />
                   <Route path="/settings" element={<SettingsPage />} />

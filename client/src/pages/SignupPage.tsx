@@ -127,10 +127,10 @@ export const SignupPage: React.FC = () => {
   ];
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-slate-950 font-sans p-6 overflow-hidden select-none">
-      {/* Decorative Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-indigo-500/10 blur-[120px] animate-pulse pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-[#F75F0A]/5 blur-[120px] animate-pulse pointer-events-none" />
+    <div className="relative min-h-screen w-full flex items-center justify-center bg-slate-950 p-6 overflow-hidden">
+      {/* Background glow effects */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#F75F0A]/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none animate-pulse delay-1000"></div>
 
       {/* Floating System Shield Banner */}
       <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-slate-900/60 border border-slate-800/80 px-4 py-2 rounded-full backdrop-blur-md">
@@ -140,9 +140,9 @@ export const SignupPage: React.FC = () => {
         </span>
       </div>
 
-      <Card className="w-full max-w-xl p-8 z-10 border border-slate-800/80 shadow-2xl backdrop-blur-xl bg-slate-900/90 text-white animate-in fade-in zoom-in-95 duration-500">
+      <Card className="w-full max-w-xl p-8 z-10 border border-slate-800 shadow-2xl backdrop-blur-xl bg-slate-900/90 text-white">
         <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+          <div className="w-12 h-12 bg-[#F75F0A]/10 border border-[#F75F0A]/20 text-[#F75F0A] rounded-2xl flex items-center justify-center mx-auto mb-3">
             <Building2 className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight">Register New Organization</h2>
@@ -165,6 +165,7 @@ export const SignupPage: React.FC = () => {
                 onChange={handleOrgNameChange}
                 placeholder="e.g. EthicSec Corporation"
                 icon={<Building2 className="w-4 h-4" />}
+                className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                 required
               />
 
@@ -174,7 +175,8 @@ export const SignupPage: React.FC = () => {
                   value={formData.organizationSlug}
                   onChange={(e) => setFormData({ ...formData, organizationSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
                   placeholder="e.g. ethicsec"
-                  icon={<Sparkles className="w-4 h-4 text-indigo-400" />}
+                  icon={<Sparkles className="w-4 h-4 text-[#F75F0A]" />}
+                  className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   required
                 />
                 <p className="mt-1 text-[10px] text-slate-400 text-left font-sans">
@@ -188,12 +190,13 @@ export const SignupPage: React.FC = () => {
               value={formData.organizationSector}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, organizationSector: e.target.value })}
               options={[{ value: '', label: 'Select Sector...' }, ...sectors]}
+              className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
               required
             />
           </div>
 
           {/* Admin User Section */}
-          <div className="space-y-3.5 pt-2 border-t border-slate-800/80">
+          <div className="space-y-3.5 pt-2 border-t border-slate-800">
             <p className="text-[9px] font-black uppercase tracking-wider text-[#F75F0A] mb-1">
               Primary Administrator Credentials
             </p>
@@ -205,6 +208,7 @@ export const SignupPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g. Abishek"
                 icon={<User className="w-4 h-4" />}
+                className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                 required
               />
 
@@ -215,6 +219,7 @@ export const SignupPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="e.g. admin@ethicsecur.co.in"
                 icon={<Mail className="w-4 h-4" />}
+                className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                 required
               />
             </div>
@@ -227,6 +232,7 @@ export const SignupPage: React.FC = () => {
                 onChange={handlePasswordChange}
                 placeholder="••••••••••••"
                 icon={<Lock className="w-4 h-4" />}
+                className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                 required
               />
 
@@ -274,16 +280,16 @@ export const SignupPage: React.FC = () => {
           <div className="pt-4 space-y-3">
             <Button
               type="submit"
-              variant="primary"
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold tracking-tight rounded-xl shadow-lg shadow-indigo-600/20 active:scale-[0.99] transition-all"
+              className="w-full bg-[#F75F0A] hover:bg-[#F75F0A]/90 text-white font-bold tracking-wider py-3 shadow-lg shadow-[#F75F0A]/20 hover:shadow-[#F75F0A]/30 transition-all scale-[1.01] mt-2 flex items-center justify-center"
               isLoading={loading}
             >
+              <Building2 className="w-5 h-5 mr-2" />
               REGISTER WORKSPACE
             </Button>
 
             <div className="text-center text-xs text-slate-400">
               Already have an active organization?{' '}
-              <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline">
+              <Link to="/login" className="text-[#F75F0A] font-bold hover:underline">
                 Sign In
               </Link>
             </div>

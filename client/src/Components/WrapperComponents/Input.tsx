@@ -1,5 +1,6 @@
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
+import { IoIosArrowDropdown } from 'react-icons/io';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -57,22 +58,25 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             {label}
           </label>
         )}
-        <select
-          id={id}
-          ref={ref}
-          className={twMerge(
-            'flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors',
-            error && 'border-destructive focus-visible:ring-destructive',
-            className
-          )}
-          {...props}
-        >
-          {options ? options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          )) : props.children}
-        </select>
+        <div className="relative w-full">
+          <select
+            id={id}
+            ref={ref}
+            className={twMerge(
+              'flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 pr-9 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors appearance-none cursor-pointer',
+              error && 'border-destructive focus-visible:ring-destructive',
+              className
+            )}
+            {...props}
+          >
+            {options ? options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            )) : props.children}
+          </select>
+          <IoIosArrowDropdown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        </div>
         {error && <p className="mt-1 text-xs text-destructive text-left font-medium">{error}</p>}
       </div>
     );

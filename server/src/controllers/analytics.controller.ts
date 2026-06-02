@@ -116,23 +116,6 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       attendanceTrends.push({ date: dayName, dateStr, present, wfh, leave });
     }
 
-    const totalWeeklyActions = attendanceTrends.reduce((sum, d) => sum + d.present + d.wfh + d.leave, 0);
-    if (totalWeeklyActions === 0) {
-      const mockData = [
-        { present: 58, wfh: 30, leave: 12 },
-        { present: 58, wfh: 22, leave: 20 },
-        { present: 48, wfh: 27, leave: 25 },
-        { present: 58, wfh: 32, leave: 10 },
-        { present: 72, wfh: 18, leave: 10 },
-        { present: 42, wfh: 33, leave: 25 },
-        { present: 45, wfh: 38, leave: 17 }
-      ];
-      attendanceTrends.forEach((item, idx) => {
-        item.present = mockData[idx].present;
-        item.wfh = mockData[idx].wfh;
-        item.leave = mockData[idx].leave;
-      });
-    }
 
     // Calculate Department Productivity & Overall Productivity using ONLY DB Data
     const activeEmployees = await Employee.find({ isActive: true, organizationId: orgId });
@@ -217,26 +200,6 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       }).filter((m) => m.allocations.length > 0);
     }
 
-    // Fallback: derive from Employee salaries if no payroll data exists
-    if (financeData.length === 0) {
-      const allActiveEmployees = await Employee.find(
-        { isActive: true, organizationId: orgId },
-        { salary: 1 }
-      );
-      const totalMonthlySalary = allActiveEmployees.reduce((sum, emp) => sum + (emp.salary || 0), 0);
-      // Use employee salary sum, or estimate from count
-      const baseCost = totalMonthlySalary > 0 ? totalMonthlySalary : (totalEmployees * 50000);
-
-      financeData = financeMonths.slice(-3).map((m) => ({
-        month: formatMonthLabel(m),
-        allocations: [
-          { name: 'Base Salary', value: Math.round(baseCost * 0.70) },
-          { name: 'Bonus & Extras', value: Math.round(baseCost * 0.10) },
-          { name: 'Tax', value: Math.round(baseCost * 0.12) },
-          { name: 'Deductions', value: Math.round(baseCost * 0.08) },
-        ],
-      }));
-    }
 
     // Build projectProductivity from Project + Task data
     const projects = await Project.find({ organizationId: orgId })

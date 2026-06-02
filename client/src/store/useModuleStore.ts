@@ -17,7 +17,6 @@ const fallbackModuleRoutes: ModuleRouteData[] = [
   { moduleCode: 'TASKS', routePath: '/task-reports', displayName: 'Task & Daily Reports', order: 5 },
   { moduleCode: 'PAYROLL', routePath: '/payroll', displayName: 'Payroll', order: 6 },
   { moduleCode: 'FINANCE', routePath: '/finance', displayName: 'Finance & Maintenance', order: 7 },
-  { moduleCode: 'ORG_STRUCTURE', routePath: '/organization', displayName: 'Organization Structure', order: 9 },
   { moduleCode: 'REPORTS', routePath: '/reports', displayName: 'Reports & Analytics', order: 11 },
   { moduleCode: 'AUDIT_LOGS', routePath: '/audit-logs', displayName: 'Audit Logs', order: 12 },
   { moduleCode: 'SETTINGS', routePath: '/settings', displayName: 'Settings', order: 13 },

@@ -308,25 +308,6 @@ export class EmployeeService {
           { email: { $in: revokedEmails } }
         ]
       });
-    } else if (isActive === 'false' || isActive === false) {
-      // Admin filter: "Inactive Only" is selected, so we allow showing revoked logins for possible reactivation
-    } else {
-      // Default: Strict filter to ONLY show login-approved and active employees
-      const approvedUsers = await User.find({
-        organizationId: orgId,
-        isLoginApproved: true,
-        isActive: true
-      }).select('employeeId email');
-
-      const approvedEmployeeIds = approvedUsers.map(u => u.employeeId).filter(Boolean);
-      const approvedEmails = approvedUsers.map(u => u.email?.toLowerCase().trim()).filter(Boolean);
-
-      andConditions.push({
-        $or: [
-          { _id: { $in: approvedEmployeeIds } },
-          { email: { $in: approvedEmails } }
-        ]
-      });
     }
 
     if (search) {
@@ -741,6 +722,7 @@ export class EmployeeService {
             user.email = email;
             user.employeeId = employee._id; // Ensure linked
             user.isActive = true;
+            user.isLoginApproved = true;
             user.ssoData = ssoData;
             await user.save();
           } else {
@@ -753,7 +735,7 @@ export class EmployeeService {
               role: 'EMPLOYEE',
               employeeId: employee._id,
               isActive: true,
-              isLoginApproved: false,
+              isLoginApproved: true,
               ssoData
             });
           }
@@ -792,7 +774,7 @@ export class EmployeeService {
             role: 'EMPLOYEE',
             employeeId: employee._id,
             isActive: true,
-            isLoginApproved: false,
+            isLoginApproved: true,
             ssoData: {
               provider: 'MICROSOFT',
               azureRoles: msUser.roles || [],

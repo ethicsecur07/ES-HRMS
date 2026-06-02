@@ -1,589 +1,62 @@
 {
-  "timestamp": "2026-06-02T05:24:13.589Z",
+  "timestamp": "2026-06-02T13:41:55.205Z",
   "msg": "Resolved employee profile",
   "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1e68fa54e8aecc0936e5b8",
-    "iat": 1780377850,
-    "exp": 1780378750
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T05:24:13.713Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T05:25:58.474Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1e68fa54e8aecc0936e5b8",
-    "iat": 1780377944,
-    "exp": 1780378844
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T05:25:58.937Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T08:17:17.185Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1e918baa38529a3249a2a0",
-    "iat": 1780388235,
-    "exp": 1780389135
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T08:17:17.287Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-01T11:36:12.357Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1d6b9fb0d9f3cbd953a27d",
-    "iat": 1780312991,
-    "exp": 1780313891
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-01T11:36:12.433Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-01T11:43:40.769Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1d6b9fb0d9f3cbd953a27d",
-    "iat": 1780313903,
-    "exp": 1780314803
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-01T11:43:40.850Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-01T12:32:17.527Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1d7bd054e8aecc0936c0f0",
-    "iat": 1780317136,
-    "exp": 1780318036
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-01T12:32:17.614Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:00:59.447Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19407d06ba32c0a73d969c",
+    "id": "6a1ed7daa03ff2c9a45f1c56",
     "role": "EMPLOYEE",
     "email": "logapriyanm@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413a42dc44db7c864f79",
-    "sessionId": "6a1e53b245a6ec2d3e87fe3c",
-    "iat": 1780372857,
-    "exp": 1780373757
+    "organizationId": "6a1ed6b76cd721e1f9d4e96c",
+    "employeeId": "6a1ed7daa03ff2c9a45f1c54",
+    "sessionId": "6a1edda18a287587d847598f",
+    "iat": 1780407713,
+    "exp": 1780408613
   },
   "employeeFound": true,
   "employeeDetails": {
-    "id": "6a19413a42dc44db7c864f79",
+    "id": "6a1ed7daa03ff2c9a45f1c54",
     "fullName": "Logapriyan Mahendran",
     "email": "logapriyanm@ethicsecur.co.in",
     "department": "MERN Stack Developer"
   }
 }
 {
-  "timestamp": "2026-06-02T04:00:59.564Z",
+  "timestamp": "2026-06-02T13:41:55.243Z",
   "msg": "Computed stats successfully",
   "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:10:26.466Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a1dbe9ee4653ded75856777",
-    "role": "EMPLOYEE",
-    "email": "suseendrakumar2003@gmail.com",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a1dbe99154c625bdf4cd4a1",
-    "sessionId": "6a1e57a754e8aecc0936c3dd",
-    "iat": 1780373416,
-    "exp": 1780374316
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a1dbe99154c625bdf4cd4a1",
-    "fullName": "Suseendra Kumar",
-    "email": "suseendrakumar2003@gmail.com",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:10:27.452Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
+    "departmentProjectCount": 0,
+    "onboardProjectCount": 0,
     "assignedProjectCount": 0,
     "completedProjectCount": 0
   }
 }
 {
-  "timestamp": "2026-06-02T04:11:09.430Z",
+  "timestamp": "2026-06-02T13:42:42.429Z",
   "msg": "Resolved employee profile",
   "user": {
-    "id": "6a1dbe9ee4653ded75856777",
-    "role": "EMPLOYEE",
-    "email": "suseendrakumar2003@gmail.com",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a1dbe99154c625bdf4cd4a1",
-    "sessionId": "6a1e57a754e8aecc0936c3dd",
-    "iat": 1780373460,
-    "exp": 1780374360
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a1dbe99154c625bdf4cd4a1",
-    "fullName": "Suseendra Kumar",
-    "email": "suseendrakumar2003@gmail.com",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:11:09.830Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 0,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:14:13.787Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1e589054e8aecc0936c6a3",
-    "iat": 1780373648,
-    "exp": 1780374548
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:14:14.225Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:24:28.338Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a1dbe9ee4653ded75856777",
-    "role": "EMPLOYEE",
-    "email": "suseendrakumar2003@gmail.com",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a1dbe99154c625bdf4cd4a1",
-    "sessionId": "6a1e5afa54e8aecc0936ca9b",
-    "iat": 1780374266,
-    "exp": 1780375166
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a1dbe99154c625bdf4cd4a1",
-    "fullName": "Suseendra Kumar",
-    "email": "suseendrakumar2003@gmail.com",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:24:28.439Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 0,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:25:22.328Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a1dbe9ee4653ded75856777",
-    "role": "EMPLOYEE",
-    "email": "suseendrakumar2003@gmail.com",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a1dbe99154c625bdf4cd4a1",
-    "sessionId": "6a1e5b3054e8aecc0936cce4",
-    "iat": 1780374320,
-    "exp": 1780375220
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a1dbe99154c625bdf4cd4a1",
-    "fullName": "Suseendra Kumar",
-    "email": "suseendrakumar2003@gmail.com",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:25:22.421Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 0,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:30:22.385Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1e5c5d54e8aecc0936d087",
-    "iat": 1780374621,
-    "exp": 1780375521
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:30:22.488Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:31:32.058Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413742dc44db7c864f35",
-    "role": "EMPLOYEE",
-    "email": "abiramip@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413742dc44db7c864f33",
-    "sessionId": "6a1e5ca254e8aecc0936d1ef",
-    "iat": 1780374690,
-    "exp": 1780375590
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413742dc44db7c864f33",
-    "fullName": "ABIRAMI PANNEERSELVAM",
-    "email": "abiramip@ethicsecur.co.in",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:31:32.156Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:32:48.443Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413942dc44db7c864f63",
-    "role": "EMPLOYEE",
-    "email": "dhinakaranr@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413942dc44db7c864f61",
-    "sessionId": "6a1e5cee54e8aecc0936d33a",
-    "iat": 1780374767,
-    "exp": 1780375667
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413942dc44db7c864f61",
-    "fullName": "Dhinakaran Ravi",
-    "email": "dhinakaranr@ethicsecur.co.in",
-    "department": "Marketing"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:32:48.551Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 0,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:48:39.212Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a1e606fe4653ded75859c4e",
-    "role": "INTERN",
-    "email": "logapriyanvky@gmail.com",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a1e606e54e8aecc0936da68",
-    "sessionId": "6a1e60a654e8aecc0936dadb",
-    "iat": 1780375718,
-    "exp": 1780376618
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a1e606e54e8aecc0936da68",
-    "fullName": "Logii M",
-    "email": "logapriyanvky@gmail.com",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:48:39.296Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 0,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:52:10.705Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a1e606fe4653ded75859c4e",
-    "role": "INTERN",
-    "email": "logapriyanvky@gmail.com",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a1e606e54e8aecc0936da68",
-    "sessionId": "6a1e617854e8aecc0936dd5a",
-    "iat": 1780375929,
-    "exp": 1780376829
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a1e606e54e8aecc0936da68",
-    "fullName": "Logii M",
-    "email": "logapriyanvky@gmail.com",
-    "department": "Development"
-  }
-}
-{
-  "timestamp": "2026-06-02T04:52:10.797Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 0,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T05:00:14.811Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19413942dc44db7c864f63",
-    "role": "EMPLOYEE",
-    "email": "dhinakaranr@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413942dc44db7c864f61",
-    "sessionId": "6a1e635c54e8aecc0936e245",
-    "iat": 1780376412,
-    "exp": 1780377312
-  },
-  "employeeFound": true,
-  "employeeDetails": {
-    "id": "6a19413942dc44db7c864f61",
-    "fullName": "Dhinakaran Ravi",
-    "email": "dhinakaranr@ethicsecur.co.in",
-    "department": "Marketing"
-  }
-}
-{
-  "timestamp": "2026-06-02T05:00:14.922Z",
-  "msg": "Computed stats successfully",
-  "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 0,
-    "completedProjectCount": 0
-  }
-}
-{
-  "timestamp": "2026-06-02T04:32:23.438Z",
-  "msg": "Resolved employee profile",
-  "user": {
-    "id": "6a19407d06ba32c0a73d969c",
+    "id": "6a1ed7daa03ff2c9a45f1c56",
     "role": "EMPLOYEE",
     "email": "logapriyanm@ethicsecur.co.in",
-    "organizationId": "605c72ef1f77bcf86cd79000",
-    "employeeId": "6a19413a42dc44db7c864f79",
-    "sessionId": "6a1e53b245a6ec2d3e87fe3c",
-    "iat": 1780374741,
-    "exp": 1780375641
+    "organizationId": "6a1ed6b76cd721e1f9d4e96c",
+    "employeeId": "6a1ed7daa03ff2c9a45f1c54",
+    "sessionId": "6a1eddd18a287587d8475b74",
+    "iat": 1780407761,
+    "exp": 1780408661
   },
   "employeeFound": true,
   "employeeDetails": {
-    "id": "6a19413a42dc44db7c864f79",
+    "id": "6a1ed7daa03ff2c9a45f1c54",
     "fullName": "Logapriyan Mahendran",
     "email": "logapriyanm@ethicsecur.co.in",
     "department": "MERN Stack Developer"
   }
 }
 {
-  "timestamp": "2026-06-02T04:32:23.516Z",
+  "timestamp": "2026-06-02T13:42:42.472Z",
   "msg": "Computed stats successfully",
   "counts": {
-    "departmentProjectCount": 3,
-    "onboardProjectCount": 3,
-    "assignedProjectCount": 1,
+    "departmentProjectCount": 0,
+    "onboardProjectCount": 0,
+    "assignedProjectCount": 0,
     "completedProjectCount": 0
   }
 }

@@ -5,8 +5,9 @@ import { io } from 'socket.io-client';
 import {
   Plus, Calendar, Award, Tag, CheckSquare, RotateCcw,
   Send, Eye, AlertCircle, Search, MoreVertical, Trash2, Edit3,
-  ChevronDown, ChevronUp, Users, Flag
+  ChevronUp, Users, Flag
 } from 'lucide-react';
+import { IoIosArrowDropdown } from 'react-icons/io';
 import { projectApi } from '../../api_service/projectApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -360,34 +361,40 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1.5 bg-muted/50 border border-border rounded-xl px-3 py-1.5">
             <Flag className="w-3.5 h-3.5 text-muted-foreground" />
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="bg-transparent text-xs font-medium text-foreground outline-none cursor-pointer [color-scheme:light_dark]"
-            >
-              <option value="ALL" className="bg-card text-foreground">All Priorities</option>
-              <option value="LOW" className="bg-card text-foreground">Low</option>
-              <option value="MEDIUM" className="bg-card text-foreground">Medium</option>
-              <option value="HIGH" className="bg-card text-foreground">High</option>
-              <option value="CRITICAL" className="bg-card text-foreground">Critical</option>
-            </select>
+            <div className="relative flex items-center">
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className="bg-transparent text-xs font-medium text-foreground outline-none cursor-pointer [color-scheme:light_dark] pr-5 appearance-none"
+              >
+                <option value="ALL" className="bg-card text-foreground">All Priorities</option>
+                <option value="LOW" className="bg-card text-foreground">Low</option>
+                <option value="MEDIUM" className="bg-card text-foreground">Medium</option>
+                <option value="HIGH" className="bg-card text-foreground">High</option>
+                <option value="CRITICAL" className="bg-card text-foreground">Critical</option>
+              </select>
+              <IoIosArrowDropdown className="pointer-events-none absolute right-0 text-muted-foreground w-4 h-4" />
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 bg-muted/50 border border-border rounded-xl px-3 py-1.5">
             <Users className="w-3.5 h-3.5 text-muted-foreground" />
-            <select
-              value={assigneeFilter}
-              onChange={(e) => setAssigneeFilter(e.target.value)}
-              className="bg-transparent text-xs font-medium text-foreground outline-none cursor-pointer [color-scheme:light_dark]"
-            >
-              <option value="ALL" className="bg-card text-foreground">All Assignees</option>
-              <option value="UNASSIGNED" className="bg-card text-foreground">Unassigned</option>
-              {teamMembers.map((member) => (
-                <option key={member._id} value={member._id} className="bg-card text-foreground">
-                  {member.fullName}
-                </option>
-              ))}
-            </select>
+            <div className="relative flex items-center">
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="bg-transparent text-xs font-medium text-foreground outline-none cursor-pointer [color-scheme:light_dark] pr-5 appearance-none"
+              >
+                <option value="ALL" className="bg-card text-foreground">All Assignees</option>
+                <option value="UNASSIGNED" className="bg-card text-foreground">Unassigned</option>
+                {teamMembers.map((member) => (
+                  <option key={member._id} value={member._id} className="bg-card text-foreground">
+                    {member.fullName}
+                  </option>
+                ))}
+              </select>
+              <IoIosArrowDropdown className="pointer-events-none absolute right-0 text-muted-foreground w-4 h-4" />
+            </div>
           </div>
         </div>
       </div>
@@ -677,7 +684,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                           onClick={() => setColumnExpanded(prev => ({ ...prev, [status]: true }))}
                           className="w-full mt-1.5 py-2 text-[11px] font-bold text-primary hover:text-primary/80 flex items-center justify-center gap-1 bg-primary/5 hover:bg-primary/10 rounded-lg border border-primary/10 transition-all duration-200"
                         >
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <IoIosArrowDropdown className="w-3.5 h-3.5" />
                           Show {hiddenCount} more
                         </button>
                       )}
@@ -742,29 +749,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Assignee *</label>
-                  <select
-                    value={newAssignedTo}
-                    onChange={e => setNewAssignedTo(e.target.value)}
-                    required
-                    className="w-full bg-background dark:bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">Select Assignee</option>
-                    {teamMembers.map(m => (
-                      <option key={m._id} value={m._id}>{m.fullName}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={newAssignedTo}
+                      onChange={e => setNewAssignedTo(e.target.value)}
+                      required
+                      className="w-full bg-background dark:bg-card border border-border rounded-xl px-3 py-2.5 pr-8 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Assignee</option>
+                      {teamMembers.map(m => (
+                        <option key={m._id} value={m._id}>{m.fullName}</option>
+                      ))}
+                    </select>
+                    <IoIosArrowDropdown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Priority</label>
-                  <select
-                    value={newPriority}
-                    onChange={e => setNewPriority(e.target.value as any)}
-                    className="w-full bg-background dark:bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={newPriority}
+                      onChange={e => setNewPriority(e.target.value as any)}
+                      className="w-full bg-background dark:bg-card border border-border rounded-xl px-3 py-2.5 pr-8 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
+                    >
+                      {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                    <IoIosArrowDropdown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                  </div>
                 </div>
               </div>
 
@@ -792,16 +805,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Sprint</label>
-                <select
-                  value={newSprintId}
-                  onChange={e => setNewSprintId(e.target.value)}
-                  className="w-full bg-background dark:bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="">Backlog (No Sprint)</option>
-                  {sprints.map(s => (
-                    <option key={s._id} value={s._id}>{s.name}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={newSprintId}
+                    onChange={e => setNewSprintId(e.target.value)}
+                    className="w-full bg-background dark:bg-card border border-border rounded-xl px-3 py-2.5 pr-8 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
+                  >
+                    <option value="">Backlog (No Sprint)</option>
+                    {sprints.map(s => (
+                      <option key={s._id} value={s._id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <IoIosArrowDropdown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2 border-t border-border">

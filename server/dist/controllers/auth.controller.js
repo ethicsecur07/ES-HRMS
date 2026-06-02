@@ -773,6 +773,9 @@ const signup = async (req, res) => {
             // Link User to Employee
             adminUser.employeeId = employee._id;
             await adminUser.save({ session });
+            // Sync Default Permissions and Roles for the new Tenant
+            const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');
+            await PermissionSyncService.syncForTenant(organization._id, session);
             // Audit log creation
             await (0, auditLog_service_js_1.createAuditLog)('ORGANIZATION_SIGNUP', normalizedEmail, 'AUTH', 'Organization', `Registered new organization "${organizationName}" with slug "${normalizedSlug}" and administrator "${name}"`, organization._id);
             await session.commitTransaction();

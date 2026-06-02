@@ -15,17 +15,8 @@ const connectDB = async () => {
         logger_js_1.logger.info('MongoDB Atlas connected successfully');
     }
     catch (error) {
-        logger_js_1.logger.error('MongoDB connection failed. Attempting fallback to In-Memory MongoDB...', { error });
-        try {
-            const { MongoMemoryServer } = await import('mongodb-memory-server');
-            const mongoServer = await MongoMemoryServer.create();
-            const uri = mongoServer.getUri();
-            await mongoose_1.default.connect(uri);
-            logger_js_1.logger.info('In-Memory MongoDB connected successfully as fallback');
-        }
-        catch (fallbackError) {
-            logger_js_1.logger.error('In-Memory MongoDB fallback failed', { fallbackError });
-        }
+        logger_js_1.logger.error('MongoDB connection failed.', { error });
+        process.exit(1);
     }
 };
 exports.connectDB = connectDB;

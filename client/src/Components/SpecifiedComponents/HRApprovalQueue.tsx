@@ -175,7 +175,7 @@ export const HRApprovalQueue: React.FC = () => {
   };
 
   return (
-    <Card className="flex flex-col shadow-md border-l-4 border-l-primary h-full text-left transition-all duration-300">
+    <Card className="flex flex-col shadow-md border-l-4 border-l-primary h-[520px] text-left transition-all duration-300">
       
       {/* Header Widget Description */}
       <div className="flex items-center justify-between pb-4 border-b border-border">
@@ -278,7 +278,7 @@ export const HRApprovalQueue: React.FC = () => {
       </div>
 
       {/* Tabs Contents Container */}
-      <div className="flex-1 overflow-y-auto min-h-0 pr-1 scrollbar-none">
+      <div className="flex-1 overflow-y-auto min-h-0 pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--border)) transparent' }}>
         
         {/* ================= TAB 1: FEED ================= */}
         {activeTab === 'feed' && (

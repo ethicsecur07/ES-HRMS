@@ -914,6 +914,10 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
       adminUser.employeeId = employee._id as any;
       await adminUser.save({ session });
 
+      // Sync Default Permissions and Roles for the new Tenant
+      const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');
+      await PermissionSyncService.syncForTenant(organization._id as any, session as any);
+
       // Audit log creation
       await createAuditLog(
         'ORGANIZATION_SIGNUP',
