@@ -3,8 +3,8 @@ import { Schema, Document, Query } from 'mongoose';
 export interface SoftDeleteDocument extends Document {
   isDeleted: boolean;
   deletedAt?: Date | null;
-  softDelete(): Promise<this>;
-  restore(): Promise<this>;
+  softDelete(options?: any): Promise<this>;
+  restore(options?: any): Promise<this>;
 }
 
 export function softDeletePlugin(schema: Schema) {
@@ -27,16 +27,16 @@ export function softDeletePlugin(schema: Schema) {
   });
 
   // Custom softDelete method
-  schema.methods.softDelete = async function (this: SoftDeleteDocument) {
+  schema.methods.softDelete = async function (this: SoftDeleteDocument, options?: any) {
     this.isDeleted = true;
     this.deletedAt = new Date();
-    return this.save();
+    return this.save(options);
   };
 
   // Custom restore method
-  schema.methods.restore = async function (this: SoftDeleteDocument) {
+  schema.methods.restore = async function (this: SoftDeleteDocument, options?: any) {
     this.isDeleted = false;
     this.deletedAt = null;
-    return this.save();
+    return this.save(options);
   };
 }

@@ -96,7 +96,7 @@ export const DashboardPage: React.FC = () => {
       
 
       {/* 1. EMPLOYEE DASHBOARD */}
-      {(role === 'EMPLOYEE' || role === 'INTERN') && (
+      {role === 'EMPLOYEE' && (
         <div className="space-y-8">
           <AttendanceCheckIn />
           <EmployeeQuickStats stats={projectStats || null} loading={projectStatsLoading} />
@@ -117,6 +117,170 @@ export const DashboardPage: React.FC = () => {
 
           {/* Bottom Row: Leave & Holiday Calendar */}
           <div className="flex flex-col h-[520px] w-full">
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
+              <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+              My Leave & Holiday Calendar
+            </h3>
+            <HolidayEnhancedCalendar
+              leaves={myLeaves || []}
+              wfh={myWfh || []}
+              perms={myPerms || []}
+              compact={false}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 1b. INTERN DASHBOARD */}
+      {role === 'INTERN' && (
+        <div className="space-y-8">
+          <AttendanceCheckIn />
+
+          {/* Internship Progress Widget */}
+          {myEmployee && myEmployee.isIntern && (
+            <Card className="border-l-4 border-l-teal-500 shadow-md p-6 bg-card text-left space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-teal-500 animate-pulse" />
+                    Internship Progress Timeline
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Track your 6-month professional timeline and performance-based stipend conversion
+                  </p>
+                </div>
+                <div className="px-3 py-1.5 rounded-xl bg-teal-500/10 text-teal-600 border border-teal-500/20 text-xs font-bold font-mono">
+                  Status: {myEmployee.internshipStatus || 'UNPAID'}
+                </div>
+              </div>
+
+              {/* Progress Stepper Visual */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+                {/* connector */}
+                <div className="hidden md:block absolute top-7 left-1/6 right-1/6 h-0.5 bg-border -z-10" />
+
+                {/* Step 1 */}
+                <div className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
+                  myEmployee.internshipStatus === 'UNPAID'
+                    ? 'border-teal-500/30 bg-teal-500/5 ring-1 ring-teal-500/20'
+                    : 'border-border bg-muted/20 opacity-80'
+                }`}>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        myEmployee.internshipStatus === 'UNPAID' ? 'bg-teal-500 text-white' : 'bg-muted text-muted-foreground'
+                      }`}>1</span>
+                      <h4 className="font-bold text-sm text-foreground">Phase 1: Unpaid Intern</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Months 1 to 3. Focused on core training, system policies, and real-time development exercises.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex justify-between items-center text-[10px] font-bold text-muted-foreground font-mono">
+                    <span>Duration: 3 Months</span>
+                    <span className="text-teal-600 bg-teal-500/10 px-2 py-0.5 rounded-md">Stipend: 0 INR</span>
+                  </div>
+                </div>
+
+                {/* Gate */}
+                <div className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
+                  myEmployee.internshipPerformanceApproved
+                    ? 'border-emerald-500/30 bg-emerald-500/5'
+                    : 'border-amber-500/30 bg-amber-500/5 ring-1 ring-amber-500/20'
+                }`}>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        myEmployee.internshipPerformanceApproved ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white animate-bounce'
+                      }`}>★</span>
+                      <h4 className="font-bold text-sm text-foreground">Performance Review Gate</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {myEmployee.internshipPerformanceApproved
+                        ? `Evaluation completed! Rating: ${myEmployee.internshipPerformanceRating}/5. Recommended for stipend.`
+                        : "Awaiting performance review and approval by HR/Manager at the end of 3 months."}
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex justify-between items-center text-[10px] font-bold text-muted-foreground font-mono">
+                    <span>Gate: Mid-Term</span>
+                    <span className={myEmployee.internshipPerformanceApproved ? "text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md" : "text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-md"}>
+                      {myEmployee.internshipPerformanceApproved ? "Approved" : "Awaiting Review"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
+                  myEmployee.internshipStatus === 'PAID'
+                    ? 'border-teal-500/30 bg-teal-500/5 ring-1 ring-teal-500/20'
+                    : 'border-border bg-muted/10 opacity-50'
+                }`}>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        myEmployee.internshipStatus === 'PAID' ? 'bg-teal-500 text-white' : 'bg-muted text-muted-foreground'
+                      }`}>2</span>
+                      <h4 className="font-bold text-sm text-foreground">Phase 2: Paid Performance</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Months 4 to 6. Assigned to primary client projects, scoping assignments, and advanced security logs.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex justify-between items-center text-[10px] font-bold text-muted-foreground font-mono">
+                    <span>Duration: 3 Months</span>
+                    <span className="text-teal-600 bg-teal-500/10 px-2 py-0.5 rounded-md">
+                      Stipend: {myEmployee.salary ? `${myEmployee.salary} INR` : 'TBD'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Countdown Card */}
+              {myEmployee.joiningDate && (
+                <div className="bg-muted/30 border border-border rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-muted-foreground">Internship Start Date:</span>{' '}
+                    <span className="font-mono font-semibold">{formatDate(myEmployee.joiningDate)}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-muted-foreground">Elapsed Duration:</span>{' '}
+                    <span className="font-semibold text-primary">
+                      {Math.max(0, Math.floor((Date.now() - new Date(myEmployee.joiningDate).getTime()) / (1000 * 60 * 60 * 24)))} Days
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-muted-foreground">Estimated Completion:</span>{' '}
+                    <span className="font-mono font-semibold">
+                      {(() => {
+                        const d = new Date(myEmployee.joiningDate);
+                        d.setMonth(d.getMonth() + 6);
+                        return formatDate(d.toISOString().split('T')[0]);
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Quick stats on attendance / tasks */}
+          <EmployeeQuickStats stats={projectStats || null} loading={projectStatsLoading} />
+
+          {/* Top Row: My Work Summary (2/3) and Announcements & Actions (1/3) – fixed height, scrollable */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+            {/* My Work Summary */}
+            <div className="lg:col-span-2 flex flex-col h-[520px] overflow-y-auto">
+              <EmployeeTaskSummary />
+            </div>
+
+            {/* Announcements & Actions */}
+            <div className="lg:col-span-1 flex flex-col h-[520px] overflow-y-auto">
+              <HRApprovalQueue />
+            </div>
+          </div>
+
+          {/* Bottom Row: Leave & Holiday Calendar */}
+          <div className="flex flex-col h-[520px] w-full text-left">
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
               <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
               My Leave & Holiday Calendar

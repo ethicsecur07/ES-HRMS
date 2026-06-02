@@ -1,6 +1,9 @@
 import React from 'react';
 import { Card } from '../WrapperComponents/Card';
-import { FolderOpen, Rocket, UserCheck, CheckCircle2 } from 'lucide-react';
+import { FolderOpen, Rocket, UserCheck, CheckCircle2, ClipboardCheck, FileText, AlertTriangle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '../../store/useAuthStore';
+import { taskApi } from '../../api_service/taskApi';
 
 interface EmployeeQuickStatsProps {
   stats: {
@@ -13,7 +16,19 @@ interface EmployeeQuickStatsProps {
 }
 
 export const EmployeeQuickStats: React.FC<EmployeeQuickStatsProps> = ({ stats, loading }) => {
-  if (loading) {
+  const { user, role } = useAuthStore();
+
+  // Load intern tasks dynamically if user is an intern
+  const { data: myTasks, isLoading: tasksLoading } = useQuery({
+    queryKey: ['myTasks', user?.employeeId || user?._id],
+    queryFn: () => taskApi.getByEmployee(user?.employeeId || user?._id || ''),
+    enabled: role === 'INTERN' && !!(user?.employeeId || user?._id),
+  });
+
+  const isIntern = role === 'INTERN';
+  const showLoading = loading || (isIntern && tasksLoading);
+
+  if (showLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
         {[...Array(4)].map((_, i) => (
@@ -30,6 +45,82 @@ export const EmployeeQuickStats: React.FC<EmployeeQuickStatsProps> = ({ stats, l
     );
   }
 
+  // 1. Intern specific task counts calculations
+  if (isIntern) {
+    const reportCount = myTasks?.length || 0;
+
+    const totalCompleted = myTasks?.reduce((sum, t) => {
+      if (!t.completedTasks) return sum;
+      const items = t.completedTasks.split(/[\n,;•]/).map(x => x.trim()).filter(x => x.length > 0 && x !== '-' && x !== 'none' && x !== 'nil');
+      return sum + Math.max(1, items.length);
+    }, 0) || 0;
+
+    const totalPending = myTasks?.reduce((sum, t) => {
+      const val = t.pendingTasks || t.inProgressTasks || '';
+      if (!val) return sum;
+      const items = val.split(/[\n,;•]/).map(x => x.trim()).filter(x => x.length > 0 && x !== '-' && x !== 'none' && x !== 'nil');
+      return sum + Math.max(1, items.length);
+    }, 0) || 0;
+
+    const totalBlockers = myTasks?.filter(t => {
+      const b = (t.blockers || '').toLowerCase().trim();
+      return b && b !== 'none' && b !== 'nil' && b !== '-' && b !== 'no blockers';
+    }).length || 0;
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left animate-in fade-in duration-300">
+        {/* 1. Daily Reports */}
+        <Card className="border-l-4 border-l-violet-500 hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Daily Submissions</span>
+            <div className="p-3 bg-violet-500/10 rounded-xl text-violet-500">
+              <ClipboardCheck className="w-6 h-6" />
+            </div>
+          </div>
+          <h3 className="text-4xl font-extrabold text-foreground">{reportCount}</h3>
+          <p className="text-xs text-muted-foreground mt-2">Total daily report updates submitted</p>
+        </Card>
+
+        {/* 2. Tasks Completed */}
+        <Card className="border-l-4 border-l-emerald-500 hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tasks Completed</span>
+            <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+          </div>
+          <h3 className="text-4xl font-extrabold text-foreground">{totalCompleted}</h3>
+          <p className="text-xs text-muted-foreground mt-2">Total tasks successfully resolved</p>
+        </Card>
+
+        {/* 3. In Progress / Pending Tasks */}
+        <Card className="border-l-4 border-l-blue-500 hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">In Progress Tasks</span>
+            <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
+              <Rocket className="w-6 h-6" />
+            </div>
+          </div>
+          <h3 className="text-4xl font-extrabold text-foreground">{totalPending}</h3>
+          <p className="text-xs text-muted-foreground mt-2">Active tasks currently in progress</p>
+        </Card>
+
+        {/* 4. Active Blockers */}
+        <Card className="border-l-4 border-l-amber-500 hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Blockers Reported</span>
+            <div className="p-3 bg-amber-500/10 rounded-xl text-amber-500">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+          </div>
+          <h3 className="text-4xl font-extrabold text-foreground">{totalBlockers}</h3>
+          <p className="text-xs text-muted-foreground mt-2">Days with active blockers encountered</p>
+        </Card>
+      </div>
+    );
+  }
+
+  // 2. Standard Employee Project Quick Stats
   const departmentProjectCount = stats?.departmentProjectCount ?? 0;
   const onboardProjectCount = stats?.onboardProjectCount ?? 0;
   const assignedProjectCount = stats?.assignedProjectCount ?? 0;
@@ -87,3 +178,5 @@ export const EmployeeQuickStats: React.FC<EmployeeQuickStatsProps> = ({ stats, l
     </div>
   );
 };
+
+export default EmployeeQuickStats;

@@ -207,6 +207,11 @@ export class AttendanceService {
         throw new Error('Check-in is disabled on Sundays.');
       }
 
+      // Enforce 9:00 AM check-in constraint (not applicable on Sundays)
+      if (!isSunday && todayDate.getHours() < 9) {
+        throw new Error('Check-in is only permitted after 9:00 AM.');
+      }
+
       // Enforce Active Workdays check
       const org = await Organization.findOne({ _id: orgId })
         .session(session)

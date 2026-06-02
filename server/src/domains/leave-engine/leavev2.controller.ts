@@ -112,10 +112,18 @@ export const checkSandwichRule = async (req: RBACRequest, res: Response, next: N
       return;
     }
 
-    // Use LeavePolicyEngine which now includes org holidays
+    // Resolve employeeId from user
+    const user = await User.findOne({ _id: req.user?.id, organizationId: orgId });
+    let empId = user?.employeeId?.toString();
+    if (!empId && user?.email) {
+      const emp = await Employee.findOne({ email: user.email, organizationId: orgId });
+      empId = emp?._id.toString();
+    }
+
+    // Use LeavePolicyEngine which now includes org holidays and intern-aware policy loading
     let durationResult;
     try {
-      durationResult = await LeavePolicyEngine.calculateLeaveDuration(orgId, leaveType, startDate, endDate);
+      durationResult = await LeavePolicyEngine.calculateLeaveDuration(orgId, leaveType, startDate, endDate, empId);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
       return;
@@ -272,9 +280,16 @@ export const getMyLeaveBalances = async (req: RBACRequest, res: Response, next: 
       return;
     }
 
+    const employee = await Employee.findById(empId);
+    const isIntern = employee?.isIntern || !!(employee?.designation?.toLowerCase().includes('intern') || employee?.department?.toLowerCase().includes('intern'));
+
     const [balances, policies] = await Promise.all([
       LeaveBalanceService.ensureBalancesExist(orgId, empId),
-      LeavePolicy.find({ organizationId: orgId, isActive: true }),
+      LeavePolicy.find({
+        organizationId: orgId,
+        isActive: true,
+        applicableTo: isIntern ? { $in: ['INTERN', 'ALL'] } : { $in: ['EMPLOYEE', 'ALL'] }
+      }),
     ]);
 
     // Enrich each balance with policy data for the frontend

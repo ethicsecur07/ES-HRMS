@@ -23,7 +23,7 @@ import {
   User, Palmtree, FileText, CalendarCheck, ArrowLeft, PhoneCall, 
   Mail, Briefcase, MapPin, Building, DollarSign, Calendar, Wifi, Clock, Laptop,
   ChevronLeft, ChevronRight, CreditCard, FileDigit, FolderOpen, Download,
-  History, Lock
+  History, Lock, Star, Award
 } from 'lucide-react';
 
 type TabType = 'PERSONAL' | 'PROFESSIONAL' | 'EMERGENCY' | 'BANK' | 'TAX' | 'DOCUMENTS' | 'LEAVE_WFH' | 'TASKS' | 'ATTENDANCE';
@@ -55,11 +55,28 @@ export const EmployeeDetailsPage: React.FC = () => {
     },
   });
 
+  const approveInternMutation = useMutation({
+    mutationFn: async ({ rating, notes }: { rating: number; notes: string }) => {
+      return employeeApi.approveIntern(id || '', rating, notes);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['employee', id] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      addToast('Paid Conversion Approved', data.message || 'Intern has been successfully converted to paid phase.', 'success');
+    },
+    onError: (err: any) => {
+      addToast('Approval Failed', err.response?.data?.message || err.message || 'Could not approve paid phase.', 'error');
+    },
+  });
+
   const allowedRoles = orgSettings?.loginApprovalRoles || ['ADMIN'];
   const canApproveLogin = currentUser?.role === 'ADMIN' || allowedRoles.includes(currentUser?.role || '');
 
   const [activeTab, setActiveTab] = useState<TabType>('PERSONAL');
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const [internRating, setInternRating] = useState(5);
+  const [internNotes, setInternNotes] = useState('');
 
   const [showHistory, setShowHistory] = useState<{ [key: string]: boolean }>({});
 
@@ -544,6 +561,160 @@ export const EmployeeDetailsPage: React.FC = () => {
                 </div>
               </div>
             </Card>
+
+            {employee.isIntern && (
+              <Card className="space-y-6 border-l-4 border-l-amber-500 shadow-md">
+                <h3 className="text-lg font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-500" /> Internship & Performance Evaluation
+                </h3>
+                
+                {/* Stats / Details */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div className="p-3.5 rounded-xl bg-muted/40 border border-border">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Current Phase</p>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider mt-1.5 border ${
+                      employee.internshipStatus === 'PAID'
+                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                        : employee.internshipStatus === 'COMPLETED'
+                        ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                        : employee.internshipStatus === 'TERMINATED'
+                        ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                        : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                    }`}>
+                      {employee.internshipStatus || 'UNPAID'} Phase
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-muted/40 border border-border">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Internship Duration</p>
+                    <p className="font-semibold text-foreground mt-1.5 text-sm">
+                      {employee.internshipDurationMonths || 6} Months Total
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      ({employee.internshipUnpaidMonths || 3}m unpaid, {employee.internshipPaidMonths || 3}m paid)
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-muted/40 border border-border">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Post-Review Stipend</p>
+                    <p className="font-semibold text-primary mt-1.5 text-sm font-mono">
+                      {formatCurrency(employee.salary)} / mo
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Applicable in Paid Phase
+                    </p>
+                  </div>
+                </div>
+
+                {/* Review Gate & Evaluation */}
+                {employee.internshipPerformanceApproved ? (
+                  <div className="space-y-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-left">
+                    <div className="flex items-center justify-between border-b border-emerald-500/10 pb-2">
+                      <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                        Performance Review Approved
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star 
+                            key={i} 
+                            className={`w-4 h-4 ${
+                              i < (employee.internshipPerformanceRating || 0)
+                                ? 'text-amber-500 fill-amber-500'
+                                : 'text-muted border-none'
+                            }`} 
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Evaluation Comments</p>
+                      <p className="text-xs text-foreground italic leading-relaxed bg-muted/30 p-3 rounded-lg border border-border">
+                        "{employee.internshipPerformanceReviewNotes || 'No notes provided.'}"
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Status has been converted to the <strong>Paid Phase</strong> of the internship.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {currentUser?.role === 'ADMIN' || currentUser?.role === 'HR' ? (
+                      <div className="space-y-4 p-5 rounded-xl bg-muted/30 border border-border text-left">
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground tracking-tight">Evaluate Performance & Approve Paid Phase</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Conduct review to unlock the paid phase and stipend of {formatCurrency(employee.salary)}/mo.
+                          </p>
+                        </div>
+
+                        {/* Star Rating */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider block">
+                            Performance Rating ({internRating} / 5 Stars)
+                          </label>
+                          <div className="flex items-center gap-2">
+                            {Array.from({ length: 5 }).map((_, i) => {
+                              const ratingVal = i + 1;
+                              return (
+                                <button
+                                  type="button"
+                                  key={i}
+                                  onClick={() => setInternRating(ratingVal)}
+                                  className="p-1 rounded-md hover:bg-muted transition-all cursor-pointer"
+                                >
+                                  <Star 
+                                    className={`w-6 h-6 transition-all ${
+                                      ratingVal <= internRating
+                                        ? 'text-amber-500 fill-amber-500 scale-110'
+                                        : 'text-muted-foreground/40 hover:text-amber-500/80'
+                                    }`} 
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Textarea Notes */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider block">
+                            Performance Review & Feedback Notes
+                          </label>
+                          <textarea
+                            value={internNotes}
+                            onChange={(e) => setInternNotes(e.target.value)}
+                            placeholder="Enter detailed feedback regarding the intern's contributions, performance, and behavior..."
+                            className="w-full min-h-[100px] p-3 rounded-xl border border-border bg-background text-foreground text-xs font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
+                          />
+                        </div>
+
+                        {/* Submit Button */}
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            onClick={() => approveInternMutation.mutate({ rating: internRating, notes: internNotes })}
+                            isLoading={approveInternMutation.isPending}
+                            className="rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10"
+                          >
+                            Approve Paid Phase Conversion
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-center gap-3">
+                        <Star className="w-5 h-5 text-amber-500 animate-pulse flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-foreground">Awaiting Performance Evaluation</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            This intern is currently in the unpaid phase of their internship. Converting to the paid phase requires a performance evaluation and approval by an Admin or HR.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
         )}
 

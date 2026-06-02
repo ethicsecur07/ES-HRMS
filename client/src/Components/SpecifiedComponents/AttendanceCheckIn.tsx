@@ -347,7 +347,8 @@ export const AttendanceCheckIn: React.FC = () => {
   const isNonWorkingDay = !activeWorkdays.includes(currentDayLabel);
   const todayHoliday = holidays?.find((h) => h.date === localTodayStr && !h.isRestricted);
 
-  const isCheckInLocked = isSunday || isNonWorkingDay || !!todayHoliday;
+  const isBefore9AM = !isSunday && currentTime.getHours() < 9;
+  const isCheckInLocked = isSunday || isNonWorkingDay || !!todayHoliday || isBefore9AM;
   let lockReason = '';
   if (isSunday) {
     lockReason = 'SUNDAY';
@@ -355,6 +356,8 @@ export const AttendanceCheckIn: React.FC = () => {
     lockReason = `HOLIDAY (${todayHoliday.name.toUpperCase()})`;
   } else if (isNonWorkingDay) {
     lockReason = 'NON-WORKING DAY';
+  } else if (isBefore9AM) {
+    lockReason = 'BEFORE 9:00 AM';
   }
 
   const isHrOrManager = user?.role === 'HR' || user?.role === 'MANAGER';
@@ -446,7 +449,9 @@ export const AttendanceCheckIn: React.FC = () => {
             </p>
             {isCheckInLocked && (
               <p className="text-xs text-muted-foreground mt-1.5 font-medium italic">
-                🕒 Check-in is locked today because it is a {lockReason.toLowerCase()}. Enjoy your day off!
+                {isBefore9AM
+                  ? '🕒 Check-in is locked. You can only check in after 9:00 AM.'
+                  : `🕒 Check-in is locked today because it is a ${lockReason.toLowerCase()}. Enjoy your day off!`}
               </p>
             )}
           </div>
