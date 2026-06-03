@@ -703,7 +703,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       <ThumbsUp className="w-4 h-4" /> Approve Task
                     </h3>
                     <textarea value={reviewNotes} onChange={e => setReviewNotes(e.target.value)}
-                      placeholder="Optional review notes..." rows={2}
+                      placeholder="review notes..." rows={2}
                       className="w-full bg-muted/40 border border-border rounded-xl px-4 py-3 text-sm text-foreground outline-none focus:border-emerald-500/50 resize-none placeholder:text-muted-foreground/50" />
                     <button onClick={handleApproveTask} disabled={isWorkflowSubmitting}
                       className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm py-3 rounded-xl transition-colors disabled:opacity-50">

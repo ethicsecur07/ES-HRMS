@@ -1037,14 +1037,14 @@ export const RecruitmentPage: React.FC = () => {
           />
 
           <Input
-            label="Resume Link (Optional)"
+            label="Resume Link"
             placeholder="https://..."
             value={formData.resumeUrl}
             onChange={(e) => setFormData(p => ({ ...p, resumeUrl: e.target.value }))}
           />
 
           <Input
-            label="Marksheet URL (Optional)"
+            label="Marksheet URL"
             placeholder="https://..."
             value={formData.marksheetUrl}
             onChange={(e) => setFormData(p => ({ ...p, marksheetUrl: e.target.value }))}
@@ -1108,7 +1108,7 @@ export const RecruitmentPage: React.FC = () => {
           />
 
           <Input
-            label="Resume Link (Optional)"
+            label="Resume Link"
             placeholder="https://..."
             value={editFormData.resumeUrl}
             onChange={(e) => setEditFormData(p => ({ ...p, resumeUrl: e.target.value }))}
@@ -1116,7 +1116,7 @@ export const RecruitmentPage: React.FC = () => {
           />
 
           <Input
-            label="Marksheet URL (Optional)"
+            label="Marksheet URL "
             placeholder="https://..."
             value={editFormData.marksheetUrl}
             onChange={(e) => setEditFormData(p => ({ ...p, marksheetUrl: e.target.value }))}
@@ -1332,7 +1332,7 @@ export const RecruitmentPage: React.FC = () => {
                 onChange={(e) => setSelectedLeadId(e.target.value)}
                 className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-2 transition-colors"
               >
-                <option value="">Select Team Lead / Manager (Optional)</option>
+                <option value="">Select Team Lead / Manager </option>
                 {leadOptions.map((emp: any) => {
                   const empDeptName = typeof emp.departmentId === 'object' && emp.departmentId !== null
                     ? emp.departmentId.name

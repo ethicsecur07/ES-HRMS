@@ -643,7 +643,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
           {/* Notes */}
           <div>
             <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
-              <FileText className="w-3 h-3 inline mr-1" /> Notes (Optional)
+              <FileText className="w-3 h-3 inline mr-1" /> Notes 
             </label>
             <textarea
               value={notes}

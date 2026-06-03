@@ -1018,25 +1018,25 @@ export const SettingsPage: React.FC = () => {
                       required
                     />
                     <Input
-                      label="First Name Key (Optional)"
+                      label="First Name Key "
                       value={ssoAttrFirstName}
                       onChange={(e) => setSsoAttrFirstName(e.target.value)}
                       placeholder="e.g. givenName"
                     />
                     <Input
-                      label="Last Name Key (Optional)"
+                      label="Last Name Key "
                       value={ssoAttrLastName}
                       onChange={(e) => setSsoAttrLastName(e.target.value)}
                       placeholder="e.g. surName"
                     />
                     <Input
-                      label="Groups/Roles Key (Optional)"
+                      label="Groups/Roles Key"
                       value={ssoAttrGroups}
                       onChange={(e) => setSsoAttrGroups(e.target.value)}
                       placeholder="e.g. memberOf"
                     />
                     <Input
-                      label="Department Key (Optional)"
+                      label="Department Key"
                       value={ssoAttrDepartment}
                       onChange={(e) => setSsoAttrDepartment(e.target.value)}
                       placeholder="e.g. department"
