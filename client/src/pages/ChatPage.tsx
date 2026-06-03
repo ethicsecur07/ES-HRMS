@@ -908,7 +908,7 @@ export const ChatPage: React.FC = () => {
                     onChange={e => handleTyping(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={
-                      filePreview ? 'Add a caption (optional)...' :
+                      filePreview ? 'Add a caption ' :
                       selectedUser === 'broadcast' ? 'Broadcast announcement...' :
                       selectedUser?.startsWith('group_') ? 'Message group...' :
                       'Type a message... '
