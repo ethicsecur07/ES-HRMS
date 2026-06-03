@@ -724,7 +724,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6">
             <h3 className="text-lg font-bold text-foreground mb-5">Create Task — {COLUMN_CONFIG[createColumn].label}</h3>
-            <form onSubmit={handleCreateTask} className="space-y-4">
+            <form onSubmit={handleCreateTask} className="space-y-4 px-4">
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Title *</label>
                 <input

@@ -364,7 +364,7 @@ export const OfferLetterModal: React.FC<OfferLetterModalProps> = ({ isOpen, onCl
             activeTab === 'edit' ? 'block' : 'hidden md:block'
           }`}>
             <form onSubmit={handleSend} className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 text-left">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 px-4 text-left">
                 
                 {isTemplateLoading ? (
                   <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">

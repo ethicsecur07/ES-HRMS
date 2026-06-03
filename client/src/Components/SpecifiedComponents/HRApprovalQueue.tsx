@@ -387,7 +387,7 @@ export const HRApprovalQueue: React.FC = () => {
         
         {/* ================= TAB 1: FEED ================= */}
         {activeTab === 'feed' && (
-          <div className="space-y-4">
+          <div className="space-y-4 px-4">
             
             {/* Publisher Form Button + Clear Button */}
             <div className="border-b border-border/50 pb-3 mb-2 flex flex-wrap gap-2 justify-between items-center">
@@ -552,7 +552,7 @@ export const HRApprovalQueue: React.FC = () => {
 
         {/* ================= TAB 2: MEETINGS ================= */}
         {activeTab === 'meetings' && (
-          <div className="space-y-4">
+          <div className="space-y-4 px-4">
             <div className="flex items-center justify-between border-b border-border/50 pb-2 mb-2">
               <span className="text-xs font-semibold text-muted-foreground">Today's schedules</span>
               {visibleMeetings.length > 0 && (
@@ -627,7 +627,7 @@ export const HRApprovalQueue: React.FC = () => {
 
         {/* ================= TAB 3: REQUESTS & APPROVALS ================= */}
         {activeTab === 'actions' && (
-          <div className="space-y-4">
+          <div className="space-y-4 px-4">
             
             {/* MANAGER / HR / ADMIN VIEW: Pending Requests Approval Queue */}
             {(role === 'HR' || role === 'ADMIN' || role === 'MANAGER') ? (

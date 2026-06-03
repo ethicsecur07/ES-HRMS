@@ -592,7 +592,7 @@ export const AttendanceCheckIn: React.FC = () => {
         title="Check-In Range Security Check"
         maxWidth="max-w-md"
       >
-        <form onSubmit={handleOverrideSubmit} className="space-y-4 text-left">
+        <form onSubmit={handleOverrideSubmit} className="space-y-4 px-4 text-left">
           <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex gap-3 text-yellow-700 dark:text-yellow-400">
             <AlertOctagon className="w-6 h-6 flex-shrink-0 mt-0.5" />
             <div className="text-xs space-y-1">
@@ -664,7 +664,7 @@ export const AttendanceCheckIn: React.FC = () => {
           title="Forgotten Checkout: Daily Task Report Required"
           maxWidth="max-w-2xl"
         >
-          <form onSubmit={handleRetroSubmit} className="space-y-4 text-left p-2">
+          <form onSubmit={handleRetroSubmit} className="space-y-4 px-4 text-left p-2">
             <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs space-y-1 leading-relaxed animate-in fade-in duration-300">
               <span className="font-bold uppercase flex items-center gap-1.5">
                 <AlertOctagon className="w-4 h-4" /> RETROACTIVE REPORT REQUIRED

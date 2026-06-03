@@ -109,7 +109,7 @@ export const DynamicFormBuilder: React.FC<DynamicFormBuilderProps> = ({
         <p className="text-xs text-muted-foreground mt-1">Please fill in the dynamic details below.</p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 px-4">
         {schema.fields.map(field => {
           // Conditional check
           const isVisible = !field.dependsOnField || String(formData[field.dependsOnField]) === field.dependsOnValue;

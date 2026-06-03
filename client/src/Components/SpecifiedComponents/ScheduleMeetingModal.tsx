@@ -283,7 +283,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title="Schedule Teams Meeting" maxWidth="max-w-2xl">
       {successResult ? (
         /* ── Success Screen ── */
-        <div className="text-center py-6 space-y-5">
+        <div className="text-center py-6 space-y-5 px-4">
           <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center">
             <Video className="w-8 h-8 text-emerald-500" />
           </div>
@@ -326,7 +326,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
         </div>
       ) : (
         /* ── Schedule Form ── */
-        <form onSubmit={handleSubmit} className="space-y-5 text-left">
+        <form onSubmit={handleSubmit} className="space-y-5 px-4 text-left">
           {/* Meeting Type Selector */}
           <div>
             <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">

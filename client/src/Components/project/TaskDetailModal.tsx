@@ -492,7 +492,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
           {/* ── CHECKLIST ── */}
           {activeTab === 'checklist' && (
-            <div className="space-y-4">
+            <div className="space-y-4 px-4">
               {editChecklist.length > 0 && (
                 <div className="flex items-center gap-3 mb-2">
                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
@@ -578,7 +578,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
           {/* ── COMMENTS ── */}
           {activeTab === 'comments' && (
-            <div className="space-y-4">
+            <div className="space-y-4 px-4">
               {isCommentsLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-primary animate-spin" /></div>
               ) : comments.length === 0 ? (
@@ -668,7 +668,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               {/* Employee: submit for review (only when IN_PROGRESS) */}
               {isEmployee && task.status === 'IN_PROGRESS' && (
-                <div className="bg-indigo-500/5 rounded-xl p-5 border border-indigo-500/20 space-y-4">
+                <div className="bg-indigo-500/5 rounded-xl p-5 border border-indigo-500/20 space-y-4 px-4">
                   <h3 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
                     <Send className="w-4 h-4" /> Submit for Review
                   </h3>
@@ -696,7 +696,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               {/* Team Lead: approve/reject (only when REVIEW) */}
               {canApprove && task.status === 'REVIEW' && (
-                <div className="space-y-4">
+                <div className="space-y-4 px-4">
                   {/* Approve */}
                   <div className="bg-emerald-500/5 rounded-xl p-5 border border-emerald-500/20 space-y-4">
                     <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
@@ -713,7 +713,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   </div>
 
                   {/* Reject / Rework */}
-                  <div className="bg-red-500/5 rounded-xl p-5 border border-red-500/20 space-y-4">
+                  <div className="bg-red-500/5 rounded-xl p-5 border border-red-500/20 space-y-4 px-4">
                     <h3 className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
                       <RotateCcw className="w-4 h-4" /> Request Rework
                     </h3>

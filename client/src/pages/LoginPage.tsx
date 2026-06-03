@@ -212,7 +212,7 @@ export const LoginPage: React.FC = () => {
             ))}
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4 text-left">
+          <form onSubmit={handleLogin} className="space-y-4 px-4 text-left">
             {/* Show organization input ONLY if tenantConfig is not resolved */}
             {!tenantConfig && (
               <div className="relative">
@@ -383,7 +383,7 @@ export const LoginPage: React.FC = () => {
             </p>
           </div>
 
-          <form onSubmit={handleMfaVerify} className="space-y-4">
+          <form onSubmit={handleMfaVerify} className="space-y-4 px-4">
             <div className="relative text-left">
               <Input
                 label="Verification Code"
