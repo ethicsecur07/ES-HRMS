@@ -47,6 +47,7 @@ export const scheduleMeeting = async (req: Request, res: Response): Promise<void
       attendees = [],
       candidateId,
       projectId,
+      description,
       notes,
     } = req.body;
 
@@ -68,6 +69,7 @@ export const scheduleMeeting = async (req: Request, res: Response): Promise<void
       attendees: attendees.map((a: any) => ({ name: a.name, email: a.email })),
       meetingType,
       microsoftCredentials,
+      description,
     });
 
     // Persist meeting record
@@ -83,12 +85,15 @@ export const scheduleMeeting = async (req: Request, res: Response): Promise<void
       attendees,
       candidateId: candidateId || undefined,
       projectId: projectId || undefined,
+      description,
       notes,
       status: 'SCHEDULED',
       createdBy: userId,
     });
 
     await meeting.save();
+
+
 
     // Emit real-time event
     getIO()?.emit('meeting_scheduled', {

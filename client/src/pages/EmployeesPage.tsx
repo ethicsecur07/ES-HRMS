@@ -425,7 +425,7 @@ export const EmployeesPage: React.FC = () => {
 
   const columns = [
     {
-      header: 'Employee',
+      header: (user?.role === 'EMPLOYEE' || user?.role === 'INTERN') ? 'Colleague' : 'Employee',
       accessor: (row: Employee) => (
         <div
           onClick={() => {
@@ -535,9 +535,13 @@ export const EmployeesPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-card border border-border shadow-sm">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-foreground tracking-tight">Employee Directory</h2>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">
+              {(user?.role === 'EMPLOYEE' || user?.role === 'INTERN') ? 'Colleague Directory' : 'Employee Directory'}
+            </h2>
             <span className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold font-mono">
-              {hasActiveFilters ? `${totalEmployees} result${totalEmployees !== 1 ? 's' : ''}` : `${totalEmployees} employee${totalEmployees !== 1 ? 's' : ''}`}
+              {hasActiveFilters
+                ? `${totalEmployees} result${totalEmployees !== 1 ? 's' : ''}`
+                : `${totalEmployees} ${(user?.role === 'EMPLOYEE' || user?.role === 'INTERN') ? 'colleague' : 'employee'}${totalEmployees !== 1 ? 's' : ''}`}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -649,7 +653,7 @@ export const EmployeesPage: React.FC = () => {
           <div className="flex items-center justify-between border-t border-border pt-4 mt-4">
             <span className="text-xs text-muted-foreground">
               Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-              {Math.min(currentPage * itemsPerPage, totalEmployees)} of {totalEmployees} employees
+              {Math.min(currentPage * itemsPerPage, totalEmployees)} of {totalEmployees} {(user?.role === 'EMPLOYEE' || user?.role === 'INTERN') ? 'colleagues' : 'employees'}
             </span>
             <div className="flex gap-2">
               <Button

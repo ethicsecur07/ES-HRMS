@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { meetingApi } from '../../api_service/meetingApi';
 import { employeeApi } from '../../api_service/employeeApi';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import type { Employee } from '../../types';
 import { Modal } from '../WrapperComponents/Modal';
 import { Button } from '../WrapperComponents/Button';
@@ -77,6 +78,16 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
 }) => {
   const { addToast } = useNotificationStore();
   const queryClient = useQueryClient();
+  const { user: currentUser, role } = useAuthStore();
+
+  const isEmployeeOrIntern = role === 'EMPLOYEE' || role === 'INTERN';
+
+  const filteredMeetingTypeOptions = MEETING_TYPE_OPTIONS.filter((opt) => {
+    if (opt.value === 'INTERVIEW') {
+      return !isEmployeeOrIntern;
+    }
+    return true;
+  });
 
   const [title, setTitle] = useState('');
   const [meetingType, setMeetingType] = useState<MeetingType>(defaultType);
@@ -84,6 +95,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
   const [startTime, setStartTime] = useState('10:00');
   const [duration, setDuration] = useState(60);
   const [notes, setNotes] = useState('');
+  const [description, setDescription] = useState('');
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [newAttendeeName, setNewAttendeeName] = useState('');
   const [newAttendeeEmail, setNewAttendeeEmail] = useState('');
@@ -156,9 +168,10 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setMeetingType(defaultType);
+      setMeetingType((defaultType === 'INTERVIEW' && isEmployeeOrIntern) ? 'TEAM' : defaultType);
       setSuccessResult(null);
       setNotes('');
+      setDescription('');
       setAttendees([]);
       setNewAttendeeName('');
       setNewAttendeeEmail('');
@@ -202,6 +215,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
         attendees,
         candidateId: candidateId || undefined,
         projectId: projectId || undefined,
+        description: description || undefined,
         notes: notes || undefined,
       });
     },
@@ -227,6 +241,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
         interviewer,
         interviewerEmail: interviewerEmail || undefined,
         duration,
+        description: description || undefined,
         notes: notes || undefined,
         attendees: attendees.filter(a => a.role !== 'Candidate'),
       });
@@ -270,11 +285,17 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (meetingType === 'INTERVIEW' && candidateId) {
-      scheduleInterviewMutation.mutate();
-    } else {
-      createMeetingMutation.mutate();
+    if (meetingType === 'INTERVIEW') {
+      if (isEmployeeOrIntern) {
+        addToast('Permission Denied', 'Employees cannot schedule hiring interviews.', 'error');
+        return;
+      }
+      if (candidateId) {
+        scheduleInterviewMutation.mutate();
+        return;
+      }
     }
+    createMeetingMutation.mutate();
   };
 
   const isLoading = createMeetingMutation.isPending || scheduleInterviewMutation.isPending;
@@ -333,7 +354,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
               Meeting Type
             </label>
             <div className="flex gap-3">
-              {MEETING_TYPE_OPTIONS.map((opt) => (
+              {filteredMeetingTypeOptions.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
@@ -604,6 +625,21 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
             )}
           </div>
 
+          {/* Description */}
+          <div>
+            <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+              Description *
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Provide a detailed description of the meeting (sent to all attendees)..."
+              rows={3}
+              required
+              className="w-full bg-background text-foreground border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            />
+          </div>
+
           {/* Notes */}
           <div>
             <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
@@ -623,7 +659,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
             <Button variant="outline" type="button" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" isLoading={isLoading} disabled={!title || !startDate}>
+            <Button type="submit" isLoading={isLoading} disabled={!title || !startDate || !description}>
               <Video className="w-4 h-4 mr-1.5" /> Schedule Meeting
             </Button>
           </div>
