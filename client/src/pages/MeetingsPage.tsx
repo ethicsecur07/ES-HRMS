@@ -64,6 +64,15 @@ export const MeetingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuthStore();
 
+  const isEmployeeOrIntern = currentUser?.role === 'EMPLOYEE' || currentUser?.role === 'INTERN';
+
+  const filteredTabConfig = TAB_CONFIG.filter((tab) => {
+    if (tab.id === 'INTERVIEW') {
+      return !isEmployeeOrIntern;
+    }
+    return true;
+  });
+
   const [activeTab, setActiveTab] = useState<TabFilter>('ALL');
   const [search, setSearch] = useState('');
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -180,7 +189,7 @@ export const MeetingsPage: React.FC = () => {
 
       {/* Tab Navigation */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar">
-        {TAB_CONFIG.map((tab) => (
+        {filteredTabConfig.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -306,6 +315,13 @@ export const MeetingsPage: React.FC = () => {
                     <Users className="w-3 h-3" />
                     Project: {meeting.projectId.name}
                   </div>
+                )}
+
+                {/* Description */}
+                {meeting.description && (
+                  <p className="text-xs text-foreground/80 mb-3 line-clamp-3">
+                    <strong>Description:</strong> {meeting.description}
+                  </p>
                 )}
 
                 {/* Notes */}

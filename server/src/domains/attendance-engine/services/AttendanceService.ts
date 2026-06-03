@@ -13,6 +13,58 @@ import { Leave } from '../../../models/Leave.js';
 import { Organization } from '../../../models/Organization.js';
 import { HolidayCalendar } from '../../../models/HolidayCalendar.js';
 
+class TimezoneHelper {
+  static getInfo(date: Date, timezone?: string) {
+    const tz = (!timezone || timezone === 'UTC') ? 'Asia/Kolkata' : timezone;
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(date);
+    const partValues: Record<string, string> = {};
+    for (const part of parts) {
+      partValues[part.type] = part.value;
+    }
+
+    const year = parseInt(partValues.year, 10);
+    const month = parseInt(partValues.month, 10) - 1; // 0-indexed
+    const day = parseInt(partValues.day, 10);
+    const hour = parseInt(partValues.hour, 10);
+    const minute = parseInt(partValues.minute, 10);
+    const second = parseInt(partValues.second, 10);
+
+    const tzDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+    const dateString = `${partValues.year}-${partValues.month}-${partValues.day}`;
+
+    return {
+      year,
+      month,
+      day,
+      hour,
+      minute,
+      second,
+      dayOfWeek: tzDate.getUTCDay(),
+      dateString,
+    };
+  }
+
+  static getUtcDate(year: number, month: number, day: number, hour: number, minute: number, second: number, timezone?: string): Date {
+    const tz = (!timezone || timezone === 'UTC') ? 'Asia/Kolkata' : timezone;
+    const utcDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+    const tzInfo = TimezoneHelper.getInfo(utcDate, tz);
+    const formattedUtc = Date.UTC(tzInfo.year, tzInfo.month, tzInfo.day, tzInfo.hour, tzInfo.minute, tzInfo.second);
+    const diffMs = utcDate.getTime() - formattedUtc;
+    return new Date(utcDate.getTime() + diffMs);
+  }
+}
+
 // Haversine formula helper
 const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371e3; // Earth radius in meters
@@ -120,7 +172,6 @@ export class AttendanceService {
     lat?: number,
     lng?: number
   ): Promise<IAttendance> {
-    const today = new Date().toISOString().split('T')[0];
     const orgId = new mongoose.Types.ObjectId(organizationId.toString());
     let empId = new mongoose.Types.ObjectId(employeeId);
 
@@ -128,6 +179,16 @@ export class AttendanceService {
     session.startTransaction();
 
     try {
+      // Fetch organization settings to resolve timezone and active workdays
+      const org = await Organization.findOne({ _id: orgId })
+        .session(session)
+        .select('settings.activeWorkdays settings.timezone settings.salaryCycleStartDay');
+      const timezone = org?.settings?.timezone || 'Asia/Kolkata';
+
+      const now = new Date();
+      const nowInfo = TimezoneHelper.getInfo(now, timezone);
+      const today = nowInfo.dateString;
+
       // 1. Validate employee exists in organization
       let employee = await Employee.findOne({ _id: empId, organizationId: orgId }).session(session);
       if (!employee) {
@@ -199,8 +260,7 @@ export class AttendanceService {
       }
 
       // 2.5. Prevent check-in on Sundays, holidays, and non-working days
-      const todayDate = new Date();
-      const isSunday = todayDate.getDay() === 0;
+      const isSunday = nowInfo.dayOfWeek === 0;
 
       // Enforce Sunday check
       if (isSunday) {
@@ -208,17 +268,14 @@ export class AttendanceService {
       }
 
       // Enforce 9:00 AM check-in constraint (not applicable on Sundays)
-      if (!isSunday && todayDate.getHours() < 9) {
+      if (!isSunday && nowInfo.hour < 9) {
         throw new Error('Check-in is only permitted after 9:00 AM.');
       }
 
       // Enforce Active Workdays check
-      const org = await Organization.findOne({ _id: orgId })
-        .session(session)
-        .select('settings.activeWorkdays');
       const activeWorkdays = org?.settings?.activeWorkdays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
       const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const currentDayLabel = DAY_LABELS[todayDate.getDay()];
+      const currentDayLabel = DAY_LABELS[nowInfo.dayOfWeek];
       if (!activeWorkdays.includes(currentDayLabel)) {
         throw new Error(`Check-in is not allowed on non-working days (${currentDayLabel}).`);
       }
@@ -258,7 +315,6 @@ export class AttendanceService {
       let lateReason = '';
 
       // 4. Resolve shift and evaluate late-in check
-      const now = new Date();
       const resolvedShift = await ShiftService.getAssignedShiftForDate(orgId, empId, now);
       
       let shiftId: mongoose.Types.ObjectId | undefined = undefined;
@@ -266,7 +322,7 @@ export class AttendanceService {
       if (resolvedShift) {
         shiftId = resolvedShift._id as mongoose.Types.ObjectId;
         const [shiftHour, shiftMin] = resolvedShift.startTime.split(':').map(Number);
-        const shiftStartToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), shiftHour, shiftMin, 0);
+        const shiftStartToday = TimezoneHelper.getUtcDate(nowInfo.year, nowInfo.month, nowInfo.day, shiftHour, shiftMin, 0, timezone);
         // Add 15 minutes grace period
         const thresholdTime = new Date(shiftStartToday.getTime() + 15 * 60 * 1000);
 
@@ -276,9 +332,7 @@ export class AttendanceService {
         }
       } else {
         // Fallback to legacy default 9:35 AM rule
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        if (currentHour > 9 || (currentHour === 9 && currentMinute > 35)) {
+        if (nowInfo.hour > 9 || (nowInfo.hour === 9 && nowInfo.minute > 35)) {
           isLate = true;
           lateReason = 'Late check-in after default 9:35 AM threshold';
         }
@@ -292,7 +346,7 @@ export class AttendanceService {
         approvalStatus: { $ne: 'REJECTED' }
       }).session(session);
 
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const currentMinutes = nowInfo.hour * 60 + nowInfo.minute;
       for (const perm of activePermissions) {
         const [startH, startM] = perm.startTime.split(':').map(Number);
         const [endH, endM] = perm.endTime.split(':').map(Number);
@@ -309,12 +363,9 @@ export class AttendanceService {
       //   - 2nd+ late in the cycle → auto-create & approve a Casual Leave for today, then allow check-in with a warning
       if (isLate) {
         // Fetch org salary cycle start day (default 10 → cycle runs 10th to 9th)
-        const org = await Organization.findOne({ _id: orgId })
-          .session(session)
-          .select('settings.salaryCycleStartDay');
         const startDay = org?.settings?.salaryCycleStartDay ?? 10;
 
-        const { cycleStart, cycleEnd } = AttendanceService.getSalaryCycleDates(now, startDay);
+        const { cycleStart, cycleEnd } = AttendanceService.getSalaryCycleDates(now, startDay, timezone);
 
         const priorLateCount = await Attendance.countDocuments({
           organizationId: orgId,
@@ -449,16 +500,20 @@ export class AttendanceService {
     session.startTransaction();
 
     try {
+      const org = await Organization.findOne({ _id: orgId })
+        .session(session)
+        .select('settings.timezone');
+      const timezone = org?.settings?.timezone || 'Asia/Kolkata';
+
       const now = new Date();
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
+      const nowInfo = TimezoneHelper.getInfo(now, timezone);
 
       const attendance = await Attendance.findOne({ _id: attId, organizationId: orgId }).session(session);
       if (!attendance) {
         throw new Error('Attendance record not found.');
       }
 
-      if (currentHour < 17 || (currentHour === 17 && currentMinute < 40)) {
+      if (nowInfo.hour < 17 || (nowInfo.hour === 17 && nowInfo.minute < 40)) {
         const todayStr = attendance.date;
         const approvedPerm = await PermissionRequest.findOne({
           organizationId: orgId,
@@ -483,7 +538,7 @@ export class AttendanceService {
         const shift = await Shift.findOne({ _id: attendance.shiftId, organizationId: orgId }).session(session);
         if (shift) {
           const [endH, endM] = shift.endTime.split(':').map(Number);
-          const shiftEndToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM, 0);
+          const shiftEndToday = TimezoneHelper.getUtcDate(nowInfo.year, nowInfo.month, nowInfo.day, endH, endM, 0, timezone);
 
           if (now < shiftEndToday) {
             const diffMs = shiftEndToday.getTime() - now.getTime();
@@ -499,10 +554,8 @@ export class AttendanceService {
         }
       } else {
         // Fallback to legacy default 6:00 PM rule
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        if (currentHour < 18 && !(currentHour === 17 && currentMinute >= 40)) {
-          const targetSixPM = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0);
+        if (nowInfo.hour < 18 && !(nowInfo.hour === 17 && nowInfo.minute >= 40)) {
+          const targetSixPM = TimezoneHelper.getUtcDate(nowInfo.year, nowInfo.month, nowInfo.day, 18, 0, 0, timezone);
           const diffMs = targetSixPM.getTime() - now.getTime();
           const permHoursToSix = Math.max(0.5, parseFloat((diffMs / (1000 * 60 * 60)).toFixed(1)));
           earlyCheckoutNote = ` (${permHoursToSix} hours permission applied for early checkout before 6:00 PM)`;
@@ -611,9 +664,14 @@ export class AttendanceService {
   ): Promise<void> {
     const orgId = new mongoose.Types.ObjectId(organizationId.toString());
     const empId = new mongoose.Types.ObjectId(employeeId.toString());
-    const todayStr = new Date().toISOString().split('T')[0];
+    
+    const org = await Organization.findOne({ _id: orgId }).select('settings.timezone');
+    const timezone = org?.settings?.timezone || 'Asia/Kolkata';
+
     const now = new Date();
-    const currentHour = now.getHours();
+    const nowInfo = TimezoneHelper.getInfo(now, timezone);
+    const todayStr = nowInfo.dateString;
+    const currentHour = nowInfo.hour;
 
     // If it is >= 6:00 PM (18:00), we can check out today's record as well
     const queryDate = currentHour >= 18 ? { $lte: todayStr } : { $lt: todayStr };
@@ -628,9 +686,11 @@ export class AttendanceService {
 
     for (const att of openAttendances) {
       const loginTime = new Date(att.loginTime);
-      // Set logout to exactly 6:00 PM (18:00) on that day in local time
-      const logoutTime = new Date(loginTime);
-      logoutTime.setHours(18, 0, 0, 0);
+      
+      // att.date is a string in YYYY-MM-DD format (e.g. "2026-06-03").
+      const [year, month, day] = att.date.split('-').map(Number);
+      // Set logout to exactly 6:00 PM (18:00) on that day in the organization's local timezone
+      const logoutTime = TimezoneHelper.getUtcDate(year, month - 1, day, 18, 0, 0, timezone);
       
       let workingHours = parseFloat(((logoutTime.getTime() - loginTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
       if (workingHours <= 0) {
@@ -661,33 +721,37 @@ export class AttendanceService {
    * Example: startDay=10, today=May 29 → { cycleStart: '2026-05-10', cycleEnd: '2026-06-09' }
    * Example: startDay=10, today=May 5  → { cycleStart: '2026-04-10', cycleEnd: '2026-05-09' }
    */
-  static getSalaryCycleDates(now: Date, startDay: number): { cycleStart: string; cycleEnd: string } {
-    const day = now.getDate();
-    const month = now.getMonth(); // 0-indexed
-    const year = now.getFullYear();
+  static getSalaryCycleDates(now: Date, startDay: number, timezone?: string): { cycleStart: string; cycleEnd: string } {
+    const nowInfo = TimezoneHelper.getInfo(now, timezone);
+    let startYear = nowInfo.year;
+    let startMonth = nowInfo.month; // 0-indexed: 0 = Jan, 11 = Dec
 
-    // Determine which month the current salary cycle started
-    let cycleStartDate: Date;
-    if (day >= startDay) {
-      // Cycle started this month
-      cycleStartDate = new Date(year, month, startDay);
-    } else {
-      // Cycle started last month (new Date handles month=-1 → Dec of prev year)
-      cycleStartDate = new Date(year, month - 1, startDay);
+    if (nowInfo.day < startDay) {
+      // Cycle started in the previous month
+      startMonth -= 1;
+      if (startMonth < 0) {
+        startMonth = 11;
+        startYear -= 1;
+      }
     }
 
-    // Next cycle starts one calendar month later from the cycle start
-    const nextCycleStart = new Date(cycleStartDate);
-    nextCycleStart.setMonth(nextCycleStart.getMonth() + 1);
+    // Next cycle starts exactly one month later
+    let nextYear = startYear;
+    let nextMonth = startMonth + 1;
+    if (nextMonth > 11) {
+      nextMonth = 0;
+      nextYear += 1;
+    }
 
-    // Cycle ends the day before the next cycle starts
-    const cycleEndDate = new Date(nextCycleStart);
-    cycleEndDate.setDate(cycleEndDate.getDate() - 1);
-
+    // The cycle ends the day before the next cycle starts.
+    // To find the day before nextYear-nextMonth-startDay:
+    const nextStartUtc = new Date(Date.UTC(nextYear, nextMonth, startDay));
+    const endUtc = new Date(nextStartUtc.getTime() - 24 * 60 * 60 * 1000);
+    
     const pad = (n: number) => String(n).padStart(2, '0');
-    const fmt = (d: Date) =>
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const cycleStart = `${startYear}-${pad(startMonth + 1)}-${pad(startDay)}`;
+    const cycleEnd = `${endUtc.getUTCFullYear()}-${pad(endUtc.getUTCMonth() + 1)}-${pad(endUtc.getUTCDate())}`;
 
-    return { cycleStart: fmt(cycleStartDate), cycleEnd: fmt(cycleEndDate) };
+    return { cycleStart, cycleEnd };
   }
 }

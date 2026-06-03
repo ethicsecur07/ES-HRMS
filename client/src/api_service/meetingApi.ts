@@ -14,6 +14,7 @@ export interface CreateMeetingPayload {
   attendees: MeetingAttendee[];
   candidateId?: string;
   projectId?: string;
+  description?: string;
   notes?: string;
 }
 
@@ -22,6 +23,7 @@ export interface ScheduleInterviewPayload {
   interviewer: string;
   interviewerEmail?: string;
   duration?: number;
+  description?: string;
   notes?: string;
   attendees?: MeetingAttendee[];
 }

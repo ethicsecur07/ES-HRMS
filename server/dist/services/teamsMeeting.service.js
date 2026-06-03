@@ -55,6 +55,10 @@ const createTeamsMeeting = async (options) => {
             const eventUrl = `https://graph.microsoft.com/v1.0/users/${organizerId}/events`;
             const eventBody = {
                 subject: options.subject,
+                body: options.description ? {
+                    contentType: 'html',
+                    content: options.description.replace(/\n/g, '<br/>'),
+                } : undefined,
                 start: {
                     dateTime: options.startDateTime,
                     timeZone: 'UTC',

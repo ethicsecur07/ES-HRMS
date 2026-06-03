@@ -20,6 +20,7 @@ export interface CreateMeetingOptions {
     clientId: string;
     clientSecret: string;
   };
+  description?: string;
 }
 
 export interface TeamsMeetingResult {
@@ -88,6 +89,10 @@ export const createTeamsMeeting = async (
       const eventUrl = `https://graph.microsoft.com/v1.0/users/${organizerId}/events`;
       const eventBody = {
         subject: options.subject,
+        body: options.description ? {
+          contentType: 'html',
+          content: options.description.replace(/\n/g, '<br/>'),
+        } : undefined,
         start: {
           dateTime: options.startDateTime,
           timeZone: 'UTC',

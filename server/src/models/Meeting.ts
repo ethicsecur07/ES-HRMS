@@ -21,6 +21,7 @@ export interface IMeeting extends Document {
   attendees: IMeetingAttendee[];
   candidateId?: mongoose.Types.ObjectId;
   projectId?: mongoose.Types.ObjectId;
+  description?: string;
   notes?: string;
   status: MeetingStatus;
   createdBy: mongoose.Types.ObjectId;
@@ -54,6 +55,7 @@ const MeetingSchema = new Schema<IMeeting>(
     attendees: [MeetingAttendeeSchema],
     candidateId: { type: Schema.Types.ObjectId, ref: 'Candidate' },
     projectId: { type: Schema.Types.ObjectId, ref: 'Project' },
+    description: { type: String },
     notes: { type: String },
     status: {
       type: String,

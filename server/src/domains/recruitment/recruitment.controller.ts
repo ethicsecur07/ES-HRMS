@@ -676,6 +676,7 @@ export const scheduleInterview = async (req: Request, res: Response): Promise<vo
       interviewerEmail,
       duration = 60, // minutes
       notes,
+      description,
       attendees = [],
     } = req.body;
 
@@ -733,6 +734,7 @@ export const scheduleInterview = async (req: Request, res: Response): Promise<vo
       attendees: meetingAttendees.map((a: any) => ({ name: a.name, email: a.email })),
       meetingType: 'INTERVIEW',
       microsoftCredentials,
+      description,
     });
 
     // Update candidate with interview schedule + Teams link
@@ -757,6 +759,7 @@ export const scheduleInterview = async (req: Request, res: Response): Promise<vo
       organizer: process.env.SMTP_USER || 'suseendrakumar@ethicsecur.co.in',
       attendees: meetingAttendees,
       candidateId: candidate._id,
+      description,
       notes,
       status: 'SCHEDULED',
       createdBy: userId,
@@ -813,6 +816,14 @@ export const scheduleInterview = async (req: Request, res: Response): Promise<vo
                 </tr>
               </table>
             </div>
+
+            <!-- Description -->
+            ${description ? `
+            <div style="background-color: #f8fafc; border-left: 4px solid #10b981; padding: 20px; margin: 24px 0; border-radius: 8px;">
+              <h3 style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">Interview Description</h3>
+              <p style="margin: 0; font-size: 14px; color: #4b5563; line-height: 1.5; white-space: pre-line;">${description}</p>
+            </div>
+            ` : ''}
             
             <!-- Call to Action -->
             <div style="text-align: center; margin: 32px 0 24px;">
@@ -857,7 +868,7 @@ export const scheduleInterview = async (req: Request, res: Response): Promise<vo
       await sendEmail({
         to: candidate.email,
         subject: `Congratulations! Shortlisted for Next Round — ${candidate.appliedRole} - ES EthicSecur SofTec`,
-        text: `Dear ${candidate.firstName},\n\nWe are pleased to inform you that you have been shortlisted for the next round of interviews for the position of ${candidate.appliedRole} at ES EthicSecur SofTec.\n\nYour interview has been scheduled on ${new Date(date).toLocaleString()}.\n\nInterviewer: ${interviewer}\nDuration: ${duration} minutes\n\nJoin the Teams meeting here: ${redirectJoinUrl}\n\nOffice Address: 2nd Floor, NV Arcade Building, Near 5 Roads, Next to Reliance Mall, Salem - 636004.\nWebsite: www.ethicsecur.com\n\nBest regards,\nHR Department\nES EthicSecur SofTec Pvt Ltd`,
+        text: `Dear ${candidate.firstName},\n\nWe are pleased to inform you that you have been shortlisted for the next round of interviews for the position of ${candidate.appliedRole} at ES EthicSecur SofTec.\n\nYour interview has been scheduled on ${new Date(date).toLocaleString()}.\n\nInterviewer: ${interviewer}\nDuration: ${duration} minutes\n\nDescription: ${description || ''}\n\nJoin the Teams meeting here: ${redirectJoinUrl}\n\nOffice Address: 2nd Floor, NV Arcade Building, Near 5 Roads, Next to Reliance Mall, Salem - 636004.\nWebsite: www.ethicsecur.com\n\nBest regards,\nHR Department\nES EthicSecur SofTec Pvt Ltd`,
         html: emailHtml,
         microsoftCredentials,
       });
@@ -904,6 +915,14 @@ export const scheduleInterview = async (req: Request, res: Response): Promise<vo
                 </table>
               </div>
               
+              <!-- Description -->
+              ${description ? `
+              <div style="background-color: #f8fafc; border-left: 4px solid #0f172a; padding: 20px; margin: 24px 0; border-radius: 8px;">
+                <h3 style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">Interview Description</h3>
+                <p style="margin: 0; font-size: 14px; color: #4b5563; line-height: 1.5; white-space: pre-line;">${description}</p>
+              </div>
+              ` : ''}
+              
               <!-- Call to Action -->
               <div style="text-align: center; margin: 32px 0 24px;">
                 <a href="${redirectJoinUrl}" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; transition: background-color 0.2s;">
@@ -935,7 +954,7 @@ export const scheduleInterview = async (req: Request, res: Response): Promise<vo
         await sendEmail({
           to: interviewerEmail,
           subject: `Interview Assignment: ${candidate.firstName} ${candidate.lastName} — ${candidate.appliedRole}`,
-          text: `Dear ${interviewer},\n\nYou have been assigned to conduct an interview for ${candidate.firstName} ${candidate.lastName} for the position of ${candidate.appliedRole}.\n\nScheduled: ${new Date(date).toLocaleString()}.\nDuration: ${duration} minutes.\n\nJoin the room here: ${redirectJoinUrl}\n\nAfter the interview, please log into HRMS to submit your technical and communication ratings.`,
+          text: `Dear ${interviewer},\n\nYou have been assigned to conduct an interview for ${candidate.firstName} ${candidate.lastName} for the position of ${candidate.appliedRole}.\n\nScheduled: ${new Date(date).toLocaleString()}.\nDuration: ${duration} minutes.\n\nDescription: ${description || ''}\n\nJoin the room here: ${redirectJoinUrl}\n\nAfter the interview, please log into HRMS to submit your technical and communication ratings.`,
           html: interviewerHtml,
           microsoftCredentials,
         });

@@ -129,12 +129,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const compiledItems = moduleRoutes
     .filter(route => enabledModules.includes(route.moduleCode))
-    .map(route => ({
-      name: route.displayName,
-      path: route.routePath,
-      icon: getIcon(route.routePath),
-      moduleCode: route.moduleCode,
-    }));
+    .map(route => {
+      let displayName = route.displayName;
+      if (route.moduleCode === 'EMPLOYEES') {
+        if (role === 'EMPLOYEE' || role === 'INTERN') {
+          displayName = 'Colleagues';
+        } else {
+          displayName = 'Employees';
+        }
+      }
+      return {
+        name: displayName,
+        path: route.routePath,
+        icon: getIcon(route.routePath),
+        moduleCode: route.moduleCode,
+      };
+    });
 
   const filteredItems = compiledItems.filter((item) => {
     if (role === 'INTERN') {

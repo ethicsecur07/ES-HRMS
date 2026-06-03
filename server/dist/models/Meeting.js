@@ -56,6 +56,7 @@ const MeetingSchema = new mongoose_1.Schema({
     attendees: [MeetingAttendeeSchema],
     candidateId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Candidate' },
     projectId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Project' },
+    description: { type: String },
     notes: { type: String },
     status: {
         type: String,

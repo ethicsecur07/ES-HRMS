@@ -43,7 +43,7 @@ const scheduleMeeting = async (req, res) => {
         const authReq = req;
         const userId = authReq.user?.id;
         const orgId = authReq.user?.organizationId;
-        const { title, meetingType, startDateTime, endDateTime, attendees = [], candidateId, projectId, notes, } = req.body;
+        const { title, meetingType, startDateTime, endDateTime, attendees = [], candidateId, projectId, description, notes, } = req.body;
         if (!title || !meetingType || !startDateTime || !endDateTime) {
             res.status(400).json({
                 success: false,
@@ -60,6 +60,7 @@ const scheduleMeeting = async (req, res) => {
             attendees: attendees.map((a) => ({ name: a.name, email: a.email })),
             meetingType,
             microsoftCredentials,
+            description,
         });
         // Persist meeting record
         const meeting = new Meeting_js_1.Meeting({
@@ -74,6 +75,7 @@ const scheduleMeeting = async (req, res) => {
             attendees,
             candidateId: candidateId || undefined,
             projectId: projectId || undefined,
+            description,
             notes,
             status: 'SCHEDULED',
             createdBy: userId,
