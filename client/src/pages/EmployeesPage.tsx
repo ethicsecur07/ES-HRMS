@@ -154,8 +154,10 @@ export const EmployeesPage: React.FC = () => {
       employeeApi.getAll({
         search: searchQuery || undefined,
         departmentId: selectedDeptId !== 'All' ? selectedDeptId : undefined,
-        isActive: selectedStatus === 'Active' ? 'true' : selectedStatus === 'Inactive' ? 'false' : undefined,
-        isLoginApproved: selectedStatus === 'Revoked' ? 'false' : undefined,
+        isLoginApproved:
+          selectedStatus === 'Approved' ? 'true'
+          : selectedStatus === 'Revoked' ? 'false'
+          : undefined,
         page: currentPage,
         limit: itemsPerPage,
       }),
@@ -481,14 +483,14 @@ export const EmployeesPage: React.FC = () => {
       ),
     },
     {
-      header: 'Status',
+      header: 'Login Status',
       accessor: (row: Employee) => (
         <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
-          row.isActive
+          (row as any).isLoginApproved !== false
             ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
             : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
         }`}>
-          {row.isActive ? 'Active' : 'Inactive'}
+          {(row as any).isLoginApproved !== false ? 'Approved' : 'Revoked'}
         </span>
       ),
     },
@@ -544,35 +546,19 @@ export const EmployeesPage: React.FC = () => {
               : 'Manage company workforce, organization structures, bank details, and profiles.'}
           </p>
         </div>
-        {hasPermission('EMPLOYEES', 'create') && (
+        {hasPermission('EMPLOYEES', 'create') && isMicrosoftSsoEnabled && (
           <div className="flex flex-wrap items-center gap-3">
-            {isMicrosoftSsoEnabled && (
-              <Button
-                onClick={handleSyncMicrosoft}
-                disabled={isSyncingMS}
-                className="bg-muted hover:bg-muted/80 text-foreground font-bold tracking-wider shadow-lg flex items-center border border-border"
-              >
-                {isSyncingMS ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin text-primary" />
-                ) : (
-                  <Sparkles className="w-5 h-5 mr-2 text-primary" />
-                )}
-                {isSyncingMS ? 'SYNCING...' : 'SYNC MICROSOFT'}
-              </Button>
-            )}
-
             <Button
-              onClick={() => {
-                reset();
-                setEditingId(null);
-                setProfileImage('');
-                setFormTab('general');
-                setShowModal(true);
-              }}
-              className="bg-primary hover:bg-primary/90 text-white font-bold tracking-wider shadow-lg flex items-center gap-1.5"
+              onClick={handleSyncMicrosoft}
+              disabled={isSyncingMS}
+              className="bg-muted hover:bg-muted/80 text-foreground font-bold tracking-wider shadow-lg flex items-center border border-border"
             >
-              <Plus className="w-5 h-5" />
-              ONBOARD STAFF
+              {isSyncingMS ? (
+                <Loader2 className="w-5 h-5 mr-2 animate-spin text-primary" />
+              ) : (
+                <Sparkles className="w-5 h-5 mr-2 text-primary" />
+              )}
+              {isSyncingMS ? 'SYNCING...' : 'SYNC MICROSOFT'}
             </Button>
           </div>
         )}
@@ -639,10 +625,9 @@ export const EmployeesPage: React.FC = () => {
               }}
               className="h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors"
             >
-              <option value="All">All Statuses</option>
-              <option value="Active">Active Only</option>
-              <option value="Inactive">Inactive Only</option>
-              <option value="Revoked">Revoked Logins</option>
+              <option value="All">All Login Statuses</option>
+              <option value="Approved">Login Approved</option>
+              <option value="Revoked">Login Revoked</option>
             </select>
           </div>
 
@@ -687,335 +672,6 @@ export const EmployeesPage: React.FC = () => {
           </div>
         )}
       </Card>
-
-      {/* Onboard / Edit Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editingId ? 'Edit Employee Record' : 'Onboard New Employee'}
-        maxWidth="max-w-2xl"
-      >
-        {/* Form Wizard Navigation */}
-        <div className="flex border-b border-border mb-4 px-4 bg-muted/20">
-          {(['general', 'professional', 'emergency', 'bank_tax'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setFormTab(tab)}
-              className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                formTab === tab ? 'border-primary text-primary font-extrabold' : 'border-transparent text-muted-foreground'
-              }`}
-            >
-              {tab.replace('_', ' & ')}
-            </button>
-          ))}
-        </div>
-
-        <form
-          onSubmit={handleSubmit(
-            (v) => createMutation.mutate(v),
-            (invalidErrors) => {
-              const tabMapping: Record<string, string> = {
-                fullName: 'General',
-                email: 'General',
-                password: 'General',
-                phone: 'General',
-                address: 'General',
-                employeeCode: 'General',
-                departmentId: 'Professional',
-                designationId: 'Professional',
-                joiningDate: 'Professional',
-                salary: 'Professional',
-                emergencyContactName: 'Emergency',
-                emergencyContactRel: 'Emergency',
-                emergencyContactPhone: 'Emergency',
-              };
-              const failedTabs = new Set<string>();
-              const errorList: string[] = [];
-              Object.keys(invalidErrors).forEach((field) => {
-                const tab = tabMapping[field] || 'Bank & Tax';
-                failedTabs.add(tab);
-                const msg = (invalidErrors as any)[field]?.message || `${field} is invalid`;
-                errorList.push(msg);
-              });
-              addToast(
-                'Validation Failed',
-                `Please check fields in [${Array.from(failedTabs).join(', ')}]: ${errorList.join('; ')}`,
-                'error'
-              );
-            }
-          )}
-          className="space-y-4 text-left px-4"
-        >
-          {formTab === 'general' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              {/* Profile Image Upload Box */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                <div className="relative group w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden flex-shrink-0">
-                  {profileImage ? (
-                    <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <Camera className="w-6 h-6 text-primary opacity-60" />
-                  )}
-                  {!editingId ? (
-                    <label
-                      className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                      title="Upload Profile Image"
-                    >
-                      <Camera className="w-5 h-5 text-white" />
-                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                    </label>
-                  ) : (
-                    <div
-                      className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-not-allowed"
-                      title="Profile photograph is read-only"
-                    >
-                      <Camera className="w-5 h-5 text-white/50" />
-                    </div>
-                  )}
-                  {isUploadingImg && (
-                    <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-                      <Loader2 className="w-5 h-5 text-white animate-spin" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-foreground">Profile Photograph</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {editingId
-                      ? 'Profile picture is locked in edit mode'
-                      : 'Click the image box to upload a high-fidelity profile picture'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1 relative">
-                  <Input label="Employee Code *" {...register('employeeCode')} error={errors.employeeCode?.message} />
-                  <button
-                    type="button"
-                    onClick={handleGenerateCode}
-                    className="absolute right-2 top-8 text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 text-[10px] font-bold"
-                    title="Auto-generate sequential code"
-                  >
-                    <Sparkles className="w-3 h-3" /> Auto Gen
-                  </button>
-                </div>
-
-                <Input
-                  label="Full Name *"
-                  {...register('fullName')}
-                  disabled={!!editingId}
-                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
-                  error={errors.fullName?.message}
-                  onKeyPress={(e) => {
-                    if (!/^[a-zA-Z\s]$/.test(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                />
-                <Input
-                  label="Work Email *"
-                  type="email"
-                  {...register('email')}
-                  disabled={!!editingId}
-                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
-                  error={errors.email?.message}
-                />
-                <Input
-                  label={editingId ? 'New Login Password (Optional)' : 'Login Password *'}
-                  type="text"
-                  {...register('password')}
-                  disabled={!!editingId}
-                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
-                  error={errors.password?.message}
-                  placeholder={editingId ? 'Leave blank to keep unchanged' : 'Default: EthicSec@2026'}
-                />
-                <Input
-                  label="Phone Number *"
-                  {...register('phone')}
-                  disabled={!!editingId}
-                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
-                  error={errors.phone?.message}
-                  onKeyPress={(e) => {
-                    if (!/^[0-9\s+-]$/.test(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                />
-              </div>
-              <Textarea
-                label="Residential Address *"
-                {...register('address')}
-                disabled={!!editingId}
-                className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
-                error={errors.address?.message}
-              />
-            </div>
-          )}
-
-          {formTab === 'professional' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1 text-left">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department *</label>
-                  <select
-                    {...register('departmentId')}
-                    disabled={!!editingId}
-                    className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-                  >
-                    <option value="" disabled>Select Department</option>
-                    {departments.map((dept: any) => (
-                      <option key={dept._id} value={dept._id}>
-                        {dept.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.departmentId && <p className="text-xs text-red-500 font-bold mt-1">{errors.departmentId.message}</p>}
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Designation *</label>
-                  <select
-                    {...register('designationId')}
-                    disabled={!!editingId || !selectedDeptIdWatch}
-                    className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-                  >
-                    <option value="" disabled>Select Designation</option>
-                    {filteredDesignations.map((desig: any) => (
-                      <option key={desig._id} value={desig._id}>
-                        {desig.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.designationId && <p className="text-xs text-red-500 font-bold mt-1">{errors.designationId.message}</p>}
-                </div>
-
-                <Input
-                  label="Employee Hire Date *"
-                  type="date"
-                  {...register('joiningDate')}
-                  disabled={!!editingId}
-                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
-                  error={errors.joiningDate?.message}
-                />
-                <Input
-                  label="Monthly Base Salary (INR) *"
-                  type="number"
-                  {...register('salary')}
-                  disabled={!!editingId}
-                  className={editingId ? 'bg-muted/50 cursor-not-allowed opacity-70' : ''}
-                  error={errors.salary?.message}
-                />
-              </div>
-            </div>
-          )}
-
-          {formTab === 'emergency' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Input
-                  label="Contact Name *"
-                  {...register('emergencyContactName')}
-                  error={errors.emergencyContactName?.message}
-                  onKeyPress={(e) => {
-                    if (!/^[a-zA-Z\s]$/.test(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                />
-                <Input
-                  label="Relationship *"
-                  {...register('emergencyContactRel')}
-                  error={errors.emergencyContactRel?.message}
-                  onKeyPress={(e) => {
-                    if (!/^[a-zA-Z\s]$/.test(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                />
-                <Input
-                  label="Contact Phone *"
-                  {...register('emergencyContactPhone')}
-                  error={errors.emergencyContactPhone?.message}
-                  onKeyPress={(e) => {
-                    if (!/^[0-9\s+-]$/.test(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {formTab === 'bank_tax' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
-                  Bank Account Specifications
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input label="Bank Name" {...register('bankName')} error={errors.bankName?.message} />
-                  <Input label="Account Holder Name" {...register('accountName')} error={errors.accountName?.message} />
-                  <Input label="Account Number" {...register('accountNumber')} error={errors.accountNumber?.message} />
-                  <Input label="IFSC Code" {...register('ifscCode')} error={errors.ifscCode?.message} />
-                </div>
-                <Input label="Branch Name" {...register('branchName')} error={errors.branchName?.message} />
-              </div>
-
-              <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
-                  Taxation & PAN Details
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input label="PAN Card Number" {...register('panNumber')} error={errors.panNumber?.message} />
-                  <div className="space-y-1 text-left">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Income Tax Regime</label>
-                    <select
-                      {...register('taxRegime')}
-                      className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors disabled:opacity-50"
-                    >
-                      <option value="">Select Regime (Optional)</option>
-                      <option value="NEW">New Tax Regime</option>
-                      <option value="OLD">Old Tax Regime</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-between items-center pt-4 border-t border-border mt-6">
-            <span className="text-xs text-muted-foreground">
-              {formTab === 'general' && 'Next: Professional Details'}
-              {formTab === 'professional' && 'Next: Emergency Contact'}
-              {formTab === 'emergency' && 'Next: Bank & Tax'}
-              {formTab === 'bank_tax' && 'Ready to Submit'}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" type="button" onClick={() => setShowModal(false)}>
-                Cancel
-              </Button>
-              {formTab !== 'bank_tax' ? (
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (formTab === 'general') setFormTab('professional');
-                    else if (formTab === 'professional') setFormTab('emergency');
-                    else if (formTab === 'emergency') setFormTab('bank_tax');
-                  }}
-                >
-                  Next Section
-                </Button>
-              ) : (
-                <Button type="submit" isLoading={isSubmitting || createMutation.isPending}>
-                  {editingId ? 'Save Changes' : 'Onboard Staff'}
-                </Button>
-              )}
-            </div>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 };

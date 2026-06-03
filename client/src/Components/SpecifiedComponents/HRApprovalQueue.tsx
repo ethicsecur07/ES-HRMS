@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi } from '../../api_service/leaveApi';
 import { wfhApi } from '../../api_service/wfhApi';
@@ -27,8 +27,34 @@ import {
   ChevronRight,
   ShieldAlert,
   Megaphone,
-  BookOpen
+  BookOpen,
+  X,
+  Eraser
 } from 'lucide-react';
+
+// ─── Helpers for seen-IDs localStorage ────────────────────────────────────
+const LS_SEEN_KEY    = 'hrq_seen_ids';
+const LS_CLEARED_KEY = 'hrq_cleared_ids';
+
+const loadSetMap = (key: string): Record<string, Set<string>> => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return { feed: new Set(), meetings: new Set(), actions: new Set(), work: new Set() };
+    const parsed = JSON.parse(raw) as Record<string, string[]>;
+    return {
+      feed:     new Set(parsed.feed     || []),
+      meetings: new Set(parsed.meetings || []),
+      actions:  new Set(parsed.actions  || []),
+      work:     new Set(parsed.work     || []),
+    };
+  } catch { return { feed: new Set(), meetings: new Set(), actions: new Set(), work: new Set() }; }
+};
+
+const saveSetMap = (key: string, ids: Record<string, Set<string>>) => {
+  const serialisable: Record<string, string[]> = {};
+  Object.entries(ids).forEach(([k, v]) => { serialisable[k] = Array.from(v); });
+  localStorage.setItem(key, JSON.stringify(serialisable));
+};
 
 export const HRApprovalQueue: React.FC = () => {
   const { addToast } = useNotificationStore();
@@ -37,7 +63,38 @@ export const HRApprovalQueue: React.FC = () => {
   
   // Dashboard card navigation tabs
   const [activeTab, setActiveTab] = useState<'feed' | 'meetings' | 'actions' | 'work'>('feed');
-  
+
+  // ─── Seen-IDs: persisted to localStorage to track which items the user has already viewed ───
+  const [seenIds, setSeenIds] = useState<Record<string, Set<string>>>(() => loadSetMap(LS_SEEN_KEY));
+
+  // ─── Cleared-IDs: permanently persisted to localStorage — cleared items never reappear ───
+  const [clearedIds, setClearedIds] = useState<Record<string, Set<string>>>(() => loadSetMap(LS_CLEARED_KEY));
+
+  // Persist seenIds whenever they change
+  useEffect(() => { saveSetMap(LS_SEEN_KEY, seenIds); }, [seenIds]);
+
+  // Persist clearedIds whenever they change
+  useEffect(() => { saveSetMap(LS_CLEARED_KEY, clearedIds); }, [clearedIds]);
+
+  // Mark all current tab items as seen when the tab becomes active
+  const markTabSeen = useCallback((tab: string, ids: string[]) => {
+    setSeenIds(prev => {
+      const updated = { ...prev, [tab]: new Set([...Array.from(prev[tab] || []), ...ids]) };
+      return updated;
+    });
+  }, []);
+
+  // Clear all items in a tab — permanently stored in localStorage, never reappear
+  const clearTab = useCallback((tab: string, ids: string[]) => {
+    setClearedIds(prev => ({
+      ...prev,
+      [tab]: new Set([...Array.from(prev[tab] || []), ...ids]),
+    }));
+    // Also mark them all as seen so badge disappears
+    markTabSeen(tab, ids);
+    addToast('Tab Cleared', 'Items permanently removed from this tab.', 'success');
+  }, [markTabSeen, addToast]);
+
   // Create announcement form slide open state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formTitle, setFormTitle] = useState('');
@@ -134,6 +191,56 @@ export const HRApprovalQueue: React.FC = () => {
   const myProjects = data?.myProjects || [];
   const myTasks = data?.myTasks || [];
 
+  // ─── IDs per tab (for seen/cleared tracking) ────────────────────────────
+  const feedIds = announcements.map((a: any) => a._id as string);
+  const meetingIds = meetingsToday.map((m: any) => m._id as string);
+  const actionIds = [
+    ...pendingLeaves.map((i: any) => i._id as string),
+    ...pendingWFH.map((i: any) => i._id as string),
+    ...pendingPermissions.map((i: any) => i._id as string),
+    ...myLeaves.map((i: any) => i._id as string),
+    ...myWFH.map((i: any) => i._id as string),
+    ...myPermissions.map((i: any) => i._id as string),
+  ];
+  const workIds = [
+    ...myProjects.map((p: any) => p._id as string),
+    ...myTasks.map((t: any) => t._id as string),
+  ];
+
+  // ─── Unseen counts (items not yet seen by the user) ──────────────────────
+  const unseenCount = (tab: string, ids: string[]) =>
+    ids.filter(id => !seenIds[tab]?.has(id)).length;
+
+  const unseenFeed    = unseenCount('feed',     feedIds);
+  const unseenMeetings= unseenCount('meetings', meetingIds);
+  const unseenActions = unseenCount('actions',  actionIds);
+  const unseenWork    = unseenCount('work',     workIds);
+
+  // ─── Visible items (not cleared) ─────────────────────────────────────────
+  const visibleAnnouncements  = announcements.filter((a: any) => !clearedIds.feed?.has(a._id));
+  const visibleMeetings       = meetingsToday.filter((m: any) => !clearedIds.meetings?.has(m._id));
+  const visiblePendingLeaves  = pendingLeaves.filter((i: any) => !clearedIds.actions?.has(i._id));
+  const visiblePendingWFH     = pendingWFH.filter((i: any) => !clearedIds.actions?.has(i._id));
+  const visiblePendingPerms   = pendingPermissions.filter((i: any) => !clearedIds.actions?.has(i._id));
+  const visibleMyLeaves       = myLeaves.filter((i: any) => !clearedIds.actions?.has(i._id));
+  const visibleMyWFH          = myWFH.filter((i: any) => !clearedIds.actions?.has(i._id));
+  const visibleMyPermissions  = myPermissions.filter((i: any) => !clearedIds.actions?.has(i._id));
+  const visibleMyProjects     = myProjects.filter((p: any) => !clearedIds.work?.has(p._id));
+  const visibleMyTasks        = myTasks.filter((t: any) => !clearedIds.work?.has(t._id));
+
+  const visibleTotalPending   = visiblePendingLeaves.length + visiblePendingWFH.length + visiblePendingPerms.length;
+  const visibleTotalMyApplied = visibleMyLeaves.length + visibleMyWFH.length + visibleMyPermissions.length;
+
+  // ─── Mark tab as seen when switching to it ───────────────────────────────
+  const handleTabChange = (tab: 'feed' | 'meetings' | 'actions' | 'work') => {
+    setActiveTab(tab);
+    setShowCreateForm(false);
+    const idsMap: Record<string, string[]> = {
+      feed: feedIds, meetings: meetingIds, actions: actionIds, work: workIds,
+    };
+    markTabSeen(tab, idsMap[tab] || []);
+  };
+
   const handleCreateAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formContent.trim()) {
@@ -200,8 +307,9 @@ export const HRApprovalQueue: React.FC = () => {
 
       {/* Tabs Navigation */}
       <div className="flex bg-muted/40 p-1 rounded-xl border border-border/40 gap-1 my-4 text-xs font-bold overflow-x-auto scrollbar-none flex-nowrap w-full">
+        {/* ── Feed Tab ── */}
         <button
-          onClick={() => { setActiveTab('feed'); setShowCreateForm(false); }}
+          onClick={() => handleTabChange('feed')}
           className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'feed'
               ? 'bg-card text-foreground shadow-sm'
@@ -210,15 +318,16 @@ export const HRApprovalQueue: React.FC = () => {
         >
           <Bell className="w-3.5 h-3.5 flex-shrink-0" />
           <span>Feed</span>
-          {announcements.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold flex-shrink-0">
-              {announcements.length}
+          {unseenFeed > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-primary text-white text-[10px] font-bold flex-shrink-0 animate-pulse">
+              {unseenFeed}
             </span>
           )}
         </button>
         
+        {/* ── Meetings Tab ── */}
         <button
-          onClick={() => { setActiveTab('meetings'); setShowCreateForm(false); }}
+          onClick={() => handleTabChange('meetings')}
           className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'meetings'
               ? 'bg-card text-foreground shadow-sm'
@@ -227,15 +336,16 @@ export const HRApprovalQueue: React.FC = () => {
         >
           <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
           <span>Meetings</span>
-          {meetingsToday.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 text-[10px] font-bold flex-shrink-0">
-              {meetingsToday.length}
+          {unseenMeetings > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex-shrink-0 animate-pulse">
+              {unseenMeetings}
             </span>
           )}
         </button>
 
+        {/* ── Requests Tab ── */}
         <button
-          onClick={() => { setActiveTab('actions'); setShowCreateForm(false); }}
+          onClick={() => handleTabChange('actions')}
           className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'actions'
               ? 'bg-card text-foreground shadow-sm'
@@ -244,23 +354,18 @@ export const HRApprovalQueue: React.FC = () => {
         >
           <ClipboardCheck className="w-3.5 h-3.5 flex-shrink-0" />
           <span>Requests</span>
-          {role === 'HR' || role === 'ADMIN' || role === 'MANAGER' ? (
-            totalPending > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] font-bold flex-shrink-0">
-                {totalPending}
-              </span>
-            )
-          ) : (
-            totalMyApplied > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold flex-shrink-0">
-                {totalMyApplied}
-              </span>
-            )
+          {unseenActions > 0 && (
+            <span className={`px-1.5 py-0.5 rounded-full text-white text-[10px] font-bold flex-shrink-0 animate-pulse ${
+              role === 'HR' || role === 'ADMIN' || role === 'MANAGER' ? 'bg-amber-500' : 'bg-primary'
+            }`}>
+              {unseenActions}
+            </span>
           )}
         </button>
 
+        {/* ── Work Tab ── */}
         <button
-          onClick={() => { setActiveTab('work'); setShowCreateForm(false); }}
+          onClick={() => handleTabChange('work')}
           className={`flex-1 flex-shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg transition-all min-w-max ${
             activeTab === 'work'
               ? 'bg-card text-foreground shadow-sm'
@@ -269,9 +374,9 @@ export const HRApprovalQueue: React.FC = () => {
         >
           <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
           <span>Work</span>
-          {myTasks.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 text-[10px] font-bold flex-shrink-0">
-              {myTasks.length}
+          {unseenWork > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex-shrink-0 animate-pulse">
+              {unseenWork}
             </span>
           )}
         </button>
@@ -284,21 +389,35 @@ export const HRApprovalQueue: React.FC = () => {
         {activeTab === 'feed' && (
           <div className="space-y-4">
             
-            {/* Publisher Form Button (restricted to HR, MANAGER, ADMIN) */}
-            {(role === 'ADMIN' || role === 'HR' || role === 'MANAGER') && (
-              <div className="border-b border-border/50 pb-3 mb-2 flex flex-wrap gap-2 justify-between items-center">
-                <span className="text-xs font-semibold text-muted-foreground">Announcements board</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowCreateForm(!showCreateForm)}
-                  className="text-xs flex items-center gap-1 border-primary/20 hover:bg-primary/5 text-primary font-bold py-1 h-8 rounded-lg"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  {showCreateForm ? 'Cancel' : 'Publish Announcement'}
-                </Button>
+            {/* Publisher Form Button + Clear Button */}
+            <div className="border-b border-border/50 pb-3 mb-2 flex flex-wrap gap-2 justify-between items-center">
+              <span className="text-xs font-semibold text-muted-foreground">Announcements board</span>
+              <div className="flex items-center gap-2">
+                {/* Clear button — visible to all, hides current feed items */}
+                {visibleAnnouncements.length > 0 && (
+                  <button
+                    onClick={() => clearTab('feed', feedIds)}
+                    className="text-[11px] flex items-center gap-1 text-muted-foreground hover:text-destructive border border-border/60 hover:border-destructive/40 rounded-lg px-2.5 py-1 transition-all font-semibold"
+                    title="Clear feed"
+                  >
+                    <Eraser className="w-3 h-3" />
+                    Clear
+                  </button>
+                )}
+                {/* Publisher form – restricted to HR/ADMIN/MANAGER */}
+                {(role === 'ADMIN' || role === 'HR' || role === 'MANAGER') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowCreateForm(!showCreateForm)}
+                    className="text-xs flex items-center gap-1 border-primary/20 hover:bg-primary/5 text-primary font-bold py-1 h-8 rounded-lg"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {showCreateForm ? 'Cancel' : 'Publish Announcement'}
+                  </Button>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Quick Announcement Post Form */}
             {showCreateForm && (
@@ -359,7 +478,7 @@ export const HRApprovalQueue: React.FC = () => {
             )}
 
             {/* List Announcements */}
-            {announcements.length === 0 ? (
+            {visibleAnnouncements.length === 0 ? (
               <div className="py-12 text-center bg-muted/10 rounded-xl border border-dashed border-border/80">
                 <Megaphone className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-30" />
                 <p className="text-xs font-bold text-foreground">All Quiet in the Feed</p>
@@ -367,7 +486,7 @@ export const HRApprovalQueue: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3.5">
-                {announcements.map((ann: any) => {
+                {visibleAnnouncements.map((ann: any) => {
                   const isPolicy = ann.type === 'POLICY_CHANGE';
                   return (
                     <div 
@@ -434,9 +553,21 @@ export const HRApprovalQueue: React.FC = () => {
         {/* ================= TAB 2: MEETINGS ================= */}
         {activeTab === 'meetings' && (
           <div className="space-y-4">
-            <span className="text-xs font-semibold text-muted-foreground block border-b border-border/50 pb-2 mb-2">Today's schedules</span>
+            <div className="flex items-center justify-between border-b border-border/50 pb-2 mb-2">
+              <span className="text-xs font-semibold text-muted-foreground">Today's schedules</span>
+              {visibleMeetings.length > 0 && (
+                <button
+                  onClick={() => clearTab('meetings', meetingIds)}
+                  className="text-[11px] flex items-center gap-1 text-muted-foreground hover:text-destructive border border-border/60 hover:border-destructive/40 rounded-lg px-2.5 py-1 transition-all font-semibold"
+                  title="Clear meetings"
+                >
+                  <Eraser className="w-3 h-3" />
+                  Clear
+                </button>
+              )}
+            </div>
             
-            {meetingsToday.length === 0 ? (
+            {visibleMeetings.length === 0 ? (
               <div className="py-12 text-center bg-muted/10 rounded-xl border border-dashed border-border/80">
                 <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-2 opacity-50" />
                 <p className="text-xs font-bold text-foreground">Clear Agenda</p>
@@ -444,7 +575,7 @@ export const HRApprovalQueue: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {meetingsToday.map((meeting: any) => {
+                {visibleMeetings.map((meeting: any) => {
                   const startTime = new Date(meeting.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   const endTime = new Date(meeting.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   
@@ -503,12 +634,24 @@ export const HRApprovalQueue: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-border/50 pb-2 mb-2">
                   <span className="text-xs font-semibold text-muted-foreground">Pending Approval Queue</span>
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                    {totalPending} PENDING
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {visibleTotalPending > 0 && (
+                      <button
+                        onClick={() => clearTab('actions', actionIds)}
+                        className="text-[11px] flex items-center gap-1 text-muted-foreground hover:text-destructive border border-border/60 hover:border-destructive/40 rounded-lg px-2.5 py-1 transition-all font-semibold"
+                        title="Clear requests"
+                      >
+                        <Eraser className="w-3 h-3" />
+                        Clear
+                      </button>
+                    )}
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                      {visibleTotalPending} PENDING
+                    </span>
+                  </div>
                 </div>
 
-                {totalPending === 0 ? (
+                {visibleTotalPending === 0 ? (
                   <div className="py-12 text-center bg-muted/10 rounded-xl border border-dashed border-border/80">
                     <UserCheck className="w-10 h-10 text-primary mx-auto mb-2 opacity-50" />
                     <p className="text-xs font-bold text-foreground">All Caught Up!</p>
@@ -517,7 +660,7 @@ export const HRApprovalQueue: React.FC = () => {
                 ) : (
                   <div className="space-y-4">
                     {/* 1. Leaves approvals */}
-                    {pendingLeaves.map((item: any) => (
+                    {visiblePendingLeaves.map((item: any) => (
                       <div key={item._id} className="p-4 rounded-xl border border-border bg-card shadow-sm space-y-3.5 hover:border-primary/30 transition-all">
                         <div className="flex items-center justify-between">
                           <span className="px-2.5 py-0.5 rounded-md bg-muted text-foreground font-bold text-[9px] uppercase border border-border tracking-wider">
@@ -572,7 +715,7 @@ export const HRApprovalQueue: React.FC = () => {
                     ))}
 
                     {/* 2. WFH approvals */}
-                    {pendingWFH.map((item: any) => (
+                    {visiblePendingWFH.map((item: any) => (
                       <div key={item._id} className="p-4 rounded-xl border border-border bg-card shadow-sm space-y-3.5 hover:border-primary/30 transition-all">
                         <div className="flex items-center justify-between">
                           <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 font-bold text-[9px] uppercase border border-indigo-500/20 tracking-wider">
@@ -626,7 +769,7 @@ export const HRApprovalQueue: React.FC = () => {
                     ))}
 
                     {/* 3. Permissions approvals */}
-                    {pendingPermissions.map((item: any) => (
+                    {visiblePendingPerms.map((item: any) => (
                       <div key={item._id} className="p-4 rounded-xl border border-border bg-card shadow-sm space-y-3.5 hover:border-primary/30 transition-all">
                         <div className="flex items-center justify-between">
                           <span className="px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 font-bold text-[9px] uppercase border border-amber-500/20 tracking-wider">
@@ -682,9 +825,21 @@ export const HRApprovalQueue: React.FC = () => {
               
               // ================= EMPLOYEE VIEW: Applied Requests Logs =================
               <div className="space-y-4">
-                <span className="text-xs font-semibold text-muted-foreground block border-b border-border/50 pb-2 mb-2">My Applied Requests Logs</span>
+                <div className="flex items-center justify-between border-b border-border/50 pb-2 mb-2">
+                  <span className="text-xs font-semibold text-muted-foreground">My Applied Requests Logs</span>
+                  {visibleTotalMyApplied > 0 && (
+                    <button
+                      onClick={() => clearTab('actions', actionIds)}
+                      className="text-[11px] flex items-center gap-1 text-muted-foreground hover:text-destructive border border-border/60 hover:border-destructive/40 rounded-lg px-2.5 py-1 transition-all font-semibold"
+                      title="Clear requests log"
+                    >
+                      <Eraser className="w-3 h-3" />
+                      Clear
+                    </button>
+                  )}
+                </div>
                 
-                {totalMyApplied === 0 ? (
+                {visibleTotalMyApplied === 0 ? (
                   <div className="py-12 text-center bg-muted/10 rounded-xl border border-dashed border-border/80">
                     <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-30" />
                     <p className="text-xs font-bold text-foreground">No Submissions</p>
@@ -694,7 +849,7 @@ export const HRApprovalQueue: React.FC = () => {
                   <div className="space-y-3">
                     
                     {/* Render Leaves applied */}
-                    {myLeaves.map((l: any) => {
+                    {visibleMyLeaves.map((l: any) => {
                       const statusColor = l.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : l.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20';
                       return (
                         <div key={l._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex flex-col xs:flex-row gap-3 xs:items-center justify-between text-xs hover:border-primary/20 transition-all">
@@ -715,7 +870,7 @@ export const HRApprovalQueue: React.FC = () => {
                     })}
 
                     {/* Render WFH requests */}
-                    {myWFH.map((w: any) => {
+                    {visibleMyWFH.map((w: any) => {
                       const statusColor = w.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : w.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20';
                       return (
                         <div key={w._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex flex-col xs:flex-row gap-3 xs:items-center justify-between text-xs hover:border-primary/20 transition-all">
@@ -736,7 +891,7 @@ export const HRApprovalQueue: React.FC = () => {
                     })}
 
                     {/* Render Permissions applied */}
-                    {myPermissions.map((p: any) => {
+                    {visibleMyPermissions.map((p: any) => {
                       const statusColor = p.approvalStatus === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : p.approvalStatus === 'REJECTED' ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20';
                       return (
                         <div key={p._id} className="p-3.5 bg-card border border-border/60 rounded-xl flex flex-col xs:flex-row gap-3 xs:items-center justify-between text-xs hover:border-primary/20 transition-all">
@@ -765,15 +920,29 @@ export const HRApprovalQueue: React.FC = () => {
         {/* ================= TAB 4: WORK ================= */}
         {activeTab === 'work' && (
           <div className="space-y-5">
+
+            {/* Work tab clear button */}
+            {(visibleMyProjects.length > 0 || visibleMyTasks.length > 0) && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => clearTab('work', workIds)}
+                  className="text-[11px] flex items-center gap-1 text-muted-foreground hover:text-destructive border border-border/60 hover:border-destructive/40 rounded-lg px-2.5 py-1 transition-all font-semibold"
+                  title="Clear work items"
+                >
+                  <Eraser className="w-3 h-3" />
+                  Clear All
+                </button>
+              </div>
+            )}
             
             {/* Project section */}
             <div>
               <span className="text-xs font-semibold text-muted-foreground block border-b border-border/50 pb-2 mb-2">My Projects</span>
-              {myProjects.length === 0 ? (
+              {visibleMyProjects.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic py-3">No active project assignments found for you.</p>
               ) : (
                 <div className="grid grid-cols-1 gap-2.5">
-                  {myProjects.map((proj: any) => (
+                  {visibleMyProjects.map((proj: any) => (
                     <div key={proj._id} className="p-3.5 bg-muted/20 border border-border rounded-xl flex flex-col xs:flex-row gap-3 xs:items-center justify-between hover:bg-muted/40 transition-colors">
                       <div className="min-w-0 flex-1">
                         <h5 className="text-xs font-bold text-foreground truncate">{proj.name}</h5>
@@ -791,11 +960,11 @@ export const HRApprovalQueue: React.FC = () => {
             {/* Task section */}
             <div className="pt-2">
               <span className="text-xs font-semibold text-muted-foreground block border-b border-border/50 pb-2 mb-2">My Pending Tasks</span>
-              {myTasks.length === 0 ? (
+              {visibleMyTasks.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic py-3">No pending tasks assigned to you. Keep it up!</p>
               ) : (
                 <div className="space-y-2.5">
-                  {myTasks.map((task: any) => {
+                  {visibleMyTasks.map((task: any) => {
                     const priorityColor = task.priority === 'CRITICAL' || task.priority === 'HIGH' 
                       ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' 
                       : task.priority === 'MEDIUM'
