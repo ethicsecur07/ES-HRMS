@@ -42,8 +42,10 @@ export const authApi = {
     organizationName: string;
     organizationSlug: string;
     organizationSector: string;
+    ssoProvider?: string;
+    ssoConfig?: any;
   }) => {
-    const response = await axiosInstance.post<{ success: boolean; message: string; organizationId: string; slug: string }>('/auth/signup', data);
+    const response = await axiosInstance.post<{ user: User; token: string }>('/auth/signup', data);
     return response.data;
-  },
+  }
 };

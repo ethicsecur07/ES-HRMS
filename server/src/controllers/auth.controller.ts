@@ -821,7 +821,16 @@ export const updateMe = async (req: AuthRequest, res: Response): Promise<void> =
 };
 
 export const signup = async (req: Request, res: Response): Promise<void> => {
-  const { name, email, password, organizationName, organizationSlug, organizationSector } = req.body;
+  const { 
+    name, 
+    email, 
+    password, 
+    organizationName, 
+    organizationSlug, 
+    organizationSector,
+    ssoProvider,
+    ssoConfig 
+  } = req.body;
 
   if (!name || !email || !password || !organizationName || !organizationSlug || !organizationSector) {
     res.status(400).json({ message: 'All registration fields are required.' });
@@ -873,6 +882,59 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
         },
       });
       await organization.save({ session });
+
+      // Create SSO configuration if chosen during registration
+      if (ssoProvider && ssoProvider !== 'NONE') {
+        const displayName = ssoProvider === 'GOOGLE' ? 'Google Workspace'
+                          : ssoProvider === 'MICROSOFT' ? 'Microsoft Entra ID'
+                          : ssoProvider === 'SAML' ? 'SAML 2.0 Federated SSO'
+                          : 'Custom OAuth 2.0 Engine';
+        
+        const authConfigData: any = {
+          organizationId: organization._id,
+          provider: ssoProvider,
+          displayName,
+          isEnabled: true,
+          isPrimary: true,
+          autoProvision: true,
+          defaultRoleCode: 'EMPLOYEE',
+        };
+
+        if (ssoProvider === 'GOOGLE' || ssoProvider === 'MICROSOFT' || ssoProvider === 'OAUTH') {
+          authConfigData.clientId = ssoConfig?.clientId?.trim();
+          authConfigData.clientSecret = ssoConfig?.clientSecret?.trim();
+          authConfigData.redirectUri = ssoConfig?.redirectUri?.trim() || 'http://localhost:5173/sso/callback';
+        }
+
+        if (ssoProvider === 'MICROSOFT') {
+          authConfigData.tenantId = ssoConfig?.tenantId?.trim() || 'common';
+        }
+
+        if (ssoProvider === 'OAUTH') {
+          authConfigData.authorizationUrl = ssoConfig?.authorizationUrl?.trim();
+          authConfigData.tokenUrl = ssoConfig?.tokenUrl?.trim();
+          authConfigData.userInfoUrl = ssoConfig?.userInfoUrl?.trim();
+          authConfigData.scopes = ssoConfig?.scopes ? ssoConfig.scopes.split(',').map((s: string) => s.trim()) : ['openid', 'profile', 'email'];
+          authConfigData.attributeMapping = {
+            email: ssoConfig?.attributeMapping?.email?.trim() || 'email',
+            name: ssoConfig?.attributeMapping?.name?.trim() || 'name',
+          };
+        }
+
+        if (ssoProvider === 'SAML') {
+          authConfigData.samlEntryPoint = ssoConfig?.samlEntryPoint?.trim();
+          authConfigData.samlIssuer = ssoConfig?.samlIssuer?.trim();
+          authConfigData.samlCert = ssoConfig?.samlCert?.trim();
+          authConfigData.samlCallbackUrl = ssoConfig?.samlCallbackUrl?.trim() || 'http://localhost:5173/sso/callback';
+          authConfigData.attributeMapping = {
+            email: ssoConfig?.attributeMapping?.email?.trim() || 'email',
+            name: ssoConfig?.attributeMapping?.name?.trim() || 'name',
+          };
+        }
+
+        const authConfig = new OrganizationAuthConfig(authConfigData);
+        await authConfig.save({ session });
+      }
 
       // Hash Password using Argon2
       const hashedPassword = await PasswordService.hashPassword(password);
@@ -930,12 +992,10 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 
       await session.commitTransaction();
 
-      res.status(201).json({
-        success: true,
-        message: 'Organization and administrator account successfully registered!',
-        organizationId: organization._id,
-        slug: normalizedSlug,
-      });
+      // Automatically sign in the registered admin and establish user session
+      const risk = { country: 'Unknown', riskLevel: 'LOW', factors: [] };
+      await createSessionAndRespond(adminUser, organization, req, res, risk);
+
     } catch (transactionError) {
       await session.abortTransaction();
       throw transactionError;
@@ -946,4 +1006,3 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ message: error.message });
   }
 };
-

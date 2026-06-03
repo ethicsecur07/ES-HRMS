@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
 import { uploadFileToS3 } from '../utils/s3.js';
 
@@ -13,15 +12,14 @@ export const uploadImage = async (req: Request, res: Response): Promise<void> =>
   }
 
   try {
-    const b64 = Buffer.from(req.file.buffer).toString('base64');
-    const dataURI = `data:${req.file.mimetype};base64,${b64}`;
-    
-    const result = await cloudinary.uploader.upload(dataURI, {
-      folder: 'es_hrms_profiles',
-      resource_type: 'auto',
-    });
-
-    res.status(200).json({ url: result.secure_url });
+    const url = await uploadFileToS3(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      (req as any).user?.organizationId,
+      (req as any).user?.email
+    );
+    res.status(200).json({ url });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -34,7 +32,13 @@ export const uploadDocument = async (req: Request, res: Response): Promise<void>
   }
 
   try {
-    const url = await uploadFileToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const url = await uploadFileToS3(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      (req as any).user?.organizationId,
+      (req as any).user?.email
+    );
     res.status(200).json({ url });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

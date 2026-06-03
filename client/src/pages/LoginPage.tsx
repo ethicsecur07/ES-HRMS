@@ -153,6 +153,7 @@ export const LoginPage: React.FC = () => {
   const logoUrl = tenantConfig?.settings?.logoUrl || ESLogo;
   const brandName = tenantConfig?.name || 'ES EthicSecur SofTec HRMS';
   const authProviders = tenantConfig?.authProviders || [];
+  const hasSsoConfigured = tenantConfig && authProviders.filter((p) => p !== 'LOCAL').length > 0;
   const isLocalEnabled = selectedRole === 'ADMIN' || !tenantConfig || authProviders.includes('LOCAL');
 
   return (
@@ -176,7 +177,7 @@ export const LoginPage: React.FC = () => {
                 : 'Enterprise Workforce & Payroll Management SaaS'}
             </p>
 
-            {tenantConfig && (
+            {tenantConfig && !hasSsoConfigured && (
               <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F75F0A]/10 border border-[#F75F0A]/20 text-[#F75F0A] text-[10px] font-bold">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Verified Organization Portal
@@ -195,22 +196,24 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Professional Role Selector Tabs */}
-          <div className="mb-6 p-1 rounded-xl bg-slate-950 border border-slate-850 grid grid-cols-3 gap-1">
-            {(['ADMIN', 'HR', 'EMPLOYEE'] as Role[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setSelectedRole(r)}
-                className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                  selectedRole === r
-                    ? 'bg-[#F75F0A] text-white shadow-md border border-[#F75F0A]/80 scale-[1.02]'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {r === 'ADMIN' ? 'Administrator' : r === 'HR' ? 'HR Manager' : 'Employee'}
-              </button>
-            ))}
-          </div>
+          {!hasSsoConfigured && (
+            <div className="mb-6 p-1 rounded-xl bg-slate-950 border border-slate-850 grid grid-cols-3 gap-1">
+              {(['ADMIN', 'HR', 'EMPLOYEE'] as Role[]).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setSelectedRole(r)}
+                  className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                    selectedRole === r
+                      ? 'bg-[#F75F0A] text-white shadow-md border border-[#F75F0A]/80 scale-[1.02]'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {r === 'ADMIN' ? 'Administrator' : r === 'HR' ? 'HR Manager' : 'Employee'}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={handleLogin} className="space-y-4 px-4 text-left">
             {/* Show organization input ONLY if tenantConfig is not resolved */}
@@ -264,7 +267,8 @@ export const LoginPage: React.FC = () => {
                     ))}
                 </div>
 
-                {isLocalEnabled && (
+               
+                {isLocalEnabled && !hasSsoConfigured && (
                   <div className="relative my-4 flex items-center justify-center">
                     <span className="absolute inset-x-0 h-px bg-slate-850"></span>
                     <span className="relative bg-slate-900 px-3 text-[10px] text-slate-500 uppercase font-bold">
@@ -276,7 +280,7 @@ export const LoginPage: React.FC = () => {
             )}
 
             {/* Local Username & Password Form */}
-            {isLocalEnabled && (
+            {isLocalEnabled && !hasSsoConfigured && (
               <>
                 <div className="relative">
                   <Mail className="absolute left-3 top-[34px] h-4 w-4 text-slate-400" />
@@ -346,7 +350,7 @@ export const LoginPage: React.FC = () => {
               </>
             )}
 
-            {!isLocalEnabled && (
+            {!isLocalEnabled && !hasSsoConfigured && (
               <div className="text-center py-6 text-slate-400 text-xs bg-slate-950/50 rounded-xl border border-slate-850">
                 <Lock className="w-8 h-8 mx-auto text-[#F75F0A]/50 mb-2" />
                 Local password logins are disabled for your organization. Please use one of the corporate single
@@ -355,12 +359,14 @@ export const LoginPage: React.FC = () => {
             )}
           </form>
 
-          <div className="mt-4 text-center text-xs text-slate-400">
-            Need a secure workspace for your business?{' '}
-            <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline">
-              Register Organization
-            </Link>
-          </div>
+          {!hasSsoConfigured && (
+            <div className="mt-4 text-center text-xs text-slate-400">
+              Need a secure workspace for your business?{' '}
+              <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline">
+                Register Organization
+              </Link>
+            </div>
+          )}
 
           <div className="mt-6 pt-5 border-t border-slate-850 text-center text-xs text-slate-500">
             <p className="font-semibold text-slate-400">Zero-Trust Enterprise IAM Active</p>
