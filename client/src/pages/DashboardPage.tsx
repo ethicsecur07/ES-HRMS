@@ -352,18 +352,16 @@ export const DashboardPage: React.FC = () => {
                   iconBg: 'bg-pink-500/15 text-pink-600',
                   icon: <ListTodo className="w-6 h-6" />,
                 },
-
                 {
-                  label: 'Add Employee',
-                  desc: 'Onboard Staff',
-                  path: '/employees?action=add',
+                  label: 'Recruitment',
+                  desc: 'Recruitment Management',
+                  path: '/recruitment',
                   gradient: 'from-teal-500/20 to-emerald-600/10',
                   border: 'border-teal-500/30',
                   iconBg: 'bg-teal-500/15 text-teal-600',
                   icon: <UserPlus className="w-6 h-6" />,
-                  hidden: role !== 'HR',
                 },
-              ].filter(item => !item.hidden).map(({ label, desc, path, gradient, border, iconBg, icon }) => (
+              ].map(({ label, desc, path, gradient, border, iconBg, icon }) => (
                 <button
                   key={path}
                   onClick={() => navigate(path)}
@@ -469,13 +467,22 @@ export const DashboardPage: React.FC = () => {
                 },
 
                 {
-                  label: 'Add Employee',
-                  desc: 'Onboard Staff',
-                  path: '/employees?action=add',
+                  label: 'Recruitment',
+                  desc: 'Recruitment Management',
+                  path: '/recruitment',
                   gradient: 'from-teal-500/20 to-emerald-600/10',
                   border: 'border-teal-500/30',
                   iconBg: 'bg-teal-500/15 text-teal-600',
                   icon: <UserPlus className="w-6 h-6" />,
+                },
+                {
+                  label: 'Employees',
+                  desc: 'Employee Directory',
+                  path: '/employees',
+                  gradient: 'from-amber-500/20 to-orange-600/10',
+                  border: 'border-amber-500/30',
+                  iconBg: 'bg-amber-500/15 text-amber-600',
+                  icon: <Users className="w-6 h-6" />,
                 },
               ].map(({ label, desc, path, gradient, border, iconBg, icon }) => (
                 <button

@@ -813,7 +813,7 @@ export const LeavePolicyPage: React.FC = () => {
         maxWidth="max-w-2xl"
       >
         {policyModal.open && policyModal.policy && (
-          <div className="space-y-4">
+          <div className="space-y-4 px-4">
             {policyModal.isNew && (
               <Select
                 label="Leave Type *"
@@ -849,7 +849,7 @@ export const LeavePolicyPage: React.FC = () => {
         maxWidth="max-w-md"
       >
         {holidayModal.open && (
-          <div className="space-y-4">
+          <div className="space-y-4 px-4">
             <Input
               label="Holiday Name *"
               value={holidayModal.holiday?.name ?? ''}

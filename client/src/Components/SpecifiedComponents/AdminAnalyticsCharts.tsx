@@ -365,8 +365,8 @@ export const AdminAnalyticsCharts: React.FC<AdminAnalyticsChartsProps> = ({ stat
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value as any)}
             >
-              <option value="week">Today</option>
-              <option value="today">Today Only</option>
+              <option value="week">Week</option>
+              <option value="today">Today </option>
             </select>
           </div>
 

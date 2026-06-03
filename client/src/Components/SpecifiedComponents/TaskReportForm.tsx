@@ -76,7 +76,7 @@ export const TaskReportForm: React.FC<TaskReportFormProps> = ({ attendanceId, on
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 space-x-1 px-2 text-left">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-4 space-x-1 px-2 text-left">
      
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
