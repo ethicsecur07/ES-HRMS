@@ -133,20 +133,24 @@ class PermissionSyncService {
             const teamLeadViewModules = ['PROJECTS', 'RECRUITMENT', 'MEETINGS'];
             // Prepare upsert operations
             const operations = [];
-            // 1. ADMIN permissions (Full access)
+            // 1. ADMIN permissions (Full access except PROJECTS which is view-only)
             for (const moduleCode of allModules) {
+                const isAdminProjectsViewOnly = moduleCode === 'PROJECTS';
+                const actions = isAdminProjectsViewOnly
+                    ? { view: true, create: false, edit: false, delete: false, approve: false, assign: false, export: false }
+                    : { view: true, create: true, edit: true, delete: true, approve: true, assign: true, export: true };
                 operations.push({
                     updateOne: {
                         filter: { organizationId: orgId, roleId: adminRole._id, userId: null, module: moduleCode },
                         update: force ? {
                             $set: {
-                                actions: { view: true, create: true, edit: true, delete: true, approve: true, assign: true, export: true },
+                                actions,
                                 restrictedFields: [],
                                 policyCondition: null,
                             },
                         } : {
                             $setOnInsert: {
-                                actions: { view: true, create: true, edit: true, delete: true, approve: true, assign: true, export: true },
+                                actions,
                                 restrictedFields: [],
                                 policyCondition: null,
                             },

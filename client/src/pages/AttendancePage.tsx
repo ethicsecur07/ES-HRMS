@@ -110,7 +110,7 @@ export const AttendancePage: React.FC = () => {
 
   const { data: employees, isLoading: empLoading } = useQuery({
     queryKey: ['employees'],
-    queryFn: () => employeeApi.getAll().then(res => res.employees),
+    queryFn: () => employeeApi.getAll({ limit: 1000 }).then(res => res.employees),
   });
 
   const filteredAttendances = useMemo(() => {

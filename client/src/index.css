@@ -166,3 +166,13 @@ select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Color scheme dark mode support for default browser UI elements like calendar popups, scrollbars, etc. */
+html.dark {
+  color-scheme: dark;
+}
+
+/* Ensure calendar indicator icon is visible and clickable in dark mode */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}

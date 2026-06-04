@@ -293,7 +293,7 @@ class EmployeeService {
         }
         // Pagination
         const pageNum = parseInt(page) || 1;
-        const limitNum = parseInt(limit) || 100;
+        const limitNum = parseInt(limit) || 1000;
         const skipNum = (pageNum - 1) * limitNum;
         // Sorting
         const sortField = sortBy || 'createdAt';

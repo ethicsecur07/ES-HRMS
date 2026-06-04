@@ -154,6 +154,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     if (item.moduleCode === 'PAYROLL') {
       return role === 'ADMIN' || role === 'HR';
     }
+    if (item.moduleCode === 'RECRUITMENT') {
+      return role === 'HR' || role === 'MANAGER';
+    }
     return hasPermission(item.moduleCode, 'view');
   });
 
