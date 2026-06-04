@@ -18,8 +18,11 @@ import {
   KeyRound,
   Chrome,
   ChevronRight,
-  Fingerprint
+  Fingerprint,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { useThemeStore } from '../store/useThemeStore';
 import type { Role } from '../types';
 import ESLogo from '../assets/ES_Logo.png';
 
@@ -41,10 +44,10 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tenantQuery = searchParams.get('tenant');
-
   const { login, isAuthenticated } = useAuthStore();
   const { addToast } = useNotificationStore();
   const { tenantConfig, fetchTenantConfig, clearTenantConfig } = useTenantStore();
+  const { theme, toggleTheme, setTheme } = useThemeStore();
 
   // If tenant query parameter is present, resolve organization details automatically
   useEffect(() => {
@@ -63,6 +66,14 @@ export const LoginPage: React.FC = () => {
       setTenantSlug(tenantConfig.slug);
     }
   }, [tenantConfig]);
+
+  // Sync tenant theme config with the global theme store
+  useEffect(() => {
+    const tenantTheme = tenantConfig?.settings?.theme;
+    if (tenantTheme === 'light' || tenantTheme === 'dark') {
+      setTheme(tenantTheme);
+    }
+  }, [tenantConfig, setTheme]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -172,21 +183,33 @@ export const LoginPage: React.FC = () => {
   const showLocalForm = portalType === 'INTERN' || isLocalEnabled;
 
   return (
-    <div className={`min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 overflow-hidden relative ${themeSetting}`}>
+    <div className={`min-h-screen w-full flex items-center justify-center bg-background text-foreground p-4 overflow-hidden relative ${theme}`}>
+      {/* Floating Theme Toggle */}
+      <div className="absolute top-4 right-4 z-50 animate-in fade-in duration-300">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="p-2 sm:p-2.5 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all shadow-md flex items-center justify-center animate-pulse hover:animate-none"
+          title="Toggle Theme"
+        >
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="h-5 w-5" />}
+        </button>
+      </div>
+
       {/* Background glow effects */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#F75F0A]/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none animate-pulse delay-1000"></div>
 
       {!isMfaRequired ? (
-        <Card className="w-full max-w-lg p-8 z-10 border border-slate-800 shadow-2xl backdrop-blur-xl bg-slate-900/90 text-white">
+        <Card className="w-full max-w-lg p-8 z-10 border border-border shadow-2xl backdrop-blur-xl bg-card/90 text-card-foreground">
           <div className="text-center mb-8">
             <img
               src={logoUrl}
               alt="Organization Logo"
               className="h-16 w-16 mx-auto object-contain drop-shadow-md mb-4 rounded-xl"
             />
-            <h2 className="text-2xl font-extrabold text-white tracking-tight">{brandName}</h2>
-            <p className="text-xs text-slate-400 mt-1.5 font-medium">
+            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">{brandName}</h2>
+            <p className="text-xs text-muted-foreground mt-1.5 font-medium">
               {tenantConfig?.sector
                 ? `${tenantConfig.sector} Portal • Enterprise IAM Secure Gate`
                 : 'Enterprise Workforce & Payroll Management SaaS'}
@@ -202,7 +225,7 @@ export const LoginPage: React.FC = () => {
                     clearTenantConfig();
                     setTenantSlug('');
                   }}
-                  className="text-slate-400 hover:text-white underline ml-1.5 font-normal"
+                  className="text-muted-foreground hover:text-foreground underline ml-1.5 font-normal"
                 >
                   Change
                 </button>
@@ -211,7 +234,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Portal Type Primary Selector Tabs */}
-          <div className="mb-4 p-1 rounded-xl bg-slate-950 border border-slate-850 grid grid-cols-2 gap-1 animate-in fade-in duration-300">
+          <div className="mb-4 p-1 rounded-xl bg-muted border border-border grid grid-cols-2 gap-1 animate-in fade-in duration-300">
             <button
               type="button"
               onClick={() => {
@@ -221,7 +244,7 @@ export const LoginPage: React.FC = () => {
               className={`py-2 text-xs font-bold rounded-lg transition-all ${
                 portalType === 'STAFF'
                   ? 'bg-[#F75F0A] text-white shadow-md border border-[#F75F0A]/80 scale-[1.02]'
-                  : 'text-slate-400 hover:text-slate-200'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Staff Portal
@@ -235,7 +258,7 @@ export const LoginPage: React.FC = () => {
               className={`py-2 text-xs font-bold rounded-lg transition-all ${
                 portalType === 'INTERN'
                   ? 'bg-[#F75F0A] text-white shadow-md border border-[#F75F0A]/80 scale-[1.02]'
-                  : 'text-slate-400 hover:text-slate-200'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Intern Portal
@@ -266,7 +289,7 @@ export const LoginPage: React.FC = () => {
             {/* Show organization input ONLY if tenantConfig is not resolved */}
             {!tenantConfig && (
               <div className="relative">
-                <Building2 className="absolute left-3 top-[34px] h-4 w-4 text-slate-400" />
+                <Building2 className="absolute left-3 top-[34px] h-4 w-4 text-muted-foreground" />
                 <Input
                   label="Organization Code (Slug)"
                   type="text"
@@ -274,7 +297,7 @@ export const LoginPage: React.FC = () => {
                   value={tenantSlug}
                   onChange={(e) => setTenantSlug(e.target.value)}
                   onBlur={handleManualSlugResolve}
-                  className="pl-10 bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                  className="pl-10 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   required
                 />
               </div>
@@ -283,7 +306,7 @@ export const LoginPage: React.FC = () => {
             {/* Dynamic SSO Buttons */}
             {portalType === 'STAFF' && tenantConfig && authProviders.filter((p) => p !== 'LOCAL').length > 0 && (
               <div className="space-y-2 mb-4">
-                <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider text-center">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider text-center">
                   Sign in with Corporate SSO
                 </p>
                 <div className="grid grid-cols-1 gap-2">
@@ -295,16 +318,16 @@ export const LoginPage: React.FC = () => {
                         type="button"
                         variant="outline"
                         onClick={() => handleSsoLogin(provider)}
-                        className="w-full border-slate-800 text-slate-200 hover:bg-slate-850 hover:text-white flex items-center justify-center py-2.5"
+                        className="w-full border-border text-foreground hover:bg-muted hover:text-foreground flex items-center justify-center py-2.5"
                       >
                         {provider === 'GOOGLE' ? (
                           <Chrome className="w-4 h-4 mr-2 text-red-400" />
                         ) : provider === 'MICROSOFT' ? (
                           <svg className="w-4 h-4 mr-2 flex-shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="0" y="0" width="10" height="10" fill="#F25022"/>
-                            <rect x="11" y="0" width="10" height="10" fill="#7FBA00"/>
-                            <rect x="0" y="11" width="10" height="10" fill="#00A4EF"/>
-                            <rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
+                             <rect x="0" y="0" width="10" height="10" fill="#F25022"/>
+                             <rect x="11" y="0" width="10" height="10" fill="#7FBA00"/>
+                             <rect x="0" y="11" width="10" height="10" fill="#00A4EF"/>
+                             <rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
                           </svg>
                         ) : (
                           <KeyRound className="w-4 h-4 mr-2 text-[#F75F0A]" />
@@ -316,8 +339,8 @@ export const LoginPage: React.FC = () => {
 
                 {isLocalEnabled && (
                   <div className="relative my-4 flex items-center justify-center">
-                    <span className="absolute inset-x-0 h-px bg-slate-850"></span>
-                    <span className="relative bg-slate-900 px-3 text-[10px] text-slate-500 uppercase font-bold">
+                    <span className="absolute inset-x-0 h-px bg-border"></span>
+                    <span className="relative bg-card px-3 text-[10px] text-muted-foreground uppercase font-bold">
                       Or local login
                     </span>
                   </div>
@@ -329,43 +352,43 @@ export const LoginPage: React.FC = () => {
             {showLocalForm && (
               <>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-[34px] h-4 w-4 text-slate-400" />
+                  <Mail className="absolute left-3 top-[34px] h-4 w-4 text-muted-foreground" />
                   <Input
                     label="Work Email Address"
                     type="email"
                     placeholder="name@organization.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                    className="pl-10 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     required
                   />
                 </div>
 
                 <div className="relative">
-                  <Lock className="absolute left-3 top-[34px] h-4 w-4 text-slate-400" />
+                  <Lock className="absolute left-3 top-[34px] h-4 w-4 text-muted-foreground" />
                   <Input
                     label="Password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                    className="pl-10 pr-10 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-[34px] text-slate-400 hover:text-slate-200 transition-colors"
+                    className="absolute right-3 top-[34px] text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
 
                 <div className="flex items-center justify-between text-xs pt-1">
-                  <label className="flex items-center gap-2 text-slate-400 cursor-pointer">
+                  <label className="flex items-center gap-2 text-muted-foreground cursor-pointer">
                     <input
                       type="checkbox"
-                      className="rounded border-slate-800 bg-slate-950 text-[#F75F0A] focus:ring-[#F75F0A] h-4 w-4"
+                      className="rounded border-border bg-background text-[#F75F0A] focus:ring-[#F75F0A] h-4 w-4"
                       defaultChecked
                     />
                     <span>Remember 30-day session</span>
@@ -397,7 +420,7 @@ export const LoginPage: React.FC = () => {
             )}
 
             {portalType === 'STAFF' && !isLocalEnabled && (
-              <div className="text-center py-6 text-slate-400 text-xs bg-slate-950/50 rounded-xl border border-slate-850">
+              <div className="text-center py-6 text-muted-foreground text-xs bg-muted/50 rounded-xl border border-border">
                 <Lock className="w-8 h-8 mx-auto text-[#F75F0A]/50 mb-2" />
                 Local password logins are disabled for your organization. Please use one of the corporate single
                 sign-on providers listed above.
@@ -405,15 +428,15 @@ export const LoginPage: React.FC = () => {
             )}
           </form>
 
-          <div className="mt-4 text-center text-xs text-slate-400">
+          <div className="mt-4 text-center text-xs text-muted-foreground">
             Need a secure workspace for your business?{' '}
-            <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline">
+            <Link to="/signup" className="text-indigo-500 hover:text-indigo-600 font-semibold hover:underline">
               Register Organization
             </Link>
           </div>
 
-          <div className="mt-6 pt-5 border-t border-slate-850 text-center text-xs text-slate-500">
-            <p className="font-semibold text-slate-400">Zero-Trust Enterprise IAM Active</p>
+          <div className="mt-6 pt-5 border-t border-border text-center text-xs text-muted-foreground">
+            <p className="font-semibold text-muted-foreground">Zero-Trust Enterprise IAM Active</p>
             <p className="mt-1">
               Geofenced check-ins are active. Sessions outside allowed network bounds are logged under WFH logs.
             </p>
@@ -421,13 +444,13 @@ export const LoginPage: React.FC = () => {
         </Card>
       ) : (
         /* MFA Prompt challenge screen */
-        <Card className="w-full max-w-md p-8 z-10 border border-slate-800 shadow-2xl backdrop-blur-xl bg-slate-900/90 text-white text-center">
+        <Card className="w-full max-w-md p-8 z-10 border border-border shadow-2xl backdrop-blur-xl bg-card/90 text-card-foreground text-center">
           <div className="mb-6">
             <div className="w-14 h-14 bg-[#F75F0A]/10 border border-[#F75F0A]/20 text-[#F75F0A] rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
               <Fingerprint className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-extrabold text-white tracking-tight">Two-Factor Authentication</h2>
-            <p className="text-xs text-slate-400 mt-2">
+            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">Two-Factor Authentication</h2>
+            <p className="text-xs text-muted-foreground mt-2">
               Provide the 6-digit verification code from your authenticator app or one of your backup recovery
               codes to verify your identity.
             </p>
@@ -441,7 +464,7 @@ export const LoginPage: React.FC = () => {
                 placeholder="000000 or backup code"
                 value={mfaCode}
                 onChange={(e) => setMfaCode(e.target.value)}
-                className="bg-slate-950 border-slate-800 text-white text-center tracking-widest text-lg font-bold placeholder-slate-700 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                className="bg-background border-border text-foreground text-center tracking-widest text-lg font-bold placeholder:text-muted-foreground focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                 maxLength={16}
                 required
                 autoFocus
@@ -464,7 +487,7 @@ export const LoginPage: React.FC = () => {
                 setMfaPendingToken(null);
                 setMfaCode('');
               }}
-              className="text-slate-400 hover:text-slate-200 text-xs mt-2 transition-colors block mx-auto underline"
+              className="text-muted-foreground hover:text-foreground text-xs mt-2 transition-colors block mx-auto underline"
             >
               Cancel and go back
             </button>
