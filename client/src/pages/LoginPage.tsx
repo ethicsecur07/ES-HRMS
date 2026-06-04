@@ -233,6 +233,7 @@ export const LoginPage: React.FC = () => {
             )}
           </div>
 
+
           {/* Portal Type Primary Selector Tabs */}
           <div className="mb-4 p-1 rounded-xl bg-muted border border-border grid grid-cols-2 gap-1 animate-in fade-in duration-300">
             <button
