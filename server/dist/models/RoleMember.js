@@ -41,4 +41,4 @@ const roleMemberSchema = new mongoose_1.Schema({
     roleId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Role', required: true, index: true },
 }, { timestamps: true });
 roleMemberSchema.index({ organizationId: 1, userId: 1, roleId: 1 }, { unique: true });
-exports.RoleMember = mongoose_1.default.model('RoleMember', roleMemberSchema);
+exports.RoleMember = mongoose_1.default.models.RoleMember || mongoose_1.default.model('RoleMember', roleMemberSchema);

@@ -55,42 +55,42 @@ class PermissionSyncService {
             if (!adminRole || !managerRole || !hrRole || !teamLeadRole || !employeeRole || !internRole) {
                 throw new Error("Critical Failure: Core roles could not be provisioned.");
             }
-            // Update hierarchy links (parentRoleId)
+            // Update hierarchy links (parentRoleId) - Top-down visual hierarchy
             await Role_js_1.Role.bulkWrite([
                 {
                     updateOne: {
                         filter: { _id: adminRole._id },
-                        update: { $set: { parentRoleId: managerRole._id } }
+                        update: { $set: { parentRoleId: null } }
                     }
                 },
                 {
                     updateOne: {
                         filter: { _id: managerRole._id },
-                        update: { $set: { parentRoleId: hrRole._id } }
+                        update: { $set: { parentRoleId: adminRole._id } }
                     }
                 },
                 {
                     updateOne: {
                         filter: { _id: hrRole._id },
-                        update: { $set: { parentRoleId: teamLeadRole._id } }
+                        update: { $set: { parentRoleId: managerRole._id } }
                     }
                 },
                 {
                     updateOne: {
                         filter: { _id: teamLeadRole._id },
-                        update: { $set: { parentRoleId: employeeRole._id } }
+                        update: { $set: { parentRoleId: hrRole._id } }
                     }
                 },
                 {
                     updateOne: {
                         filter: { _id: employeeRole._id },
-                        update: { $set: { parentRoleId: internRole._id } }
+                        update: { $set: { parentRoleId: teamLeadRole._id } }
                     }
                 },
                 {
                     updateOne: {
                         filter: { _id: internRole._id },
-                        update: { $set: { parentRoleId: null } }
+                        update: { $set: { parentRoleId: employeeRole._id } }
                     }
                 }
             ], { session });

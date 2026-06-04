@@ -19,4 +19,4 @@ const roleMemberSchema = new Schema<IRoleMember>(
 
 roleMemberSchema.index({ organizationId: 1, userId: 1, roleId: 1 }, { unique: true });
 
-export const RoleMember = mongoose.model<IRoleMember>('RoleMember', roleMemberSchema);
+export const RoleMember = (mongoose.models.RoleMember as mongoose.Model<IRoleMember>) || mongoose.model<IRoleMember>('RoleMember', roleMemberSchema);
