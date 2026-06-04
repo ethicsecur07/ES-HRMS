@@ -32,25 +32,25 @@ const payrollConfigSchema = new Schema<IPayrollConfig>(
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', default: null, index: true },
 
     // Earnings
-    basicSalaryPercent: { type: Number, default: 40, min: 0, max: 100 },
-    hraPercent: { type: Number, default: 40, min: 0, max: 100 },
-    conveyanceMonthly: { type: Number, default: 1600, min: 0 },
+    basicSalaryPercent: { type: Number, default: 55, min: 0, max: 100 },
+    hraPercent: { type: Number, default: 20, min: 0, max: 100 },
+    conveyanceMonthly: { type: Number, default: 5, min: 0, max: 100 },
     performanceIncentiveMonthly: { type: Number, default: 0, min: 0 },
-    otherAllowancesMonthly: { type: Number, default: 0, min: 0 },
+    otherAllowancesMonthly: { type: Number, default: 10, min: 0, max: 100 },
 
     // Deductions
-    pfEmployeePercent: { type: Number, default: 12, min: 0, max: 100 },
-    professionalTaxMonthly: { type: Number, default: 200, min: 0 },
+    pfEmployeePercent: { type: Number, default: 0, min: 0, max: 100 },
+    professionalTaxMonthly: { type: Number, default: 0, min: 0 },
     incomeTaxTdsMonthly: { type: Number, default: 0, min: 0 },
 
     // Employer Contributions
-    pfEmployerPercent: { type: Number, default: 12, min: 0, max: 100 },
-    gratuityPercent: { type: Number, default: 4.81, min: 0, max: 100 },
-    esiEmployerPercent: { type: Number, default: 3.25, min: 0, max: 100 },
+    pfEmployerPercent: { type: Number, default: 0, min: 0, max: 100 },
+    gratuityPercent: { type: Number, default: 0, min: 0, max: 100 },
+    esiEmployerPercent: { type: Number, default: 0, min: 0, max: 100 },
     insuranceMonthly: { type: Number, default: 0, min: 0 },
 
     // ESI Toggle
-    applyEsiOnlyIfGrossBelow21000: { type: Boolean, default: true },
+    applyEsiOnlyIfGrossBelow21000: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -61,17 +61,17 @@ export const PayrollConfig = mongoose.model<IPayrollConfig>('PayrollConfig', pay
 
 // Default config values used when no org config exists
 export const DEFAULT_PAYROLL_CONFIG = {
-  basicSalaryPercent: 40,
-  hraPercent: 40,
-  conveyanceMonthly: 1600,
+  basicSalaryPercent: 55,
+  hraPercent: 20,
+  conveyanceMonthly: 5,
   performanceIncentiveMonthly: 0,
-  otherAllowancesMonthly: 0,
-  pfEmployeePercent: 12,
-  professionalTaxMonthly: 200,
+  otherAllowancesMonthly: 10,
+  pfEmployeePercent: 0,
+  professionalTaxMonthly: 0,
   incomeTaxTdsMonthly: 0,
-  pfEmployerPercent: 12,
-  gratuityPercent: 4.81,
-  esiEmployerPercent: 3.25,
+  pfEmployerPercent: 0,
+  gratuityPercent: 0,
+  esiEmployerPercent: 0,
   insuranceMonthly: 0,
-  applyEsiOnlyIfGrossBelow21000: true,
+  applyEsiOnlyIfGrossBelow21000: false,
 };
