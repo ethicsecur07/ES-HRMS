@@ -48,6 +48,34 @@ export const getOrgProviders = async (req: Request, res: Response): Promise<void
   }
 };
 
+const resolveDynamicRedirectUri = (req: Request, provider: any, adapter: any) => {
+  const clientOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+  if (clientOrigin) {
+    if (provider.redirectUri) {
+      try {
+        const resolvedUri = new URL(provider.redirectUri);
+        const clientUrl = new URL(clientOrigin);
+        resolvedUri.protocol = clientUrl.protocol;
+        resolvedUri.host = clientUrl.host;
+        (adapter as any).config.redirectUri = resolvedUri.toString();
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (provider.samlCallbackUrl) {
+      try {
+        const resolvedUri = new URL(provider.samlCallbackUrl);
+        const clientUrl = new URL(clientOrigin);
+        resolvedUri.protocol = clientUrl.protocol;
+        resolvedUri.host = clientUrl.host;
+        (adapter as any).config.samlCallbackUrl = resolvedUri.toString();
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+};
+
 /**
  * GET /api/v2/auth/sso/initiate/:orgSlug/:providerType
  * Initiate SSO login — redirects user to the IDP.
@@ -72,6 +100,7 @@ export const initiateSSO = async (req: Request, res: Response): Promise<void> =>
     }
 
     const adapter = ProviderRegistry.createAdapter(provider);
+    resolveDynamicRedirectUri(req, provider, adapter);
     // Encode org.slug and providerKey in the state to allow stateless context recovery
     const state = `${crypto.randomUUID()}_${org.slug}_${providerKey}`;
 
@@ -111,6 +140,7 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
     }
 
     const adapter = ProviderRegistry.createAdapter(provider);
+    resolveDynamicRedirectUri(req, provider, adapter);
     const authResult = await adapter.handleCallback(SAMLResponse || code);
 
     if (!authResult.profile.email) {
