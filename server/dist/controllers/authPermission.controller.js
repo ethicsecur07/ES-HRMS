@@ -262,31 +262,8 @@ const getMyPermissions = async (req, res) => {
                 roleIds.push(rm.roleId.toString());
             }
         }
-        // 2. Recursively compile parent roles for all assigned roles
+        // 2. No recursive parent compilation (per requirements: permissions restricted to assigned role members only)
         const compiledRoleIds = [...roleIds];
-        const maxDepth = 10;
-        for (const rId of roleIds) {
-            let currentParentId = null;
-            const roleObj = await Role_js_1.Role.findOne({ _id: rId, organizationId: orgId, isActive: true });
-            if (roleObj)
-                currentParentId = roleObj.parentRoleId;
-            let depth = 0;
-            while (currentParentId && depth < maxDepth) {
-                const parentRole = await Role_js_1.Role.findOne({
-                    _id: currentParentId,
-                    organizationId: orgId,
-                    isActive: true,
-                });
-                if (!parentRole)
-                    break;
-                const parentIdStr = parentRole._id.toString();
-                if (!compiledRoleIds.includes(parentIdStr)) {
-                    compiledRoleIds.push(parentIdStr);
-                }
-                currentParentId = parentRole.parentRoleId;
-                depth++;
-            }
-        }
         // Find all permissions (role and user overrides)
         const permissions = await Permission_js_1.Permission.find({
             organizationId: orgId,

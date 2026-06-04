@@ -433,7 +433,7 @@ export const RoleManagementPage: React.FC = () => {
               <select
                 value={parentRoleId || ''}
                 onChange={(e) => setParentRoleId(e.target.value || null)}
-                disabled={!!editingRole && ['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD', 'EMPLOYEE'].includes(editingRole.code)}
+                disabled={!!editingRole && editingRole.code === 'ADMIN'}
                 className="w-full px-4 py-2.5 pr-9 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed appearance-none cursor-pointer"
               >
                 <option value="">None (Base Level)</option>
