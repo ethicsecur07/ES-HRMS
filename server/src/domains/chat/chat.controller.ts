@@ -5,6 +5,7 @@ import { notificationService } from '../../services/notification.service.js';
 import { User } from '../../models/User.js';
 import { uploadFileToOneDrive, generateSharingLink } from '../../utils/onedrive.js';
 import multer from 'multer';
+import { runGlobalChatBackup } from '../../services/chatBackup.service.js';
 
 // Multer in-memory storage for chat file uploads
 const storage = multer.memoryStorage();
@@ -305,6 +306,43 @@ export const getOnlineUsers = async (req: Request, res: Response): Promise<void>
     const organizationId = (req as any).user.organizationId;
     const onlineUserIds = getOnlineUserIdsByOrg(organizationId);
     res.status(200).json({ success: true, data: { onlineUserIds } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/chat/admin/backup-sync
+ * Trigger OneDrive chat backup manually for a specific date (YYYY-MM-DD) or yesterday.
+ */
+export const triggerChatBackup = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userRole = (req as any).user?.role;
+    if (userRole !== 'ADMIN' && userRole !== 'HR') {
+      res.status(403).json({ success: false, message: 'Forbidden. Admin/HR role required.' });
+      return;
+    }
+
+    const { date } = req.body;
+    let targetDate: Date | undefined;
+
+    if (date) {
+      targetDate = new Date(date);
+      if (isNaN(targetDate.getTime())) {
+        res.status(400).json({ success: false, message: 'Invalid date parameter. Use YYYY-MM-DD format.' });
+        return;
+      }
+    }
+
+    // Run backup asynchronously so it doesn't block the HTTP request
+    runGlobalChatBackup(targetDate).catch(err => {
+      console.error('[triggerChatBackup] Global backup failed async:', err);
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Chat backup job triggered successfully${date ? ` for date ${date}` : ' for yesterday'}.`,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

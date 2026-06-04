@@ -25,7 +25,7 @@ const startServer = async () => {
 
   const PORT = process.env.PORT || 5000;
 
-  server.listen(Number(PORT), '0.0.0.0', () => {
+  server.listen(Number(PORT), () => {
     logger.info(`🚀 Enterprise HRMS Backend Server running on port ${PORT}`);
   });
 

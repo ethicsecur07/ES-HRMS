@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.approveInternPerformance = exports.syncMicrosoftEmployees = exports.deleteEmployee = exports.updateEmployee = exports.createEmployee = exports.getEmployeeById = exports.getEmployees = exports.getNextEmployeeCode = void 0;
+exports.convertToFullTime = exports.getAzureLicenses = exports.approveInternPerformance = exports.syncMicrosoftEmployees = exports.deleteEmployee = exports.updateEmployee = exports.createEmployee = exports.getEmployeeById = exports.getEmployees = exports.getNextEmployeeCode = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const employee_service_js_1 = require("../services/employee.service.js");
 const getNextEmployeeCode = async (req, res) => {
@@ -284,3 +284,45 @@ const approveInternPerformance = async (req, res) => {
     }
 };
 exports.approveInternPerformance = approveInternPerformance;
+const getAzureLicenses = async (req, res) => {
+    try {
+        const orgId = req.user?.organizationId;
+        if (!orgId) {
+            res.status(400).json({ message: 'Organization context is missing.' });
+            return;
+        }
+        const { MicrosoftGraphService } = await import('../services/microsoftGraph.service.js');
+        const result = await MicrosoftGraphService.getAvailableLicenses(orgId);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+exports.getAzureLicenses = getAzureLicenses;
+const convertToFullTime = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const orgId = req.user?.organizationId;
+        const emailForAudit = req.user?.email || 'System';
+        const role = req.user?.role;
+        if (role !== 'ADMIN' && role !== 'HR') {
+            res.status(403).json({ message: 'Forbidden. Only HR and Admins can convert interns to full-time.' });
+            return;
+        }
+        if (!orgId) {
+            res.status(400).json({ message: 'Organization context is missing.' });
+            return;
+        }
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            res.status(400).json({ message: 'Invalid employee ID format.' });
+            return;
+        }
+        const employee = await employee_service_js_1.EmployeeService.convertToFullTime(id, req.body, orgId, emailForAudit);
+        res.status(200).json({ employee, message: 'Intern converted to full-time employee successfully.' });
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+exports.convertToFullTime = convertToFullTime;

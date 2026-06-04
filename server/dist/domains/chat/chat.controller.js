@@ -3,13 +3,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getOnlineUsers = exports.markOfflineHard = exports.getRecentConversations = exports.markMessageRead = exports.sendFileMessage = exports.sendMessage = exports.getConversation = exports.chatUpload = void 0;
+exports.triggerChatBackup = exports.getOnlineUsers = exports.markOfflineHard = exports.getRecentConversations = exports.markMessageRead = exports.sendFileMessage = exports.sendMessage = exports.getConversation = exports.chatUpload = void 0;
 const Message_js_1 = require("../../models/Message.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const notification_service_js_1 = require("../../services/notification.service.js");
 const User_js_1 = require("../../models/User.js");
 const onedrive_js_1 = require("../../utils/onedrive.js");
 const multer_1 = __importDefault(require("multer"));
+const chatBackup_service_js_1 = require("../../services/chatBackup.service.js");
 // Multer in-memory storage for chat file uploads
 const storage = multer_1.default.memoryStorage();
 exports.chatUpload = (0, multer_1.default)({
@@ -286,3 +287,37 @@ const getOnlineUsers = async (req, res) => {
     }
 };
 exports.getOnlineUsers = getOnlineUsers;
+/**
+ * POST /api/chat/admin/backup-sync
+ * Trigger OneDrive chat backup manually for a specific date (YYYY-MM-DD) or yesterday.
+ */
+const triggerChatBackup = async (req, res) => {
+    try {
+        const userRole = req.user?.role;
+        if (userRole !== 'ADMIN' && userRole !== 'HR') {
+            res.status(403).json({ success: false, message: 'Forbidden. Admin/HR role required.' });
+            return;
+        }
+        const { date } = req.body;
+        let targetDate;
+        if (date) {
+            targetDate = new Date(date);
+            if (isNaN(targetDate.getTime())) {
+                res.status(400).json({ success: false, message: 'Invalid date parameter. Use YYYY-MM-DD format.' });
+                return;
+            }
+        }
+        // Run backup asynchronously so it doesn't block the HTTP request
+        (0, chatBackup_service_js_1.runGlobalChatBackup)(targetDate).catch(err => {
+            console.error('[triggerChatBackup] Global backup failed async:', err);
+        });
+        res.status(200).json({
+            success: true,
+            message: `Chat backup job triggered successfully${date ? ` for date ${date}` : ' for yesterday'}.`,
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.triggerChatBackup = triggerChatBackup;

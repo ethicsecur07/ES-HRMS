@@ -40,6 +40,11 @@ exports.createEmployeeSchema = zod_1.z.object({
         }).optional(),
         candidateId: zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid candidate ID').optional(),
         leadId: zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid lead ID').optional(),
+        isIntern: zod_1.z.boolean().optional(),
+        createAzureAccount: zod_1.z.boolean().optional(),
+        azureUserPrincipalName: zod_1.z.string().optional(),
+        azureTempPassword: zod_1.z.string().optional(),
+        azureLicenses: zod_1.z.array(zod_1.z.string()).optional(),
     }),
 });
 exports.updateEmployeeSchema = zod_1.z.object({

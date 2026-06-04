@@ -16,8 +16,22 @@ import { Organization } from '../models/Organization.js';
 import { logger } from '../utils/logger.js';
 import { LeaveAccrualService } from '../domains/leave-engine/services/LeaveAccrualService.js';
 import { calculateMonthlyPayroll } from '../services/payroll.service.js';
+import { runGlobalChatBackup } from '../services/chatBackup.service.js';
 
 export const initCronJobs = () => {
+  // ─────────────────────────────────────────────────────────────
+  // Daily Chat Backup to OneDrive at 00:15
+  // ─────────────────────────────────────────────────────────────
+  cron.schedule('15 0 * * *', async () => {
+    try {
+      logger.info('[CRON] Starting daily chat logs backup to employee OneDrives...');
+      await runGlobalChatBackup();
+      logger.info('[CRON] Daily chat logs backup complete.');
+    } catch (error) {
+      logger.error('[CRON] Daily chat logs backup failed', { error });
+    }
+  });
+
   // ─────────────────────────────────────────────────────────────
   // Auto-checkout at midnight: close any open attendance records
   // ─────────────────────────────────────────────────────────────
