@@ -64,20 +64,12 @@ export class LoginRiskService {
       console.warn('Geolocation API lookup failed, using fallback subnets:', err);
     }
 
-    // Fallback region mapping based on IP subnets (stable hash-based lookup)
-    let hash = 0;
-    for (let i = 0; i < ipAddress.length; i++) {
-      hash = ipAddress.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const countryIndex = Math.abs(hash) % 5;
-    const countries = ['United States', 'India', 'Germany', 'United Kingdom', 'Singapore'];
-    const lats = [37.0902, 20.5937, 51.1657, 55.3781, 1.3521];
-    const lons = [-95.7129, 78.9629, 10.4515, -3.4360, 103.8198];
-
+    // Fallback if lookup failed (e.g. rate-limited on production)
+    // To prevent false-positive Impossible Travel detections, we return 0 coordinates.
     return {
-      country: countries[countryIndex],
-      lat: lats[countryIndex],
-      lon: lons[countryIndex],
+      country: 'Unknown',
+      lat: 0,
+      lon: 0,
     };
   }
 
