@@ -8,7 +8,7 @@ const Message_js_1 = require("../../models/Message.js");
 const socketHandler_js_1 = require("../../sockets/socketHandler.js");
 const notification_service_js_1 = require("../../services/notification.service.js");
 const User_js_1 = require("../../models/User.js");
-const cloudinary_1 = require("cloudinary");
+const onedrive_js_1 = require("../../utils/onedrive.js");
 const multer_1 = __importDefault(require("multer"));
 // Multer in-memory storage for chat file uploads
 const storage = multer_1.default.memoryStorage();
@@ -122,19 +122,22 @@ const sendFileMessage = async (req, res) => {
         // Determine message type
         const isImage = req.file.mimetype.startsWith('image/');
         const messageType = isImage ? 'image' : 'file';
-        // Upload to Cloudinary
-        const b64 = Buffer.from(req.file.buffer).toString('base64');
-        const dataURI = `data:${req.file.mimetype};base64,${b64}`;
-        const uploadResult = await cloudinary_1.v2.uploader.upload(dataURI, {
-            folder: 'es_hrms_chat',
-            resource_type: isImage ? 'image' : 'raw',
-        });
+        const orgId = req.user.organizationId;
+        const userEmail = req.user?.email;
+        if (!orgId) {
+            res.status(400).json({ success: false, message: 'User organization context is missing.' });
+            return;
+        }
+        // Upload to OneDrive
+        const onedriveResult = await (0, onedrive_js_1.uploadFileToOneDrive)(orgId, req.file.buffer, req.file.originalname, req.file.mimetype, 'uploads/chat', userEmail);
+        // Generate sharing link
+        const sharingUrl = await (0, onedrive_js_1.generateSharingLink)(orgId, onedriveResult.fileId, userEmail);
         const message = new Message_js_1.Message({
             senderId,
             receiverId,
             content: req.file.originalname,
             messageType,
-            fileUrl: uploadResult.secure_url,
+            fileUrl: sharingUrl,
             fileName: req.file.originalname,
             fileSize: req.file.size,
             fileType: req.file.mimetype,

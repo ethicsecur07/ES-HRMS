@@ -312,6 +312,7 @@ export const deleteCandidate = async (req: Request, res: Response): Promise<void
 export const sendCandidateOffer = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const orgId = (req as any).user?.organizationId;
     const candidate = await findOrCreateCandidate(id);
 
     if (!candidate) {
@@ -355,7 +356,7 @@ export const sendCandidateOffer = async (req: Request, res: Response): Promise<v
       fileName = customPdfName || `Offer_Letter_${candidateName.replace(/\s+/g, '_')}.pdf`;
       try {
         pdfBuffer = Buffer.from(customPdfBase64, 'base64');
-        uploadedUrl = await uploadFileToS3(pdfBuffer, fileName, 'application/pdf');
+        uploadedUrl = await uploadFileToS3(pdfBuffer, fileName, 'application/pdf', orgId);
         logger.info(`[RecruitmentController] Custom PDF uploaded successfully: ${uploadedUrl}`);
       } catch (uploadErr: any) {
         logger.error('[RecruitmentController] Failed to process/upload custom PDF base64', { error: uploadErr.message });
@@ -400,7 +401,7 @@ export const sendCandidateOffer = async (req: Request, res: Response): Promise<v
 
       // 2. Upload PDF to S3/Cloudinary
       fileName = `Offer_Letter_${candidateName.replace(/\s+/g, '_')}.pdf`;
-      uploadedUrl = await uploadFileToS3(pdfBuffer, fileName, 'application/pdf');
+      uploadedUrl = await uploadFileToS3(pdfBuffer, fileName, 'application/pdf', orgId);
       logger.info(`[RecruitmentController] Offer letter uploaded successfully: ${uploadedUrl}`);
     }
 
@@ -461,7 +462,6 @@ export const sendCandidateOffer = async (req: Request, res: Response): Promise<v
     `;
 
     // Fetch Organization Custom Microsoft OAuth2 Credentials from DB if available
-    const orgId = (req as any).user?.organizationId;
     let microsoftCredentials: { tenantId: string; clientId: string; clientSecret: string } | undefined;
 
     if (orgId) {

@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchFileBuffer = exports.uploadFileToS3 = void 0;
 const client_s3_1 = require("@aws-sdk/client-s3");
 const lib_storage_1 = require("@aws-sdk/lib-storage");
-const cloudinary_1 = require("cloudinary");
+const onedrive_js_1 = require("./onedrive.js");
 const logger_js_1 = require("./logger.js");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -23,12 +23,12 @@ if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY && AWS_REGION) {
     logger_js_1.logger.info('AWS S3 Client Initialized successfully');
 }
 else {
-    logger_js_1.logger.warn('AWS credentials not fully configured in environment. File uploads will fall back to Cloudinary.');
+    logger_js_1.logger.warn('AWS credentials not fully configured in environment. File uploads will fall back to Microsoft OneDrive.');
 }
 /**
  * Uploads a file buffer to S3, falling back to Cloudinary if S3 credentials are not set.
  */
-const uploadFileToS3 = async (fileBuffer, fileName, mimeType) => {
+const uploadFileToS3 = async (fileBuffer, fileName, mimeType, organizationId, userEmail) => {
     if (s3Client && AWS_S3_BUCKET && AWS_REGION) {
         try {
             const uniqueFileName = `${Date.now()}-${fileName.replace(/\s+/g, '_')}`;
@@ -45,22 +45,17 @@ const uploadFileToS3 = async (fileBuffer, fileName, mimeType) => {
             return `https://${AWS_S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/documents/${uniqueFileName}`;
         }
         catch (error) {
-            logger_js_1.logger.error('S3 upload error, falling back to Cloudinary:', error);
+            logger_js_1.logger.error('S3 upload error, falling back to OneDrive:', error);
         }
     }
-    // Fallback to Cloudinary
     try {
-        const b64 = fileBuffer.toString('base64');
-        const dataURI = `data:${mimeType};base64,${b64}`;
-        const result = await cloudinary_1.v2.uploader.upload(dataURI, {
-            folder: 'es_hrms_documents',
-            resource_type: 'auto',
-        });
-        return result.secure_url;
+        const onedriveResult = await (0, onedrive_js_1.uploadFileToOneDrive)(organizationId, fileBuffer, fileName, mimeType, 'uploads/documents', userEmail);
+        const sharingUrl = await (0, onedrive_js_1.generateSharingLink)(organizationId, onedriveResult.fileId, userEmail);
+        return sharingUrl;
     }
-    catch (cloudinaryError) {
-        logger_js_1.logger.error('Cloudinary fallback upload failed:', cloudinaryError);
-        throw new Error(`Upload failed: ${cloudinaryError.message || cloudinaryError}`, { cause: cloudinaryError });
+    catch (onedriveError) {
+        logger_js_1.logger.error('OneDrive fallback upload failed:', onedriveError);
+        throw new Error(`Upload failed: ${onedriveError.message || onedriveError}`, { cause: onedriveError });
     }
 };
 exports.uploadFileToS3 = uploadFileToS3;

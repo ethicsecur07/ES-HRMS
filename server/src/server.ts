@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import { createApp } from './app.js';
 import { connectDB } from './config/db.js';
-import { configureCloudinary } from './config/cloudinary.js';
+
 import { initSockets } from './sockets/socketHandler.js';
 import { initCronJobs } from './jobs/cronJobs.js';
 import { logger } from './utils/logger.js';
@@ -17,7 +17,7 @@ const startServer = async () => {
 
   // Initialize Core Services
   await connectDB();
-  configureCloudinary();
+
   initSockets(server);
   registerSubscribers();
   initCronJobs();

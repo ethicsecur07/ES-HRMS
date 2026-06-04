@@ -288,6 +288,7 @@ exports.deleteCandidate = deleteCandidate;
 const sendCandidateOffer = async (req, res) => {
     try {
         const { id } = req.params;
+        const orgId = req.user?.organizationId;
         const candidate = await findOrCreateCandidate(id);
         if (!candidate) {
             res.status(404).json({ success: false, message: 'Candidate not found' });
@@ -302,7 +303,7 @@ const sendCandidateOffer = async (req, res) => {
             fileName = customPdfName || `Offer_Letter_${candidateName.replace(/\s+/g, '_')}.pdf`;
             try {
                 pdfBuffer = Buffer.from(customPdfBase64, 'base64');
-                uploadedUrl = await (0, s3_js_1.uploadFileToS3)(pdfBuffer, fileName, 'application/pdf');
+                uploadedUrl = await (0, s3_js_1.uploadFileToS3)(pdfBuffer, fileName, 'application/pdf', orgId);
                 logger_js_1.logger.info(`[RecruitmentController] Custom PDF uploaded successfully: ${uploadedUrl}`);
             }
             catch (uploadErr) {
@@ -349,7 +350,7 @@ const sendCandidateOffer = async (req, res) => {
             });
             // 2. Upload PDF to S3/Cloudinary
             fileName = `Offer_Letter_${candidateName.replace(/\s+/g, '_')}.pdf`;
-            uploadedUrl = await (0, s3_js_1.uploadFileToS3)(pdfBuffer, fileName, 'application/pdf');
+            uploadedUrl = await (0, s3_js_1.uploadFileToS3)(pdfBuffer, fileName, 'application/pdf', orgId);
             logger_js_1.logger.info(`[RecruitmentController] Offer letter uploaded successfully: ${uploadedUrl}`);
         }
         // 3. Update candidate stage & offer details
@@ -405,7 +406,6 @@ const sendCandidateOffer = async (req, res) => {
       </div>
     `;
         // Fetch Organization Custom Microsoft OAuth2 Credentials from DB if available
-        const orgId = req.user?.organizationId;
         let microsoftCredentials;
         if (orgId) {
             try {
