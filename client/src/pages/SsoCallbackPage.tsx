@@ -52,6 +52,7 @@ export const SsoCallbackPage: React.FC = () => {
         if (samlResponse) payload.SAMLResponse = samlResponse;
         if (parsedContext.orgSlug) payload.orgSlug = parsedContext.orgSlug;
         if (parsedContext.providerType) payload.providerType = parsedContext.providerType;
+        payload.origin = window.location.origin;
 
         // Fetch user from tenant callback
         const data = await authV2Api.handleSSOCallback(payload);
