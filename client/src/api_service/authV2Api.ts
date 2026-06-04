@@ -39,7 +39,7 @@ export const authV2Api = {
 
   initiateSSO: async (orgSlug: string, providerType: string) => {
     const response = await axiosInstance.get<{ authorizationUrl: string; state: string }>(
-      `/v2/auth/sso/initiate/${orgSlug}/${providerType}?origin=${encodeURIComponent(window.location.origin)}`
+      `/v2/auth/sso/initiate/${orgSlug}/${providerType}`
     );
     if (response.data?.authorizationUrl) {
       sessionStorage.setItem('es-hrms-sso-context', JSON.stringify({ orgSlug, providerType }));
@@ -47,7 +47,7 @@ export const authV2Api = {
     }
   },
 
-  handleSSOCallback: async (data: { code?: string; state?: string; orgSlug?: string; providerType?: string; SAMLResponse?: string; origin?: string }) => {
+  handleSSOCallback: async (data: { code?: string; state?: string; orgSlug?: string; providerType?: string; SAMLResponse?: string }) => {
     const response = await axiosInstance.post<{ user: User; token: string }>('/v2/auth/sso/callback', data);
     return response.data;
   },

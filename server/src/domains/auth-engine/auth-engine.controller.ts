@@ -49,21 +49,7 @@ export const getOrgProviders = async (req: Request, res: Response): Promise<void
 };
 
 const resolveDynamicRedirectUri = (req: Request, provider: any, adapter: any) => {
-  let clientOrigin: string | null = null;
-  if (typeof req.query.origin === 'string' && req.query.origin) {
-    clientOrigin = req.query.origin;
-  } else if (typeof req.body.origin === 'string' && req.body.origin) {
-    clientOrigin = req.body.origin;
-  } else if (req.headers.origin) {
-    clientOrigin = req.headers.origin;
-  } else if (req.headers.referer) {
-    try {
-      clientOrigin = new URL(req.headers.referer).origin;
-    } catch (e) {
-      // ignore
-    }
-  }
-
+  const clientOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
   if (clientOrigin) {
     if (provider.redirectUri) {
       try {
