@@ -86,22 +86,6 @@ export const RecruitmentPage: React.FC = () => {
   const [hiredCandidate, setHiredCandidate] = useState<Candidate | null>(null);
   const [isOnboardingSubmit, setIsOnboardingSubmit] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState('');
-  const [hiredFormData, setHiredFormData] = useState({
-    employeeCode: '',
-    fullName: '',
-    email: '',
-    phone: '',
-    password: 'EthicSec@2026',
-    departmentId: '',
-    designationId: '',
-    joiningDate: new Date().toISOString().split('T')[0],
-    salary: 0,
-    isIntern: false,
-    address: '2nd Floor, NV Arcade Building, Salem - 636004',
-    emergencyName: 'Emergency Contact',
-    emergencyRel: 'Guardian',
-    emergencyPhone: '+919876543210'
-  });
 
   // Load dynamic Departments & Designations
   const { data: departments = [] } = useQuery({
@@ -113,6 +97,39 @@ export const RecruitmentPage: React.FC = () => {
     queryKey: ['designations_recruitment'],
     queryFn: () => designationApi.getAll(),
   });
+
+  const [hiredFormData, setHiredFormData] = useState({
+    employeeCode: '',
+    fullName: '',
+    email: '',
+    phone: '',
+    password: 'EthicSec@2026',
+    departmentId: '',
+    designationId: '',
+    joiningDate: '',
+    salary: 0,
+    isIntern: false,
+    address: '2nd Floor, NV Arcade Building, Salem - 636004',
+    emergencyName: 'Emergency Contact',
+    emergencyRel: 'Guardian',
+    emergencyPhone: '+919876543210',
+    createAzureAccount: false,
+    azureUserPrincipalName: '',
+    azureTempPassword: 'EthicSec@2026!',
+    azureLicensesSelected: [] as string[],
+  });
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+
+  // Query Azure Licenses
+  const { data: azureLicensesData } = useQuery({
+    queryKey: ['azure_licenses_recruitment'],
+    queryFn: employeeApi.getAzureLicenses,
+    enabled: showHiredModal && !hiredFormData.isIntern,
+  });
+  const azureLicenses = azureLicensesData?.licenses || [];
+  const isAzureConfigured = azureLicensesData?.isAzureConfigured ?? false;
 
   // Load employees for lead assignment (TEAM_LEAD + MANAGER + HR roles)
   const { data: allEmployeesData } = useQuery({
@@ -435,6 +452,10 @@ export const RecruitmentPage: React.FC = () => {
       // fallback
     }
 
+    const suggestedUPN = `${cand.firstName.toLowerCase().trim().replace(/\s/g, '')}.${cand.lastName.toLowerCase().trim().replace(/\s/g, '')}@ethicsecur.co.in`;
+
+    setFirstName(cand.firstName || '');
+    setLastName(cand.lastName || '');
     setHiredFormData({
       employeeCode: finalCode,
       fullName: `${cand.firstName} ${cand.lastName}`,
@@ -449,7 +470,11 @@ export const RecruitmentPage: React.FC = () => {
       address: '2nd Floor, NV Arcade Building, Salem - 636004',
       emergencyName: 'Emergency Contact',
       emergencyRel: 'Guardian',
-      emergencyPhone: '+919876543210'
+      emergencyPhone: '+919876543210',
+      createAzureAccount: false,
+      azureUserPrincipalName: suggestedUPN,
+      azureTempPassword: 'EthicSec@2026!',
+      azureLicensesSelected: [],
     });
     setSelectedLeadId('');
     setShowHiredModal(true);
@@ -515,7 +540,7 @@ export const RecruitmentPage: React.FC = () => {
 
       const payload: any = {
         employeeCode: hiredFormData.employeeCode,
-        fullName: hiredFormData.fullName,
+        fullName: `${firstName.trim()} ${lastName.trim()}`.trim(),
         email: hiredFormData.email,
         password: hiredFormData.password,
         phone: hiredFormData.phone,
@@ -546,6 +571,10 @@ export const RecruitmentPage: React.FC = () => {
         },
         ...(hiredCandidate?._id ? { candidateId: hiredCandidate._id } : {}),
         ...(selectedLeadId ? { leadId: selectedLeadId } : {}),
+        createAzureAccount: !hiredFormData.isIntern && hiredFormData.createAzureAccount,
+        azureUserPrincipalName: hiredFormData.azureUserPrincipalName,
+        azureTempPassword: hiredFormData.azureTempPassword,
+        azureLicenses: hiredFormData.azureLicensesSelected,
       };
 
       const resData = await employeeApi.create(payload);
@@ -1219,38 +1248,54 @@ export const RecruitmentPage: React.FC = () => {
               Onboard this hired candidate into the general employee database. This will auto-provision their system access credentials for email login, attendance checkins, dashboard analytics, separate projects, and meetings.
             </p>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Employment / Onboarding Type *</label>
-              <select
-                value={hiredFormData.isIntern ? 'INTERN' : 'FULL_TIME'}
-                onChange={async (e) => {
-                  const val = e.target.value === 'INTERN';
-                  setHiredFormData(p => ({ ...p, isIntern: val }));
-                  
-                  // Auto-regenerate next code based on isIntern selection
-                  let nextCode = val ? `INT-${Date.now().toString().slice(-4)}` : `EMP-${Date.now().toString().slice(-4)}`;
-                  try {
-                    const code = await employeeApi.getNextEmployeeCode(val, hiredFormData.departmentId, hiredFormData.designationId);
-                    if (code) nextCode = code;
-                  } catch (err) {
-                    // fallback
-                  }
-                  setHiredFormData(p => ({ ...p, employeeCode: nextCode }));
-                }}
-                className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-2 transition-colors font-semibold"
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Employment / Onboarding Type *</label>
+                <select
+                  value={hiredFormData.isIntern ? 'INTERN' : 'FULL_TIME'}
+                  onChange={async (e) => {
+                    const val = e.target.value === 'INTERN';
+                    setHiredFormData(p => ({ ...p, isIntern: val }));
+                    
+                    // Auto-regenerate next code based on isIntern selection
+                    let nextCode = val ? `INT-${Date.now().toString().slice(-4)}` : `EMP-${Date.now().toString().slice(-4)}`;
+                    try {
+                      const code = await employeeApi.getNextEmployeeCode(val, hiredFormData.departmentId, hiredFormData.designationId);
+                      if (code) nextCode = code;
+                    } catch (err) {
+                      // fallback
+                    }
+                    setHiredFormData(p => ({ ...p, employeeCode: nextCode }));
+                  }}
+                  className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-2 transition-colors font-semibold"
+                  required
+                >
+                  <option value="FULL_TIME">💼 Full-time with Salary</option>
+                  <option value="INTERN">🎓 6-Month Internship (3m Unpaid + 3m Performance-based Paid)</option>
+                </select>
+              </div>
+              <Input
+                label="Employee ID *"
+                value={hiredFormData.employeeCode}
+                onChange={(e) => setHiredFormData(p => ({ ...p, employeeCode: e.target.value }))}
                 required
-              >
-                <option value="FULL_TIME">💼 Full-time with Salary</option>
-                <option value="INTERN">🎓 6-Month Internship (3m Unpaid + 3m Performance-based Paid)</option>
-              </select>
+              />
             </div>
 
-            <Input
-              label="Full Name *"
-              value={hiredFormData.fullName}
-              onChange={(e) => setHiredFormData(p => ({ ...p, fullName: e.target.value }))}
-              required
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="First Name *"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+              />
+              <Input
+                label="Last Name *"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+              />
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -1381,6 +1426,99 @@ export const RecruitmentPage: React.FC = () => {
                 required
               />
             </div>
+
+            {!hiredFormData.isIntern && (
+              <div className="border border-border rounded-xl p-4 bg-muted/10 space-y-4 text-left">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-xs font-bold text-foreground">Azure AD Account Provisioning</h5>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Provision a corporate Microsoft Azure AD account for this employee.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hiredFormData.createAzureAccount}
+                      onChange={(e) => setHiredFormData(p => ({ ...p, createAzureAccount: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-muted-foreground/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+
+                {hiredFormData.createAzureAccount && (
+                  <div className="space-y-4 pt-2 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {!isAzureConfigured && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] p-2.5 rounded-lg font-medium">
+                        ⚠️ Microsoft SSO integration is not configured or is disabled. Accounts will be simulated, but configuration must be enabled in Settings for actual sync.
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        label="Azure Principal Email (UPN) *"
+                        value={hiredFormData.azureUserPrincipalName}
+                        onChange={(e) => setHiredFormData(p => ({ ...p, azureUserPrincipalName: e.target.value }))}
+                        placeholder="username@yourdomain.com"
+                        required
+                      />
+                      <Input
+                        label="Temporary Password *"
+                        value={hiredFormData.azureTempPassword}
+                        onChange={(e) => setHiredFormData(p => ({ ...p, azureTempPassword: e.target.value }))}
+                        placeholder="EthicSec@2026!"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
+                        Select Azure / Microsoft 365 Licenses
+                      </label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1">
+                        {azureLicenses.map((lic: any) => {
+                          const isChecked = (hiredFormData.azureLicensesSelected || []).includes(lic.skuId);
+                          return (
+                            <label
+                              key={lic.skuId}
+                              className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-semibold cursor-pointer select-none transition-colors ${
+                                isChecked
+                                  ? 'bg-primary/5 border-primary text-primary'
+                                  : 'bg-card border-border hover:border-primary/20 text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setHiredFormData(p => {
+                                    const current = p.azureLicensesSelected || [];
+                                    const next = checked
+                                      ? [...current, lic.skuId]
+                                      : current.filter((id: string) => id !== lic.skuId);
+                                    return { ...p, azureLicensesSelected: next };
+                                  });
+                                }}
+                                className="w-3.5 h-3.5 rounded text-primary focus:ring-primary border-border bg-background cursor-pointer accent-primary"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="block truncate font-bold text-[11px]">{lic.displayName}</span>
+                                {lic.availableUnits !== undefined && (
+                                  <span className="block text-[9px] text-muted-foreground">
+                                    {lic.availableUnits} units free (of {lic.consumedUnits + lic.availableUnits})
+                                  </span>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <Input
               label="Residential Address *"

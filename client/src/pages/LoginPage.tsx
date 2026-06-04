@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useTenantStore } from '../store/useTenantStore';
@@ -28,6 +28,7 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [tenantSlug, setTenantSlug] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [portalType, setPortalType] = useState<'STAFF' | 'INTERN'>('STAFF');
   const [selectedRole, setSelectedRole] = useState<Role>('ADMIN');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -38,9 +39,23 @@ export const LoginPage: React.FC = () => {
   const [isMfaLoading, setIsMfaLoading] = useState(false);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tenantQuery = searchParams.get('tenant');
+
   const { login, isAuthenticated } = useAuthStore();
   const { addToast } = useNotificationStore();
   const { tenantConfig, fetchTenantConfig, clearTenantConfig } = useTenantStore();
+
+  // If tenant query parameter is present, resolve organization details automatically
+  useEffect(() => {
+    if (tenantQuery) {
+      const cleanQuery = tenantQuery.trim().toLowerCase();
+      if (cleanQuery) {
+        setTenantSlug(cleanQuery);
+        fetchTenantConfig(cleanQuery);
+      }
+    }
+  }, [tenantQuery, fetchTenantConfig]);
 
   // If tenantConfig is resolved, set the tenantSlug state
   useEffect(() => {
@@ -154,6 +169,7 @@ export const LoginPage: React.FC = () => {
   const brandName = tenantConfig?.name || 'ES EthicSecur SofTec HRMS';
   const authProviders = tenantConfig?.authProviders || [];
   const isLocalEnabled = selectedRole === 'ADMIN' || !tenantConfig || authProviders.includes('LOCAL');
+  const showLocalForm = portalType === 'INTERN' || isLocalEnabled;
 
   return (
     <div className={`min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 overflow-hidden relative ${themeSetting}`}>
@@ -194,23 +210,57 @@ export const LoginPage: React.FC = () => {
             )}
           </div>
 
-          {/* Professional Role Selector Tabs */}
-          <div className="mb-6 p-1 rounded-xl bg-slate-950 border border-slate-850 grid grid-cols-3 gap-1">
-            {(['ADMIN', 'HR', 'EMPLOYEE'] as Role[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setSelectedRole(r)}
-                className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                  selectedRole === r
-                    ? 'bg-[#F75F0A] text-white shadow-md border border-[#F75F0A]/80 scale-[1.02]'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {r === 'ADMIN' ? 'Administrator' : r === 'HR' ? 'HR Manager' : 'Employee'}
-              </button>
-            ))}
+          {/* Portal Type Primary Selector Tabs */}
+          <div className="mb-4 p-1 rounded-xl bg-slate-950 border border-slate-850 grid grid-cols-2 gap-1 animate-in fade-in duration-300">
+            <button
+              type="button"
+              onClick={() => {
+                setPortalType('STAFF');
+                setSelectedRole('EMPLOYEE'); // Default back to Employee
+              }}
+              className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                portalType === 'STAFF'
+                  ? 'bg-[#F75F0A] text-white shadow-md border border-[#F75F0A]/80 scale-[1.02]'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Staff Portal
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPortalType('INTERN');
+                setSelectedRole('INTERN');
+              }}
+              className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                portalType === 'INTERN'
+                  ? 'bg-[#F75F0A] text-white shadow-md border border-[#F75F0A]/80 scale-[1.02]'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Intern Portal
+            </button>
           </div>
+
+          {/* Professional Role Selector Tabs - only for STAFF portal */}
+          {/* {portalType === 'STAFF' && (
+            <div className="mb-6 p-1 rounded-xl bg-slate-950 border border-slate-850 grid grid-cols-3 gap-1 animate-in slide-in-from-top-1 duration-200">
+              {(['ADMIN', 'HR', 'EMPLOYEE'] as Role[]).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setSelectedRole(r)}
+                  className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                    selectedRole === r
+                      ? 'bg-slate-800 text-white border border-slate-700 shadow-sm scale-[1.01]'
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {r === 'ADMIN' ? 'Administrator' : r === 'HR' ? 'HR Manager' : 'Employee'}
+                </button>
+              ))}
+            </div>
+          )} */}
 
           <form onSubmit={handleLogin} className="space-y-4 px-4 text-left">
             {/* Show organization input ONLY if tenantConfig is not resolved */}
@@ -231,7 +281,7 @@ export const LoginPage: React.FC = () => {
             )}
 
             {/* Dynamic SSO Buttons */}
-            {tenantConfig && authProviders.filter((p) => p !== 'LOCAL').length > 0 && (
+            {portalType === 'STAFF' && tenantConfig && authProviders.filter((p) => p !== 'LOCAL').length > 0 && (
               <div className="space-y-2 mb-4">
                 <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider text-center">
                   Sign in with Corporate SSO
@@ -276,7 +326,7 @@ export const LoginPage: React.FC = () => {
             )}
 
             {/* Local Username & Password Form */}
-            {isLocalEnabled && (
+            {showLocalForm && (
               <>
                 <div className="relative">
                   <Mail className="absolute left-3 top-[34px] h-4 w-4 text-slate-400" />
@@ -346,7 +396,7 @@ export const LoginPage: React.FC = () => {
               </>
             )}
 
-            {!isLocalEnabled && (
+            {portalType === 'STAFF' && !isLocalEnabled && (
               <div className="text-center py-6 text-slate-400 text-xs bg-slate-950/50 rounded-xl border border-slate-850">
                 <Lock className="w-8 h-8 mx-auto text-[#F75F0A]/50 mb-2" />
                 Local password logins are disabled for your organization. Please use one of the corporate single

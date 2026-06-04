@@ -18,6 +18,14 @@ export const notificationWorker = new Worker('notificationQueue', async (job: Jo
   connection: { host: '127.0.0.1', port: 6379 },
 });
 
+notificationQueue.on('error', (err: any) => {
+  console.warn('BullMQ Notification Queue error (Redis down):', err.message);
+});
+
+notificationWorker.on('error', (err: any) => {
+  console.warn('BullMQ Notification Worker error (Redis down):', err.message);
+});
+
 notificationWorker.on('failed', (job: Job | undefined, err: Error) => {
   console.error(`Notification job ${job?.id} failed:`, err);
 });

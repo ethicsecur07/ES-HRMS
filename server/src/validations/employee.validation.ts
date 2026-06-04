@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createEmployeeSchema = z.object({
   body: z.object({
-    employeeCode: z.string().min(2).optional().or(z.literal('')),
+    employeeCode: z.string().min(2),
     fullName: z.string().min(3),
     email: z.string().email(),
     phone: z.string().min(10),
@@ -38,6 +38,11 @@ export const createEmployeeSchema = z.object({
     }).optional(),
     candidateId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid candidate ID').optional(),
     leadId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid lead ID').optional(),
+    isIntern: z.boolean().optional(),
+    createAzureAccount: z.boolean().optional(),
+    azureUserPrincipalName: z.string().optional(),
+    azureTempPassword: z.string().optional(),
+    azureLicenses: z.array(z.string()).optional(),
   }),
 });
 

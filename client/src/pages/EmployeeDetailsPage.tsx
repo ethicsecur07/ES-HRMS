@@ -9,6 +9,8 @@ import { permissionApi } from '../api_service/permissionApi';
 import { taskApi } from '../api_service/taskApi';
 import { attendanceApi } from '../api_service/attendanceApi';
 import { documentApi } from '../api_service/documentApi';
+import { departmentApi } from '../api_service/departmentApi';
+import { designationApi } from '../api_service/designationApi';
 import { axiosInstance } from '../api_service/axiosInstance';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -16,6 +18,7 @@ import { ProfileSkeleton } from '../Components/WrapperComponents/Skeleton';
 import { Card } from '../Components/WrapperComponents/Card';
 import { Button } from '../Components/WrapperComponents/Button';
 import { Input, Select } from '../Components/WrapperComponents/Input';
+import { Modal } from '../Components/WrapperComponents/Modal';
 import { TableWrapper } from '../Components/WrapperComponents/TableWrapper';
 import type { Attendance } from '../types';
 import { formatDate, formatCurrency } from '../utils/formatters';
@@ -155,6 +158,86 @@ export const EmployeeDetailsPage: React.FC = () => {
     queryFn: () => employeeApi.getById(id || ''),
     enabled: !!id,
   });
+
+  // Convert Intern to Full-Time states & logic
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [convertForm, setConvertForm] = useState({
+    userPrincipalName: '',
+    displayName: '',
+    givenName: '',
+    surname: '',
+    jobTitle: '',
+    department: '',
+    tempPassword: 'EthicSec@2026!',
+    selectedLicenses: [] as string[],
+    salary: 0,
+    departmentId: '',
+    designationId: '',
+    employeeId: '',
+    employeeHireDate: '',
+    mobilePhone: '',
+  });
+
+  const { data: azureLicensesData } = useQuery({
+    queryKey: ['azureLicenses'],
+    queryFn: employeeApi.getAzureLicenses,
+    enabled: !!employee && !!employee.isIntern && showConvertModal,
+  });
+  const azureLicenses = azureLicensesData?.licenses || [];
+  const isAzureConfigured = azureLicensesData?.isAzureConfigured ?? false;
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments_convert'],
+    queryFn: departmentApi.getAll,
+    enabled: !!employee && !!employee.isIntern && showConvertModal,
+  });
+
+  const { data: designations = [] } = useQuery({
+    queryKey: ['designations_convert'],
+    queryFn: () => designationApi.getAll(),
+    enabled: !!employee && !!employee.isIntern && showConvertModal,
+  });
+
+  const convertToFullTimeMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return employeeApi.convertToFullTime(id || '', data);
+    },
+    onSuccess: (resData) => {
+      queryClient.invalidateQueries({ queryKey: ['employee', id] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      addToast('Conversion Successful', resData.message || 'Intern has been converted to a full-time employee and registered in Azure AD.', 'success');
+      setShowConvertModal(false);
+    },
+    onError: (err: any) => {
+      addToast('Conversion Failed', err.response?.data?.message || err.message || 'Could not convert intern to full-time.', 'error');
+    },
+  });
+
+  const startConversion = () => {
+    if (!employee) return;
+    const nameParts = employee.fullName.trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    const suggestedUPN = `${firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}.${lastName.toLowerCase().replace(/[^a-z0-9]/g, '')}@ethicsecur.co.in`;
+
+    setConvertForm({
+      userPrincipalName: suggestedUPN,
+      displayName: employee.fullName,
+      givenName: firstName,
+      surname: lastName,
+      jobTitle: employee.designation,
+      department: employee.department,
+      tempPassword: 'EthicSec@2026!',
+      selectedLicenses: [],
+      salary: employee.salary || 0,
+      departmentId: typeof employee.departmentId === 'object' && employee.departmentId !== null ? (employee.departmentId as any)._id : employee.departmentId || '',
+      designationId: typeof employee.designationId === 'object' && employee.designationId !== null ? (employee.designationId as any)._id : employee.designationId || '',
+      employeeId: employee.employeeCode && !employee.employeeCode.startsWith('TEMP-EMP-') ? employee.employeeCode : '',
+      employeeHireDate: employee.joiningDate ? new Date(employee.joiningDate).toISOString().split('T')[0] : '',
+      mobilePhone: employee.phone || '',
+    });
+    setShowConvertModal(true);
+  };
 
   const { data: leaves, isLoading: leavesLoading } = useQuery({ queryKey: ['leaves'], queryFn: leaveApi.getAll });
   const { data: wfh, isLoading: wfhLoading } = useQuery({ queryKey: ['wfh'], queryFn: wfhApi.getAll });
@@ -498,6 +581,38 @@ export const EmployeeDetailsPage: React.FC = () => {
                 )}
               </div>
             </Card>
+
+            {employee.ssoData?.provider === 'MICROSOFT' && (
+              <Card className="space-y-6 border-l-4 border-l-indigo-500 shadow-md">
+                <h3 className="text-lg font-bold text-foreground border-b border-border pb-3 flex items-center gap-2">
+                  <Building className="w-5 h-5 text-indigo-500" /> Microsoft Entra / Azure AD Integration
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/20">
+                    <Mail className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Microsoft UPN (Work Email)</p>
+                      <p className="font-semibold text-foreground font-mono">{employee.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/20">
+                    <User className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">SSO Identity Status</p>
+                      <p className="font-semibold text-foreground">Linked to Azure Active Directory</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/20 col-span-2">
+                    <Lock className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Authentication Control</p>
+                      <p className="font-semibold text-foreground">Microsoft Single Sign-On (SSO)</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Local password database sign-in has been removed. This account requires secure identity assertion through the corporate Microsoft portal.</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         )}
 
@@ -711,6 +826,18 @@ export const EmployeeDetailsPage: React.FC = () => {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Convert to Full-Time Button */}
+                {(currentUser?.role === 'ADMIN' || currentUser?.role === 'HR') && (
+                  <div className="pt-4 border-t border-border flex justify-end">
+                    <Button
+                      onClick={startConversion}
+                      className="rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md bg-primary hover:bg-primary/95 text-white"
+                    >
+                      💼 Convert to Full-Time Employee (Azure)
+                    </Button>
                   </div>
                 )}
               </Card>
@@ -1316,6 +1443,206 @@ export const EmployeeDetailsPage: React.FC = () => {
         )}
 
       </div>
+
+      <Modal
+        isOpen={showConvertModal}
+        onClose={() => setShowConvertModal(false)}
+        title="Convert Intern to Full-Time Employee (Azure AD)"
+        maxWidth="max-w-2xl"
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!convertForm.departmentId || !convertForm.designationId) {
+              addToast('Selection Missing', 'Please select a valid Department and Designation.', 'error');
+              return;
+            }
+            convertToFullTimeMutation.mutate(convertForm);
+          }}
+          className="space-y-4 px-2 text-left"
+        >
+          <p className="text-xs text-muted-foreground">
+            This will upgrade the intern to a Full-Time employee. It will provision a secure account in Microsoft Azure AD/Entra ID for corporate SSO and remove their local password login.
+          </p>
+
+          {!isAzureConfigured && (
+            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10.5px] p-3 rounded-xl font-semibold">
+              ⚠️ Microsoft SSO integration is not configured or is disabled. Accounts will be simulated, but configuration must be enabled in Settings for actual sync.
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Azure Principal Email (UPN) *"
+              value={convertForm.userPrincipalName}
+              onChange={(e) => setConvertForm(p => ({ ...p, userPrincipalName: e.target.value }))}
+              placeholder="username@yourdomain.com"
+              required
+            />
+            <Input
+              label="Display Name *"
+              value={convertForm.displayName}
+              onChange={(e) => setConvertForm(p => ({ ...p, displayName: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Given/First Name *"
+              value={convertForm.givenName}
+              onChange={(e) => setConvertForm(p => ({ ...p, givenName: e.target.value }))}
+              required
+            />
+            <Input
+              label="Surname/Last Name *"
+              value={convertForm.surname}
+              onChange={(e) => setConvertForm(p => ({ ...p, surname: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Temporary Password *"
+              value={convertForm.tempPassword}
+              onChange={(e) => setConvertForm(p => ({ ...p, tempPassword: e.target.value }))}
+              required
+            />
+            <Input
+              label="Monthly Base Salary (INR) *"
+              type="number"
+              value={convertForm.salary}
+              onChange={(e) => setConvertForm(p => ({ ...p, salary: Number(e.target.value) }))}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="Employee ID *"
+              value={convertForm.employeeId}
+              onChange={(e) => setConvertForm(p => ({ ...p, employeeId: e.target.value }))}
+              required
+            />
+            <Input
+              label="Employee Hired Date *"
+              type="date"
+              value={convertForm.employeeHireDate}
+              onChange={(e) => setConvertForm(p => ({ ...p, employeeHireDate: e.target.value }))}
+              required
+            />
+            <Input
+              label="Mobile Number *"
+              value={convertForm.mobilePhone}
+              onChange={(e) => setConvertForm(p => ({ ...p, mobilePhone: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department *</label>
+              <select
+                value={convertForm.departmentId}
+                onChange={(e) => {
+                  const deptId = e.target.value;
+                  const filteredDesigs = designations.filter((d: any) => {
+                    const dId = typeof d.departmentId === 'object' && d.departmentId !== null ? d.departmentId._id : d.departmentId;
+                    return dId === deptId && d.isActive;
+                  });
+                  const firstDesigId = filteredDesigs.length > 0 ? filteredDesigs[0]._id : '';
+                  setConvertForm(p => ({ ...p, departmentId: deptId, designationId: firstDesigId }));
+                }}
+                className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-2 transition-colors"
+                required
+              >
+                <option value="" disabled>Select Department</option>
+                {departments.map((dept: any) => (
+                  <option key={dept._id} value={dept._id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Designation *</label>
+              <select
+                value={convertForm.designationId}
+                onChange={(e) => setConvertForm(p => ({ ...p, designationId: e.target.value }))}
+                className="w-full h-10 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-2 transition-colors disabled:opacity-50"
+                disabled={!convertForm.departmentId}
+                required
+              >
+                <option value="" disabled>Select Designation</option>
+                {designations.filter((d: any) => {
+                  const dId = typeof d.departmentId === 'object' && d.departmentId !== null ? d.departmentId._id : d.departmentId;
+                  return dId === convertForm.departmentId && d.isActive;
+                }).map((desig: any) => (
+                  <option key={desig._id} value={desig._id}>
+                    {desig.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
+              Select Azure / Microsoft 365 Licenses
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1">
+              {azureLicenses.map((lic: any) => {
+                const isChecked = (convertForm.selectedLicenses || []).includes(lic.skuId);
+                return (
+                  <label
+                    key={lic.skuId}
+                    className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-semibold cursor-pointer select-none transition-colors ${
+                      isChecked
+                        ? 'bg-primary/5 border-primary text-primary'
+                        : 'bg-card border-border hover:border-primary/20 text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setConvertForm(p => {
+                          const current = p.selectedLicenses || [];
+                          const next = checked
+                            ? [...current, lic.skuId]
+                            : current.filter((id: string) => id !== lic.skuId);
+                          return { ...p, selectedLicenses: next };
+                        });
+                      }}
+                      className="w-3.5 h-3.5 rounded text-primary focus:ring-primary border-border bg-background cursor-pointer accent-primary"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="block truncate font-bold text-[11px]">{lic.displayName}</span>
+                      {lic.availableUnits !== undefined && (
+                        <span className="block text-[9px] text-muted-foreground">
+                          {lic.availableUnits} units free (of {lic.consumedUnits + lic.availableUnits})
+                        </span>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button variant="outline" type="button" onClick={() => setShowConvertModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={convertToFullTimeMutation.isPending} className="bg-primary text-white font-bold flex items-center gap-1.5 shadow-md">
+              Upgrade & Provision in Azure
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

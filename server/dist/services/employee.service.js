@@ -58,9 +58,26 @@ class EmployeeService {
             const isInternRole = employeeData.isIntern !== undefined
                 ? !!employeeData.isIntern
                 : !!(employeeData.designation?.toLowerCase().includes('intern') || employeeData.department?.toLowerCase().includes('intern') || employeeData.departmentId === '605c72ef1f77bcf86cd79777'); // Fallback department checks
+            let createdAzureUser = null;
+            if (employeeData.createAzureAccount && employeeData.azureUserPrincipalName) {
+                const { MicrosoftGraphService } = await import('./microsoftGraph.service.js');
+                createdAzureUser = await MicrosoftGraphService.createUserInAzure(orgId, {
+                    userPrincipalName: employeeData.azureUserPrincipalName,
+                    displayName: employeeData.fullName,
+                    givenName: employeeData.fullName.split(' ')[0] || employeeData.fullName,
+                    surname: employeeData.fullName.split(' ').slice(1).join(' ') || '',
+                    jobTitle: employeeData.designation,
+                    department: employeeData.department,
+                    tempPassword: employeeData.azureTempPassword,
+                });
+                if (createdAzureUser && employeeData.azureLicenses && employeeData.azureLicenses.length > 0) {
+                    await MicrosoftGraphService.assignLicenses(orgId, createdAzureUser.id, employeeData.azureLicenses);
+                }
+            }
             // 3. Create Employee record
             const [employee] = await Employee_js_1.Employee.create([{
                     ...employeeData,
+                    email: createdAzureUser ? createdAzureUser.userPrincipalName.toLowerCase() : employeeData.email,
                     isActive: true,
                     organizationId: orgId,
                     isIntern: isInternRole,
@@ -72,16 +89,29 @@ class EmployeeService {
                         internshipPerformanceApproved: false,
                     } : {}),
                 }], { session });
-            await User_js_1.User.findOneAndUpdate({ organizationId: orgId, email: employee.email }, {
+            const userUpdate = {
                 organizationId: orgId,
                 name: employee.fullName,
                 email: employee.email,
-                password: hashedPassword,
                 role: isInternRole ? 'INTERN' : 'EMPLOYEE',
                 employeeId: employee._id,
                 isActive: true,
                 isLoginApproved: true,
-            }, { upsert: true, session });
+            };
+            if (createdAzureUser) {
+                userUpdate.password = ''; // Clear local password for Microsoft SSO
+                userUpdate.ssoData = {
+                    provider: 'MICROSOFT',
+                    azureRoles: [],
+                    jobTitle: employee.designation,
+                    department: employee.department,
+                    lastSyncedAt: new Date()
+                };
+            }
+            else {
+                userUpdate.password = hashedPassword;
+            }
+            await User_js_1.User.findOneAndUpdate({ organizationId: orgId, email: employee.email }, userUpdate, { upsert: true, session });
             // Apply lead assignment as primaryManagerId if provided
             if (leadId && mongoose_1.default.isValidObjectId(leadId)) {
                 employee.primaryManagerId = new mongoose_1.default.Types.ObjectId(leadId);
@@ -697,6 +727,94 @@ class EmployeeService {
         await employee.save();
         await (0, auditLog_service_js_1.createAuditLog)('INTERN_PERFORMANCE_APPROVED', emailForAudit, 'EMPLOYEE', employee.employeeCode, `Approved paid phase for intern ${employee.fullName}. Rating: ${rating}/5`, orgId);
         return employee;
+    }
+    /**
+     * Converts an intern to a Full-Time employee and provisions an Azure AD account.
+     */
+    static async convertToFullTime(id, convertData, orgId, emailForAudit) {
+        const session = await mongoose_1.default.startSession();
+        session.startTransaction();
+        try {
+            // 1. Verify employee exists and is an intern
+            const employee = await Employee_js_1.Employee.findOne({ _id: id, organizationId: orgId }).session(session);
+            if (!employee) {
+                throw new Error('Employee not found or unauthorized.');
+            }
+            if (!employee.isIntern) {
+                throw new Error('This employee is already a full-time employee.');
+            }
+            // 2. Create the user in Azure AD
+            const { MicrosoftGraphService } = await import('./microsoftGraph.service.js');
+            const azureUser = await MicrosoftGraphService.createUserInAzure(orgId, {
+                userPrincipalName: convertData.userPrincipalName,
+                displayName: convertData.displayName || employee.fullName,
+                givenName: convertData.givenName || employee.fullName.split(' ')[0],
+                surname: convertData.surname || employee.fullName.split(' ').slice(1).join(' '),
+                jobTitle: convertData.jobTitle || employee.designation,
+                department: convertData.department || employee.department,
+                tempPassword: convertData.tempPassword,
+            });
+            // 3. Assign licenses in Azure AD
+            if (convertData.selectedLicenses && convertData.selectedLicenses.length > 0) {
+                await MicrosoftGraphService.assignLicenses(orgId, azureUser.id, convertData.selectedLicenses);
+            }
+            // 4. Update local Employee record
+            employee.isIntern = false;
+            const originalEmail = employee.email;
+            employee.email = azureUser.userPrincipalName.toLowerCase();
+            employee.internshipStatus = 'COMPLETED';
+            if (convertData.salary !== undefined) {
+                employee.salary = convertData.salary;
+            }
+            if (convertData.departmentId) {
+                employee.departmentId = new mongoose_1.default.Types.ObjectId(convertData.departmentId);
+                const dept = await Department_js_1.Department.findById(convertData.departmentId).session(session);
+                if (dept)
+                    employee.department = dept.name;
+            }
+            if (convertData.designationId) {
+                employee.designationId = new mongoose_1.default.Types.ObjectId(convertData.designationId);
+                const desig = await Designation_js_1.Designation.findById(convertData.designationId).session(session);
+                if (desig)
+                    employee.designation = desig.name;
+            }
+            await employee.save({ session });
+            // 5. Update User record (map to Azure SSO)
+            const ssoData = {
+                provider: 'MICROSOFT',
+                azureRoles: [],
+                jobTitle: employee.designation,
+                department: employee.department,
+                lastSyncedAt: new Date(),
+            };
+            await User_js_1.User.findOneAndUpdate({
+                $or: [
+                    { employeeId: employee._id },
+                    { email: originalEmail.toLowerCase().trim() },
+                ],
+                organizationId: orgId,
+            }, {
+                email: employee.email,
+                name: employee.fullName,
+                role: 'EMPLOYEE',
+                employeeId: employee._id,
+                isActive: true,
+                isLoginApproved: true,
+                password: '', // Disable local password sign in
+                ssoData: ssoData,
+            }, { upsert: true, session });
+            // 6. Write Audit Log
+            await (0, auditLog_service_js_1.createAuditLog)('INTERN_CONVERT_FULLTIME', emailForAudit, 'EMPLOYEE', employee.employeeCode, `Converted intern ${employee.fullName} to full-time employee and provisioned Azure AD account ${azureUser.userPrincipalName}`, orgId);
+            await session.commitTransaction();
+            return employee;
+        }
+        catch (error) {
+            await session.abortTransaction();
+            throw error;
+        }
+        finally {
+            session.endSession();
+        }
     }
 }
 exports.EmployeeService = EmployeeService;

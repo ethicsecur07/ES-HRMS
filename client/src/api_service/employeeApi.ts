@@ -61,4 +61,26 @@ export const employeeApi = {
     const response = await axiosInstance.patch<{ employee: Employee; message: string }>(`/employees/${id}/approve-intern`, { rating, notes });
     return response.data;
   },
+
+  getAzureLicenses: async () => {
+    const response = await axiosInstance.get<{
+      isAzureConfigured: boolean;
+      licenses: Array<{
+        skuId: string;
+        skuPartNumber: string;
+        displayName: string;
+        availableUnits: number;
+        consumedUnits: number;
+      }>;
+    }>('/employees/azure-licenses');
+    return response.data;
+  },
+
+  convertToFullTime: async (id: string, data: any) => {
+    const response = await axiosInstance.post<{
+      employee: Employee;
+      message: string;
+    }>(`/employees/${id}/convert-to-fulltime`, data);
+    return response.data;
+  },
 };

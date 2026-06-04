@@ -315,3 +315,48 @@ export const approveInternPerformance = async (req: AuthRequest, res: Response):
   }
 };
 
+export const getAzureLicenses = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const orgId = req.user?.organizationId;
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
+      return;
+    }
+
+    const { MicrosoftGraphService } = await import('../services/microsoftGraph.service.js');
+    const result = await MicrosoftGraphService.getAvailableLicenses(orgId);
+    res.status(200).json(result);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const convertToFullTime = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const orgId = req.user?.organizationId;
+    const emailForAudit = req.user?.email || 'System';
+    const role = req.user?.role;
+
+    if (role !== 'ADMIN' && role !== 'HR') {
+      res.status(403).json({ message: 'Forbidden. Only HR and Admins can convert interns to full-time.' });
+      return;
+    }
+
+    if (!orgId) {
+      res.status(400).json({ message: 'Organization context is missing.' });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ message: 'Invalid employee ID format.' });
+      return;
+    }
+
+    const employee = await EmployeeService.convertToFullTime(id, req.body, orgId, emailForAudit);
+    res.status(200).json({ employee, message: 'Intern converted to full-time employee successfully.' });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+

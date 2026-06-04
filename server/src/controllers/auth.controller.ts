@@ -918,6 +918,80 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
       const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');
       await PermissionSyncService.syncForTenant(organization._id as any, session as any);
 
+      // Create database-backed user session for auto-login
+      const sessionId = new mongoose.Types.ObjectId();
+      const userObj = adminUser.toObject();
+      delete userObj.password;
+      delete userObj.mfaSecret;
+      delete userObj.backupCodes;
+
+      // Parse User-Agent
+      const userAgent = req.headers['user-agent'] || '';
+      let browser = 'Unknown Browser';
+      let os = 'Unknown OS';
+      if (/chrome/i.test(userAgent)) browser = 'Chrome';
+      else if (/firefox/i.test(userAgent)) browser = 'Firefox';
+      else if (/safari/i.test(userAgent)) browser = 'Safari';
+      else if (/edge/i.test(userAgent)) browser = 'Edge';
+
+      if (/windows/i.test(userAgent)) os = 'Windows';
+      else if (/macintosh|mac os/i.test(userAgent)) os = 'macOS';
+      else if (/linux/i.test(userAgent)) os = 'Linux';
+      else if (/android/i.test(userAgent)) os = 'Android';
+      else if (/iphone|ipad/i.test(userAgent)) os = 'iOS';
+
+      const deviceInfo = `${browser} on ${os}`;
+
+      // Generate Refresh Token
+      const refreshToken = generateRefreshToken({
+        id: adminUser.id,
+        organizationId: organization._id.toString(),
+        sessionId: sessionId.toString(),
+      });
+
+      const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      await UserSession.create([{
+        _id: sessionId,
+        userId: adminUser._id,
+        organizationId: organization._id,
+        refreshTokenHash,
+        deviceInfo,
+        ipAddress: req.ip,
+        browser,
+        os,
+        location: 'Unknown',
+        lastActivity: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      }], { session });
+
+      // Generate Access Token
+      const accessToken = generateAccessToken({
+        id: adminUser.id,
+        role: adminUser.role,
+        email: adminUser.email,
+        organizationId: organization._id.toString(),
+        employeeId: adminUser.employeeId?.toString(),
+        sessionId: sessionId.toString(),
+      });
+
+      // Record SUCCESS login event
+      await LoginRiskService.recordEvent({
+        userId: adminUser._id,
+        organizationId: organization._id,
+        email: adminUser.email,
+        status: 'SUCCESS',
+        ipAddress: req.ip || '127.0.0.1',
+        userAgent,
+        location: 'Unknown',
+        riskLevel: 'LOW',
+        riskFactors: [],
+        sessionId: sessionId.toString(),
+      });
+
+      adminUser.lastLogin = new Date();
+      await adminUser.save({ session });
+
       // Audit log creation
       await createAuditLog(
         'ORGANIZATION_SIGNUP',
@@ -930,11 +1004,21 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 
       await session.commitTransaction();
 
+      // Set Refresh Token as HttpOnly Cookie
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
       res.status(201).json({
         success: true,
         message: 'Organization and administrator account successfully registered!',
         organizationId: organization._id,
         slug: normalizedSlug,
+        user: userObj,
+        token: accessToken,
       });
     } catch (transactionError) {
       await session.abortTransaction();

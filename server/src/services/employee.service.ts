@@ -80,9 +80,41 @@ export class EmployeeService {
         ? !!employeeData.isIntern
         : !!(employeeData.designation?.toLowerCase().includes('intern') || employeeData.department?.toLowerCase().includes('intern') || employeeData.departmentId === '605c72ef1f77bcf86cd79777'); // Fallback department checks
 
+      let createdAzureUser = null;
+      if (employeeData.createAzureAccount && employeeData.azureUserPrincipalName) {
+        if (!employeeData.employeeCode) {
+          throw new Error('Employee ID is required for Azure AD provisioning.');
+        }
+        if (!employeeData.phone) {
+          throw new Error('Mobile number is required for Azure AD provisioning.');
+        }
+        if (!employeeData.joiningDate) {
+          throw new Error('Hire/joining date is required for Azure AD provisioning.');
+        }
+
+        const { MicrosoftGraphService } = await import('./microsoftGraph.service.js');
+        createdAzureUser = await MicrosoftGraphService.createUserInAzure(orgId, {
+          userPrincipalName: employeeData.azureUserPrincipalName,
+          displayName: employeeData.fullName,
+          givenName: employeeData.fullName.split(' ')[0] || employeeData.fullName,
+          surname: employeeData.fullName.split(' ').slice(1).join(' ') || '',
+          jobTitle: employeeData.designation,
+          department: employeeData.department,
+          tempPassword: employeeData.azureTempPassword,
+          employeeId: employeeData.employeeCode,
+          employeeHireDate: String(employeeData.joiningDate),
+          mobilePhone: employeeData.phone,
+        });
+
+        if (createdAzureUser && employeeData.azureLicenses && employeeData.azureLicenses.length > 0) {
+          await MicrosoftGraphService.assignLicenses(orgId, createdAzureUser.id, employeeData.azureLicenses);
+        }
+      }
+
       // 3. Create Employee record
       const [employee] = await Employee.create([{
         ...employeeData,
+        email: createdAzureUser ? createdAzureUser.userPrincipalName.toLowerCase() : employeeData.email,
         isActive: true,
         organizationId: orgId,
         isIntern: isInternRole,
@@ -95,18 +127,32 @@ export class EmployeeService {
         } : {}),
       }], { session });
 
+      const userUpdate: any = {
+        organizationId: orgId,
+        name: employee.fullName,
+        email: employee.email,
+        role: isInternRole ? 'INTERN' : 'EMPLOYEE',
+        employeeId: employee._id,
+        isActive: true,
+        isLoginApproved: true,
+      };
+
+      if (createdAzureUser) {
+        userUpdate.password = ''; // Clear local password for Microsoft SSO
+        userUpdate.ssoData = {
+          provider: 'MICROSOFT',
+          azureRoles: [],
+          jobTitle: employee.designation,
+          department: employee.department,
+          lastSyncedAt: new Date()
+        };
+      } else {
+        userUpdate.password = hashedPassword;
+      }
+
       await User.findOneAndUpdate(
         { organizationId: orgId, email: employee.email },
-        {
-          organizationId: orgId,
-          name: employee.fullName,
-          email: employee.email,
-          password: hashedPassword,
-          role: isInternRole ? 'INTERN' : 'EMPLOYEE',
-          employeeId: employee._id,
-          isActive: true,
-          isLoginApproved: true,
-        },
+        userUpdate,
         { upsert: true, session }
       );
 
@@ -469,6 +515,17 @@ export class EmployeeService {
         } else {
           user.isActive = false;
           await user.save({ session });
+        }
+      }
+
+      // 3. Delete from Azure AD if the employee is NOT an intern
+      if (!employee.isIntern) {
+        try {
+          const { MicrosoftGraphService } = await import('./microsoftGraph.service.js');
+          await MicrosoftGraphService.deleteUserInAzure(orgId, employee.email);
+        } catch (azureError: any) {
+          // Log the error but do NOT block database deletion
+          console.warn(`[Azure AD] Failed to delete user ${employee.email} from Azure AD:`, azureError.message);
         }
       }
 
@@ -846,6 +903,149 @@ export class EmployeeService {
     );
 
     return employee;
+  }
+
+  /**
+   * Converts an intern to a Full-Time employee and provisions an Azure AD account.
+   */
+  static async convertToFullTime(
+    id: string,
+    convertData: {
+      userPrincipalName: string;
+      displayName: string;
+      givenName: string;
+      surname: string;
+      jobTitle?: string;
+      department?: string;
+      tempPassword?: string;
+      selectedLicenses?: string[];
+      salary?: number;
+      departmentId?: string;
+      designationId?: string;
+      employeeId: string;
+      employeeHireDate: string;
+      mobilePhone: string;
+    },
+    orgId: mongoose.Types.ObjectId | string,
+    emailForAudit: string
+  ) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // 1. Verify employee exists and is an intern
+      const employee = await Employee.findOne({ _id: id, organizationId: orgId }).session(session);
+      if (!employee) {
+        throw new Error('Employee not found or unauthorized.');
+      }
+      if (!employee.isIntern) {
+        throw new Error('This employee is already a full-time employee.');
+      }
+
+      if (!convertData.employeeId) {
+        throw new Error('Employee ID is required for Azure AD provisioning.');
+      }
+      if (!convertData.employeeHireDate) {
+        throw new Error('Employee Hire/Joining Date is required for Azure AD provisioning.');
+      }
+      if (!convertData.mobilePhone) {
+        throw new Error('Mobile Number is required for Azure AD provisioning.');
+      }
+
+      // 2. Create the user in Azure AD
+      const { MicrosoftGraphService } = await import('./microsoftGraph.service.js');
+      const azureUser = await MicrosoftGraphService.createUserInAzure(orgId, {
+        userPrincipalName: convertData.userPrincipalName,
+        displayName: convertData.displayName || employee.fullName,
+        givenName: convertData.givenName || employee.fullName.split(' ')[0],
+        surname: convertData.surname || employee.fullName.split(' ').slice(1).join(' '),
+        jobTitle: convertData.jobTitle || employee.designation,
+        department: convertData.department || employee.department,
+        tempPassword: convertData.tempPassword,
+        employeeId: convertData.employeeId,
+        employeeHireDate: convertData.employeeHireDate,
+        mobilePhone: convertData.mobilePhone,
+      });
+
+      // 3. Assign licenses in Azure AD
+      if (convertData.selectedLicenses && convertData.selectedLicenses.length > 0) {
+        await MicrosoftGraphService.assignLicenses(orgId, azureUser.id, convertData.selectedLicenses);
+      }
+
+      // 4. Update local Employee record
+      employee.isIntern = false;
+      const originalEmail = employee.email;
+      employee.email = azureUser.userPrincipalName.toLowerCase();
+      employee.internshipStatus = 'COMPLETED';
+      employee.fullName = convertData.displayName.trim();
+      employee.employeeCode = convertData.employeeId.trim();
+      employee.joiningDate = new Date(convertData.employeeHireDate);
+      employee.phone = convertData.mobilePhone.trim();
+
+      if (convertData.salary !== undefined) {
+        employee.salary = convertData.salary;
+      }
+      if (convertData.departmentId) {
+        employee.departmentId = new mongoose.Types.ObjectId(convertData.departmentId);
+        const dept = await Department.findById(convertData.departmentId).session(session);
+        if (dept) employee.department = dept.name;
+      }
+      if (convertData.designationId) {
+        employee.designationId = new mongoose.Types.ObjectId(convertData.designationId);
+        const desig = await Designation.findById(convertData.designationId).session(session);
+        if (desig) employee.designation = desig.name;
+      }
+
+      await employee.save({ session });
+
+      // 5. Update User record (map to Azure SSO)
+      const ssoData = {
+        provider: 'MICROSOFT',
+        azureRoles: [],
+        jobTitle: employee.designation,
+        department: employee.department,
+        lastSyncedAt: new Date(),
+      };
+
+      await User.findOneAndUpdate(
+        {
+          $or: [
+            { employeeId: employee._id },
+            { email: originalEmail.toLowerCase().trim() },
+          ],
+          organizationId: orgId,
+        },
+        {
+          email: employee.email,
+          name: employee.fullName,
+          role: 'EMPLOYEE',
+          employeeId: employee._id,
+          isActive: true,
+          isLoginApproved: true,
+          password: '', // Disable local password sign in
+          ssoData: ssoData,
+        },
+        { upsert: true, session }
+      );
+
+      // 6. Write Audit Log
+      await createAuditLog(
+        'INTERN_CONVERT_FULLTIME',
+        emailForAudit,
+        'EMPLOYEE',
+        employee.employeeCode,
+        `Converted intern ${employee.fullName} to full-time employee and provisioned Azure AD account ${azureUser.userPrincipalName}`,
+        orgId
+      );
+
+      await session.commitTransaction();
+      return employee;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 }
 

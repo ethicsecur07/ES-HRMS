@@ -21,7 +21,21 @@ const Organization_js_1 = require("../models/Organization.js");
 const logger_js_1 = require("../utils/logger.js");
 const LeaveAccrualService_js_1 = require("../domains/leave-engine/services/LeaveAccrualService.js");
 const payroll_service_js_1 = require("../services/payroll.service.js");
+const chatBackup_service_js_1 = require("../services/chatBackup.service.js");
 const initCronJobs = () => {
+    // ─────────────────────────────────────────────────────────────
+    // Daily Chat Backup to OneDrive at 00:15
+    // ─────────────────────────────────────────────────────────────
+    node_cron_1.default.schedule('15 0 * * *', async () => {
+        try {
+            logger_js_1.logger.info('[CRON] Starting daily chat logs backup to employee OneDrives...');
+            await (0, chatBackup_service_js_1.runGlobalChatBackup)();
+            logger_js_1.logger.info('[CRON] Daily chat logs backup complete.');
+        }
+        catch (error) {
+            logger_js_1.logger.error('[CRON] Daily chat logs backup failed', { error });
+        }
+    });
     // ─────────────────────────────────────────────────────────────
     // Auto-checkout at midnight: close any open attendance records
     // ─────────────────────────────────────────────────────────────
