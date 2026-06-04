@@ -23,13 +23,17 @@ import {
   CheckCircle2,
   ArrowRight,
   ChevronRight,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { useThemeStore } from '../store/useThemeStore';
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const addToast = useNotificationStore((state) => state.addToast);
   const { login, logout } = useAuthStore();
+  const { theme, toggleTheme } = useThemeStore();
 
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
@@ -348,10 +352,10 @@ export const SignupPage: React.FC = () => {
     const isEnabled = config?.isEnabled !== false;
 
     return (
-      <Card className="flex flex-col justify-between border border-slate-800 bg-slate-900/40 p-5 hover:border-slate-700 transition-all relative overflow-hidden backdrop-blur-sm">
+      <Card className="flex flex-col justify-between border border-border bg-card/40 p-5 hover:border-muted-foreground/30 transition-all relative overflow-hidden backdrop-blur-sm">
         <div className="space-y-3.5">
           <div className="flex justify-between items-start">
-            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="p-2.5 rounded-xl bg-background/60 border border-border">
               {icon}
             </div>
             {isConfigured ? (
@@ -363,23 +367,23 @@ export const SignupPage: React.FC = () => {
                 <CheckCircle2 className="w-3 h-3" /> Configured
               </span>
             ) : (
-              <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-full bg-slate-950 text-slate-500 border border-slate-800/60 tracking-wider">
+              <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-full bg-muted text-muted-foreground border border-border/60 tracking-wider">
                 Not Configured
               </span>
             )}
           </div>
 
           <div className="space-y-1 text-left">
-            <h4 className="text-sm font-bold text-white">{title}</h4>
-            <p className="text-[11px] text-slate-400 leading-normal">{description}</p>
+            <h4 className="text-sm font-bold text-foreground">{title}</h4>
+            <p className="text-[11px] text-muted-foreground leading-normal">{description}</p>
           </div>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-slate-950 flex gap-2">
+        <div className="mt-4 pt-3 border-t border-border flex gap-2">
           <Button
             type="button"
             onClick={() => handleOpenSSOModal(providerType)}
-            className="w-full bg-slate-950 hover:bg-slate-900 text-white border border-slate-850 hover:border-slate-800 text-[10px] font-extrabold py-2 tracking-wider"
+            className="w-full bg-background hover:bg-muted text-foreground border border-border text-[10px] font-extrabold py-2 tracking-wider"
           >
             {isConfigured ? 'Edit Details' : 'Configure SSO'}
           </Button>
@@ -400,44 +404,56 @@ export const SignupPage: React.FC = () => {
   ];
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-slate-950 p-6 overflow-hidden">
+    <div className={`relative min-h-screen w-full flex items-center justify-center bg-background text-foreground p-6 overflow-hidden ${theme}`}>
+      {/* Floating Theme Toggle */}
+      <div className="absolute top-4 right-4 z-50 animate-in fade-in duration-300">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="p-2 sm:p-2.5 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all shadow-md flex items-center justify-center animate-pulse hover:animate-none"
+          title="Toggle Theme"
+        >
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="h-5 w-5" />}
+        </button>
+      </div>
+
       {/* Background glow effects */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#F75F0A]/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none animate-pulse delay-1000"></div>
 
       {/* Floating Stepper Indicators */}
-      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 flex items-center gap-6 bg-slate-900/60 border border-slate-800/80 px-6 py-2.5 rounded-full backdrop-blur-md">
+      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 flex items-center gap-6 bg-card/60 border border-border/80 px-6 py-2.5 rounded-full backdrop-blur-md">
         <div className="flex items-center gap-2">
           <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
             step === 1 ? 'bg-[#F75F0A] text-white' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
           }`}>
             {step === 1 ? '1' : '✓'}
           </span>
-          <span className={`text-[10px] font-black uppercase tracking-wider ${step === 1 ? 'text-white' : 'text-slate-400'}`}>
+          <span className={`text-[10px] font-black uppercase tracking-wider ${step === 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
             Workspace Signup
           </span>
         </div>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
         <div className="flex items-center gap-2">
           <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-            step === 2 ? 'bg-[#F75F0A] text-white' : 'bg-slate-950 text-slate-600'
+            step === 2 ? 'bg-[#F75F0A] text-white' : 'bg-muted text-muted-foreground'
           }`}>
             2
           </span>
-          <span className={`text-[10px] font-black uppercase tracking-wider ${step === 2 ? 'text-white' : 'text-slate-600'}`}>
+          <span className={`text-[10px] font-black uppercase tracking-wider ${step === 2 ? 'text-foreground' : 'text-muted-foreground'}`}>
             SSO Directory Config
           </span>
         </div>
       </div>
 
       {step === 1 ? (
-        <Card className="w-full max-w-xl p-8 z-10 border border-slate-800 shadow-2xl backdrop-blur-xl bg-slate-900/90 text-white mt-10">
+        <Card className="w-full max-w-xl p-8 z-10 border border-border shadow-2xl backdrop-blur-xl bg-card/90 text-card-foreground mt-10">
           <div className="text-center mb-6">
             <div className="w-12 h-12 bg-[#F75F0A]/10 border border-[#F75F0A]/20 text-[#F75F0A] rounded-2xl flex items-center justify-center mx-auto mb-3">
               <Building2 className="w-6 h-6" />
             </div>
-            <h2 className="text-2xl font-extrabold text-white tracking-tight">Register New Organization</h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">Register New Organization</h2>
+            <p className="text-xs text-muted-foreground mt-1">
               Establish your business workspace domain and configure your administrator account in one click.
             </p>
           </div>
@@ -456,7 +472,7 @@ export const SignupPage: React.FC = () => {
                   onChange={handleOrgNameChange}
                   placeholder="e.g. EthicSec Corporation"
                   icon={<Building2 className="w-4 h-4" />}
-                  className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                  className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   required
                 />
 
@@ -467,10 +483,10 @@ export const SignupPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, organizationSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
                     placeholder="e.g. ethicsec"
                     icon={<Sparkles className="w-4 h-4 text-[#F75F0A]" />}
-                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                    className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     required
                   />
-                  <p className="mt-1 text-[10px] text-slate-400 text-left font-sans">
+                  <p className="mt-1 text-[10px] text-muted-foreground text-left font-sans">
                     This unique identifier serves as your subdomain login code.
                   </p>
                 </div>
@@ -481,13 +497,13 @@ export const SignupPage: React.FC = () => {
                 value={formData.organizationSector}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, organizationSector: e.target.value })}
                 options={[{ value: '', label: 'Select Sector...' }, ...sectors]}
-                className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                 required
               />
             </div>
 
             {/* Admin User Section */}
-            <div className="space-y-3.5 pt-2 border-t border-slate-800">
+            <div className="space-y-3.5 pt-2 border-t border-border">
               <p className="text-[9px] font-black uppercase tracking-wider text-[#F75F0A] mb-1">
                 Primary Administrator Credentials
               </p>
@@ -499,7 +515,7 @@ export const SignupPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Abishek"
                   icon={<User className="w-4 h-4" />}
-                  className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                  className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   required
                 />
 
@@ -510,7 +526,7 @@ export const SignupPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="e.g. admin@ethicsecur.co.in"
                   icon={<Mail className="w-4 h-4" />}
-                  className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                  className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   required
                 />
               </div>
@@ -523,24 +539,24 @@ export const SignupPage: React.FC = () => {
                   onChange={handlePasswordChange}
                   placeholder="••••••••••••"
                   icon={<Lock className="w-4 h-4" />}
-                  className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                  className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   required
                 />
 
                 {formData.password && (
                   <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
                     <div className="flex justify-between items-center text-[10px]">
-                      <span className="text-slate-400">Password Strength:</span>
-                      <span className="font-bold text-slate-300">{passwordStrength.label}</span>
+                      <span className="text-muted-foreground">Password Strength:</span>
+                      <span className="font-bold text-foreground">{passwordStrength.label}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${passwordStrength.color}`}
                         style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
                       />
                     </div>
                     {/* Dynamic password requirements checklist */}
-                    <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 text-[10px] bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/40">
+                    <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 text-[10px] bg-muted/40 p-2.5 rounded-lg border border-border/40">
                       {[
                         { label: 'Min 8 characters', met: formData.password.length >= 8 },
                         { label: 'One uppercase letter (A-Z)', met: /[A-Z]/.test(formData.password) },
@@ -552,11 +568,11 @@ export const SignupPage: React.FC = () => {
                           <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black border transition-all ${
                             criteria.met
                               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                              : 'bg-slate-900 border-slate-800 text-slate-500'
+                              : 'bg-muted border-border text-muted-foreground'
                           }`}>
                             {criteria.met ? '✓' : '•'}
                           </span>
-                          <span className={criteria.met ? 'text-emerald-400/90 font-medium' : 'text-slate-500'}>
+                          <span className={criteria.met ? 'text-emerald-400/90 font-medium' : 'text-muted-foreground'}>
                             {criteria.label}
                           </span>
                         </div>
@@ -578,7 +594,7 @@ export const SignupPage: React.FC = () => {
                 REGISTER WORKSPACE
               </Button>
 
-              <div className="text-center text-xs text-slate-400">
+              <div className="text-center text-xs text-muted-foreground">
                 Already have an active organization?{' '}
                 <Link to="/login" className="text-[#F75F0A] font-bold hover:underline">
                   Sign In
@@ -589,20 +605,20 @@ export const SignupPage: React.FC = () => {
         </Card>
       ) : (
         /* STEP 2: SSO ONBOARDING PAGE */
-        <Card className="w-full max-w-4xl p-8 z-10 border border-slate-800 shadow-2xl backdrop-blur-xl bg-slate-900/90 text-white mt-16 text-center animate-in fade-in zoom-in-98 duration-300">
+        <Card className="w-full max-w-4xl p-8 z-10 border border-border shadow-2xl backdrop-blur-xl bg-card/90 text-card-foreground mt-16 text-center animate-in fade-in zoom-in-98 duration-300">
           <div className="mb-6 space-y-2">
             <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
               <Shield className="w-6 h-6 animate-pulse" />
             </div>
-            <h2 className="text-2xl font-extrabold text-white tracking-tight">Configure Enterprise SSO</h2>
-            <p className="text-xs text-slate-400 max-w-2xl mx-auto leading-relaxed">
+            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">Configure Enterprise SSO</h2>
+            <p className="text-xs text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               Step 2: Secure login directories for **{registeredOrgName}**. Configure corporate authentication systems (Google, Microsoft Entra, SAML, or OAuth 2.0). 
               If skipped, users will fall back to local password logins.
             </p>
 
-            <div className="text-[10px] text-slate-400 bg-slate-950/80 border border-slate-850 px-4 py-2.5 rounded-xl max-w-md mx-auto inline-block mt-3">
-              <span className="font-bold text-slate-300 block mb-1">Corporate SSO ACS Callback URL</span>
-              <code className="text-indigo-400 font-mono text-[9px] select-all bg-slate-900 px-2 py-0.5 rounded border border-slate-800 block truncate max-w-[340px] mx-auto">
+            <div className="text-[10px] text-muted-foreground bg-muted/80 border border-border px-4 py-2.5 rounded-xl max-w-md mx-auto inline-block mt-3">
+              <span className="font-bold text-foreground block mb-1">Corporate SSO ACS Callback URL</span>
+              <code className="text-[#F75F0A] font-mono text-[9px] select-all bg-background px-2 py-0.5 rounded border border-border block truncate max-w-[340px] mx-auto">
                 {window.location.origin}/sso/callback
               </code>
             </div>
@@ -652,8 +668,8 @@ export const SignupPage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex justify-between items-center pt-5 border-t border-slate-950 mt-6">
-            <p className="text-[10px] text-slate-500 font-sans text-left leading-normal">
+          <div className="flex justify-between items-center pt-5 border-t border-border mt-6">
+            <p className="text-[10px] text-muted-foreground font-sans text-left leading-normal">
               Need to change this later? Once logged in, these provider configurations will be available in the **Settings &gt; SSO Configuration** tab.
             </p>
             <Button
@@ -670,18 +686,18 @@ export const SignupPage: React.FC = () => {
       {/* --- SSO Provider Modal --- */}
       {isSSOModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl animate-in zoom-in-95 duration-200 my-8 text-white">
-            <div className="flex justify-between items-center border-b border-slate-850 pb-3 mb-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-card border border-border p-6 shadow-2xl animate-in zoom-in-95 duration-200 my-8 text-card-foreground">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
               <div className="flex items-center gap-2">
                 {ssoModalMode === 'GOOGLE' && <span className="p-1.5 rounded-lg bg-red-500/10 text-red-400"><Lock className="w-5 h-5" /></span>}
                 {ssoModalMode === 'MICROSOFT' && <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400"><Lock className="w-5 h-5" /></span>}
                 {ssoModalMode === 'SAML' && <span className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400"><Fingerprint className="w-5 h-5" /></span>}
                 {ssoModalMode === 'OAUTH' && <span className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400"><Globe className="w-5 h-5" /></span>}
-                <h4 className="text-lg font-bold text-white">
+                <h4 className="text-lg font-bold text-foreground">
                   Configure {ssoModalMode === 'GOOGLE' ? 'Google Workspace' : ssoModalMode === 'MICROSOFT' ? 'Microsoft Entra ID' : ssoModalMode === 'SAML' ? 'SAML 2.0' : 'Custom OAuth 2.0'}
                 </h4>
               </div>
-              <button onClick={() => setIsSSOModalOpen(false)} className="text-slate-400 hover:text-slate-200">
+              <button onClick={() => setIsSSOModalOpen(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -689,7 +705,7 @@ export const SignupPage: React.FC = () => {
             <form onSubmit={handleSaveSSOProvider} className="space-y-6 text-left">
               {/* SECTION: GENERAL SETTINGS */}
               <div className="space-y-4">
-                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">General Configuration</h5>
+                <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">General Configuration</h5>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="Display Name *"
@@ -697,7 +713,7 @@ export const SignupPage: React.FC = () => {
                     value={ssoDisplayName}
                     onChange={(e) => setSsoDisplayName(e.target.value)}
                     required
-                    className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                    className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   />
                   <Select
                     label="Default Provisioning Role *"
@@ -711,56 +727,56 @@ export const SignupPage: React.FC = () => {
                       { value: 'ADMIN', label: 'System Administrator' },
                     ]}
                     required
-                    className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                    className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-850">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
                     <div className="space-y-0.5">
-                      <label htmlFor="ssoIsEnabled" className="text-xs font-bold text-white cursor-pointer uppercase tracking-wide">
+                      <label htmlFor="ssoIsEnabled" className="text-xs font-bold text-foreground cursor-pointer uppercase tracking-wide">
                         Status
                       </label>
-                      <p className="text-[10px] text-slate-500">Enable login via this IDP</p>
+                      <p className="text-[10px] text-muted-foreground">Enable login via this IDP</p>
                     </div>
                     <input
                       type="checkbox"
                       id="ssoIsEnabled"
                       checked={ssoIsEnabled}
                       onChange={(e) => setSsoIsEnabled(e.target.checked)}
-                      className="h-4.5 w-4.5 rounded border border-slate-800 bg-slate-950 text-[#F75F0A] focus:ring-[#F75F0A] cursor-pointer"
+                      className="h-4.5 w-4.5 rounded border border-border bg-background text-[#F75F0A] focus:ring-[#F75F0A] cursor-pointer"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-850">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
                     <div className="space-y-0.5">
-                      <label htmlFor="ssoIsPrimary" className="text-xs font-bold text-white cursor-pointer uppercase tracking-wide">
+                      <label htmlFor="ssoIsPrimary" className="text-xs font-bold text-foreground cursor-pointer uppercase tracking-wide">
                         Primary Provider
                       </label>
-                      <p className="text-[10px] text-slate-500">Default redirect for SSO logins</p>
+                      <p className="text-[10px] text-muted-foreground">Default redirect for SSO logins</p>
                     </div>
                     <input
                       type="checkbox"
                       id="ssoIsPrimary"
                       checked={ssoIsPrimary}
                       onChange={(e) => setSsoIsPrimary(e.target.checked)}
-                      className="h-4.5 w-4.5 rounded border border-slate-800 bg-slate-950 text-[#F75F0A] focus:ring-[#F75F0A] cursor-pointer"
+                      className="h-4.5 w-4.5 rounded border border-border bg-background text-[#F75F0A] focus:ring-[#F75F0A] cursor-pointer"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-850">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
                     <div className="space-y-0.5">
-                      <label htmlFor="ssoAutoProvision" className="text-xs font-bold text-white cursor-pointer uppercase tracking-wide">
+                      <label htmlFor="ssoAutoProvision" className="text-xs font-bold text-foreground cursor-pointer uppercase tracking-wide">
                         Auto Provision
                       </label>
-                      <p className="text-[10px] text-slate-500">Create account on success</p>
+                      <p className="text-[10px] text-muted-foreground">Create account on success</p>
                     </div>
                     <input
                       type="checkbox"
                       id="ssoAutoProvision"
                       checked={ssoAutoProvision}
                       onChange={(e) => setSsoAutoProvision(e.target.checked)}
-                      className="h-4.5 w-4.5 rounded border border-slate-800 bg-slate-950 text-[#F75F0A] focus:ring-[#F75F0A] cursor-pointer"
+                      className="h-4.5 w-4.5 rounded border border-border bg-background text-[#F75F0A] focus:ring-[#F75F0A] cursor-pointer"
                     />
                   </div>
                 </div>
@@ -768,8 +784,8 @@ export const SignupPage: React.FC = () => {
 
               {/* SECTION: CREDENTIALS (OAUTH/OIDC) */}
               {(ssoModalMode === 'GOOGLE' || ssoModalMode === 'MICROSOFT' || ssoModalMode === 'OAUTH') && (
-                <div className="space-y-4 border-t border-slate-850 pt-4">
-                  <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">API & Client Credentials</h5>
+                <div className="space-y-4 border-t border-border pt-4">
+                  <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">API & Client Credentials</h5>
                   <div className="space-y-4">
                     <Input
                       label="Client ID *"
@@ -777,7 +793,7 @@ export const SignupPage: React.FC = () => {
                       value={ssoClientId}
                       onChange={(e) => setSsoClientId(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
 
                     <div className="relative">
@@ -788,12 +804,12 @@ export const SignupPage: React.FC = () => {
                         value={ssoClientSecret}
                         onChange={(e) => setSsoClientSecret(e.target.value)}
                         required
-                        className="pr-10 bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                        className="pr-10 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                       />
                       <button
                         type="button"
                         onClick={() => setShowClientSecret(!showClientSecret)}
-                        className="absolute right-3 top-[38px] text-slate-400 hover:text-slate-200 transition-colors"
+                        className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {showClientSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -805,7 +821,7 @@ export const SignupPage: React.FC = () => {
                       onChange={(e) => setSsoRedirectUri(e.target.value)}
                       required
                       placeholder="e.g. http://localhost:5173/sso/callback"
-                      className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                   </div>
                 </div>
@@ -813,23 +829,23 @@ export const SignupPage: React.FC = () => {
 
               {/* MICROSOFT SPECIFIC */}
               {ssoModalMode === 'MICROSOFT' && (
-                <div className="space-y-4 border-t border-slate-850 pt-4">
-                  <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Microsoft Directory Settings</h5>
+                <div className="space-y-4 border-t border-border pt-4">
+                  <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Microsoft Directory Settings</h5>
                   <Input
                     label="Directory (Tenant) ID *"
                     placeholder="e.g. common, organizations, or UUID"
                     value={ssoTenantId}
                     onChange={(e) => setSsoTenantId(e.target.value)}
                     required
-                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                    className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                   />
                 </div>
               )}
 
               {/* CUSTOM OAUTH SPECIFIC */}
               {ssoModalMode === 'OAUTH' && (
-                <div className="space-y-4 border-t border-slate-850 pt-4">
-                  <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Custom OAuth Endpoint Configuration</h5>
+                <div className="space-y-4 border-t border-border pt-4">
+                  <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Custom OAuth Endpoint Configuration</h5>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Input
                       label="Authorization URL *"
@@ -837,7 +853,7 @@ export const SignupPage: React.FC = () => {
                       value={ssoAuthorizationUrl}
                       onChange={(e) => setSsoAuthorizationUrl(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                     <Input
                       label="Token Exchange URL *"
@@ -845,7 +861,7 @@ export const SignupPage: React.FC = () => {
                       value={ssoTokenUrl}
                       onChange={(e) => setSsoTokenUrl(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -855,7 +871,7 @@ export const SignupPage: React.FC = () => {
                       value={ssoUserInfoUrl}
                       onChange={(e) => setSsoUserInfoUrl(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                     <Input
                       label="Authorization Scopes *"
@@ -863,7 +879,7 @@ export const SignupPage: React.FC = () => {
                       value={ssoScopes}
                       onChange={(e) => setSsoScopes(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                   </div>
                 </div>
@@ -871,8 +887,8 @@ export const SignupPage: React.FC = () => {
 
               {/* SAML SPECIFIC */}
               {ssoModalMode === 'SAML' && (
-                <div className="space-y-4 border-t border-slate-850 pt-4">
-                  <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">SAML 2.0 Directory Settings</h5>
+                <div className="space-y-4 border-t border-border pt-4">
+                  <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">SAML 2.0 Directory Settings</h5>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input
@@ -881,7 +897,7 @@ export const SignupPage: React.FC = () => {
                         value={ssoSamlEntryPoint}
                         onChange={(e) => setSsoSamlEntryPoint(e.target.value)}
                         required
-                        className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                        className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                       />
                       <Input
                         label="Identity Provider Issuer (Entity ID) *"
@@ -889,7 +905,7 @@ export const SignupPage: React.FC = () => {
                         value={ssoSamlIssuer}
                         onChange={(e) => setSsoSamlIssuer(e.target.value)}
                         required
-                        className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                        className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                       />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -898,7 +914,7 @@ export const SignupPage: React.FC = () => {
                         value={ssoSamlCallbackUrl}
                         onChange={(e) => setSsoSamlCallbackUrl(e.target.value)}
                         required
-                        className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                        className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                       />
                       <Select
                         label="Signature Algorithm *"
@@ -910,7 +926,7 @@ export const SignupPage: React.FC = () => {
                           { value: 'sha512', label: 'RSA-SHA512' },
                         ]}
                         required
-                        className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                        className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                       />
                     </div>
                     <Textarea
@@ -920,7 +936,7 @@ export const SignupPage: React.FC = () => {
                       onChange={(e) => setSsoSamlCert(e.target.value)}
                       required
                       rows={5}
-                      className="font-mono text-[11px] bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="font-mono text-[11px] focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                   </div>
                 </div>
@@ -928,9 +944,9 @@ export const SignupPage: React.FC = () => {
 
               {/* ATTRIBUTE CLAIMS MAP SECTION (SAML & CUSTOM OAUTH) */}
               {(ssoModalMode === 'SAML' || ssoModalMode === 'OAUTH') && (
-                <div className="space-y-4 border-t border-slate-850 pt-4">
-                  <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Profile Claim Attribute Mappings</h5>
-                  <p className="text-[11px] text-slate-500 leading-relaxed -mt-2">
+                <div className="space-y-4 border-t border-border pt-4">
+                  <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Profile Claim Attribute Mappings</h5>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed -mt-2">
                     Specify which keys in the SAML assertion or userinfo profile payload correspond to standard fields.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -939,14 +955,14 @@ export const SignupPage: React.FC = () => {
                       value={ssoAttrEmail}
                       onChange={(e) => setSsoAttrEmail(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                     <Input
                       label="Full Name Attribute Key *"
                       value={ssoAttrName}
                       onChange={(e) => setSsoAttrName(e.target.value)}
                       required
-                      className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -954,13 +970,13 @@ export const SignupPage: React.FC = () => {
                       label="First Name Attribute Key (Optional)"
                       value={ssoAttrFirstName}
                       onChange={(e) => setSsoAttrFirstName(e.target.value)}
-                      className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                     <Input
                       label="Last Name Attribute Key (Optional)"
                       value={ssoAttrLastName}
                       onChange={(e) => setSsoAttrLastName(e.target.value)}
-                      className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -968,23 +984,23 @@ export const SignupPage: React.FC = () => {
                       label="Directory Groups Attribute Key (Optional)"
                       value={ssoAttrGroups}
                       onChange={(e) => setSsoAttrGroups(e.target.value)}
-                      className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                     <Input
                       label="Department Attribute Key (Optional)"
                       value={ssoAttrDepartment}
                       onChange={(e) => setSsoAttrDepartment(e.target.value)}
-                      className="bg-slate-950 border-slate-800 text-white focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                      className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                     />
                   </div>
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-850">
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <Button
                   type="button"
                   onClick={() => setIsSSOModalOpen(false)}
-                  className="bg-slate-950 hover:bg-slate-900 border border-slate-800 text-white font-bold py-2 text-xs"
+                  className="bg-background hover:bg-muted border border-border text-foreground font-bold py-2 text-xs"
                 >
                   Cancel
                 </Button>
