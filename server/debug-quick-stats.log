@@ -370,3 +370,34 @@
     "completedProjectCount": 0
   }
 }
+{
+  "timestamp": "2026-06-04T06:29:36.737Z",
+  "msg": "Resolved employee profile",
+  "user": {
+    "id": "6a1ed7d7a03ff2c9a45f1c10",
+    "role": "EMPLOYEE",
+    "email": "abiramip@ethicsecur.co.in",
+    "organizationId": "6a1ed6b76cd721e1f9d4e96c",
+    "employeeId": "6a1ed7d7a03ff2c9a45f1c0e",
+    "sessionId": "6a211b4e57c76f776454764e",
+    "iat": 1780554574,
+    "exp": 1780555474
+  },
+  "employeeFound": true,
+  "employeeDetails": {
+    "id": "6a1ed7d7a03ff2c9a45f1c0e",
+    "fullName": "ABIRAMI PANNEERSELVAM",
+    "email": "abiramip@ethicsecur.co.in",
+    "department": "Development"
+  }
+}
+{
+  "timestamp": "2026-06-04T06:29:36.825Z",
+  "msg": "Computed stats successfully",
+  "counts": {
+    "departmentProjectCount": 1,
+    "onboardProjectCount": 1,
+    "assignedProjectCount": 0,
+    "completedProjectCount": 0
+  }
+}

@@ -3,7 +3,7 @@ import { Message } from '../../models/Message.js';
 import { getIO, forceUserOffline, getOnlineUserIdsByOrg } from '../../sockets/socketHandler.js';
 import { notificationService } from '../../services/notification.service.js';
 import { User } from '../../models/User.js';
-import { v2 as cloudinary } from 'cloudinary';
+import { uploadFileToOneDrive, generateSharingLink } from '../../utils/onedrive.js';
 import multer from 'multer';
 
 // Multer in-memory storage for chat file uploads
@@ -132,20 +132,32 @@ export const sendFileMessage = async (req: Request, res: Response): Promise<void
     const isImage = req.file.mimetype.startsWith('image/');
     const messageType = isImage ? 'image' : 'file';
 
-    // Upload to Cloudinary
-    const b64 = Buffer.from(req.file.buffer).toString('base64');
-    const dataURI = `data:${req.file.mimetype};base64,${b64}`;
-    const uploadResult = await cloudinary.uploader.upload(dataURI, {
-      folder: 'es_hrms_chat',
-      resource_type: isImage ? 'image' : 'raw',
-    });
+    const orgId = (req as any).user.organizationId;
+    const userEmail = (req as any).user?.email;
+    if (!orgId) {
+      res.status(400).json({ success: false, message: 'User organization context is missing.' });
+      return;
+    }
+
+    // Upload to OneDrive
+    const onedriveResult = await uploadFileToOneDrive(
+      orgId,
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      'uploads/chat',
+      userEmail
+    );
+
+    // Generate sharing link
+    const sharingUrl = await generateSharingLink(orgId, onedriveResult.fileId, userEmail);
 
     const message = new Message({
       senderId,
       receiverId,
       content: req.file.originalname,
       messageType,
-      fileUrl: uploadResult.secure_url,
+      fileUrl: sharingUrl,
       fileName: req.file.originalname,
       fileSize: req.file.size,
       fileType: req.file.mimetype,

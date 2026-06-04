@@ -22,5 +22,5 @@ if (R2_ENDPOINT && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY) {
     logger_js_1.logger.info('Cloudflare R2 Client initialized successfully');
 }
 else {
-    logger_js_1.logger.warn('Cloudflare R2 credentials not fully configured in environment. Resume uploads will fall back to Cloudinary.');
+    logger_js_1.logger.warn('Cloudflare R2 credentials not fully configured in environment. Resume uploads will fall back to OneDrive/S3.');
 }
