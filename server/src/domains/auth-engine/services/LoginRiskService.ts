@@ -155,17 +155,25 @@ export class LoginRiskService {
       const timeDiffHours = timeDiffMs / (1000 * 60 * 60);
 
       const geoLast = await this.resolveGeo(lastSuccessfulLogin.ipAddress);
-      const distance = this.getDistance(geoCurrent.lat, geoCurrent.lon, geoLast.lat, geoLast.lon);
+      const isLocalhost =
+        geoLast.country === 'Localhost' ||
+        geoCurrent.country === 'Localhost' ||
+        (geoLast.lat === 0 && geoLast.lon === 0) ||
+        (geoCurrent.lat === 0 && geoCurrent.lon === 0);
 
-      if (distance > 100 && timeDiffHours > 0) {
-        const requiredSpeed = distance / timeDiffHours;
-        if (requiredSpeed > 900) {
-          factors.push(
-            `Impossible travel detected: ${Math.round(distance)} km in ${timeDiffHours.toFixed(
-              2
-            )} hours (requires speed of ${Math.round(requiredSpeed)} km/h)`
-          );
-          riskScore += 50;
+      if (!isLocalhost) {
+        const distance = this.getDistance(geoCurrent.lat, geoCurrent.lon, geoLast.lat, geoLast.lon);
+
+        if (distance > 100 && timeDiffHours > 0) {
+          const requiredSpeed = distance / timeDiffHours;
+          if (requiredSpeed > 900) {
+            factors.push(
+              `Impossible travel detected: ${Math.round(distance)} km in ${timeDiffHours.toFixed(
+                2
+              )} hours (requires speed of ${Math.round(requiredSpeed)} km/h)`
+            );
+            riskScore += 50;
+          }
         }
       }
     }
