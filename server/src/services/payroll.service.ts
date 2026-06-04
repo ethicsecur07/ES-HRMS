@@ -142,10 +142,10 @@ async function calculateWithPayrollConfig(
 
   // Earnings calculation
   const basic = Math.round(ctcMonthly * config.basicSalaryPercent / 100);
-  const hra = Math.round(basic * config.hraPercent / 100);
-  const conveyance = config.conveyanceMonthly;
-  const performanceIncentive = config.performanceIncentiveMonthly;
-  const otherAllowances = config.otherAllowancesMonthly;
+  const hra = Math.round(ctcMonthly * config.hraPercent / 100);
+  const conveyance = Math.round(ctcMonthly * (config.conveyanceMonthly || 0) / 100);
+  const performanceIncentive = Math.round(ctcMonthly * (config.performanceIncentiveMonthly || 0) / 100);
+  const otherAllowances = Math.round(ctcMonthly * (config.otherAllowancesMonthly || 0) / 100);
 
   // Employer contributions (part of CTC, not part of gross)
   const pfEmployer = Math.round(basic * config.pfEmployerPercent / 100);

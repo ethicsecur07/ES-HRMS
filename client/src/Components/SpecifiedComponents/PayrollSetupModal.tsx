@@ -40,19 +40,19 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
 
   // Form state
   const [formData, setFormData] = useState<PayrollConfig>({
-    basicSalaryPercent: 40,
-    hraPercent: 40,
-    conveyanceMonthly: 1600,
-    performanceIncentiveMonthly: 0,
-    otherAllowancesMonthly: 0,
-    pfEmployeePercent: 12,
-    professionalTaxMonthly: 200,
+    basicSalaryPercent: 55,
+    hraPercent: 20,
+    conveyanceMonthly: 5,
+    performanceIncentiveMonthly: 10,
+    otherAllowancesMonthly: 10,
+    pfEmployeePercent: 0,
+    professionalTaxMonthly: 0,
     incomeTaxTdsMonthly: 0,
-    pfEmployerPercent: 12,
-    gratuityPercent: 4.81,
-    esiEmployerPercent: 3.25,
+    pfEmployerPercent: 0,
+    gratuityPercent: 0,
+    esiEmployerPercent: 0,
     insuranceMonthly: 0,
-    applyEsiOnlyIfGrossBelow21000: true,
+    applyEsiOnlyIfGrossBelow21000: false,
   });
 
   // Fetch existing config (automatically refetches when selectedEmployeeId changes)
@@ -179,26 +179,39 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value) || 0;
-    setCurrentSalary(val);
+    setCurrentSalary(val / 12);
   };
 
   useEffect(() => {
     if (existingConfig) {
+      let conveyance = existingConfig.conveyanceMonthly;
+      let otherAllowances = existingConfig.otherAllowancesMonthly;
+      let performance = existingConfig.performanceIncentiveMonthly;
+
+      // Migrate legacy default/fixed values to percentages
+      if (conveyance === 1600 || conveyance > 100) {
+        conveyance = 5;
+        otherAllowances = 10;
+      }
+      if (performance > 100) {
+        performance = 10;
+      }
+
       setFormData({
         employeeId: existingConfig.employeeId || null,
         basicSalaryPercent: existingConfig.basicSalaryPercent,
         hraPercent: existingConfig.hraPercent,
-        conveyanceMonthly: existingConfig.conveyanceMonthly,
-        performanceIncentiveMonthly: existingConfig.performanceIncentiveMonthly,
-        otherAllowancesMonthly: existingConfig.otherAllowancesMonthly,
-        pfEmployeePercent: existingConfig.pfEmployeePercent,
-        professionalTaxMonthly: existingConfig.professionalTaxMonthly,
-        incomeTaxTdsMonthly: existingConfig.incomeTaxTdsMonthly,
-        pfEmployerPercent: existingConfig.pfEmployerPercent,
-        gratuityPercent: existingConfig.gratuityPercent,
-        esiEmployerPercent: existingConfig.esiEmployerPercent,
-        insuranceMonthly: existingConfig.insuranceMonthly,
-        applyEsiOnlyIfGrossBelow21000: existingConfig.applyEsiOnlyIfGrossBelow21000,
+        conveyanceMonthly: conveyance,
+        performanceIncentiveMonthly: performance,
+        otherAllowancesMonthly: otherAllowances,
+        pfEmployeePercent: 0,
+        professionalTaxMonthly: 0,
+        incomeTaxTdsMonthly: 0,
+        pfEmployerPercent: 0,
+        gratuityPercent: 0,
+        esiEmployerPercent: 0,
+        insuranceMonthly: 0,
+        applyEsiOnlyIfGrossBelow21000: false,
       });
     }
   }, [existingConfig]);
@@ -223,7 +236,7 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
   const handleNumberChange = (field: keyof PayrollConfig) => (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = parseFloat(e.target.value) || 0;
     // Constrain percentage fields to maximum 100
-    if (field.endsWith('Percent') && val > 100) {
+    if ((field.endsWith('Percent') || field === 'conveyanceMonthly' || field === 'otherAllowancesMonthly' || field === 'performanceIncentiveMonthly') && val > 100) {
       val = 100;
     }
     handleChange(field, val);
@@ -233,10 +246,10 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
   const preview = useMemo(() => {
     const ctcMonthly = currentSalary;
     const basic = Math.round(ctcMonthly * formData.basicSalaryPercent / 100);
-    const hra = Math.round(basic * formData.hraPercent / 100);
-    const conveyance = formData.conveyanceMonthly;
-    const performance = formData.performanceIncentiveMonthly;
-    const otherAllowances = formData.otherAllowancesMonthly;
+    const hra = Math.round(ctcMonthly * formData.hraPercent / 100);
+    const conveyance = Math.round(ctcMonthly * formData.conveyanceMonthly / 100);
+    const performance = Math.round(ctcMonthly * formData.performanceIncentiveMonthly / 100);
+    const otherAllowances = Math.round(ctcMonthly * formData.otherAllowancesMonthly / 100);
 
     // Employer contributions
     const pfEmployer = Math.round(basic * formData.pfEmployerPercent / 100);
@@ -429,18 +442,18 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
                 {/* CTC / Salary Input */}
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
                   <label className="block text-xs font-bold text-primary uppercase tracking-wider text-left">
-                    Monthly Salary / CTC (INR) *
+                    Yearly Salary / CTC (INR) *
                   </label>
                   <input
                     type="number"
-                    value={currentSalary || ''}
+                    value={currentSalary ? Math.round(currentSalary * 12) : ''}
                     onChange={handleSalaryChange}
                     className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-bold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-primary transition-colors text-left"
-                    placeholder="Enter Monthly CTC / Salary"
+                    placeholder="Enter Yearly CTC / Salary"
                     min={0}
                   />
                   <p className="text-[10px] text-muted-foreground mt-0.5 text-left">
-                    Updating this value will save the new monthly salary for this employee upon save.
+                    Updating this value will calculate the new monthly salary for this employee upon save.
                   </p>
                 </div>
 
@@ -500,10 +513,9 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
                       />
                       <span className="text-sm text-muted-foreground font-medium">%</span>
                     </div>
-                    <p className="text-[10px] text-primary mt-0.5">Allowed: 35-50</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">HRA (% of Basic)</label>
+                    <label className="block text-xs font-medium text-primary mb-1 text-left">HRA (% of CTC)</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -514,165 +526,52 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
                       />
                       <span className="text-sm text-muted-foreground font-medium">%</span>
                     </div>
-                    <p className="text-[10px] text-primary mt-0.5">Allowed: 40-50</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">Conveyance (Monthly)</label>
-                    <input
-                      type="number"
-                      value={formData.conveyanceMonthly}
-                      onChange={handleNumberChange('conveyanceMonthly')}
-                      className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                      min={0} step={100}
-                    />
+                    <label className="block text-xs font-medium text-primary mb-1 text-left">Internet Allowance (% of CTC)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={formData.conveyanceMonthly}
+                        onChange={handleNumberChange('conveyanceMonthly')}
+                        className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                        min={0} max={100} step={1}
+                      />
+                      <span className="text-sm text-muted-foreground font-medium">%</span>
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">Performance Incentive (Monthly)</label>
-                    <input
-                      type="number"
-                      value={formData.performanceIncentiveMonthly}
-                      onChange={handleNumberChange('performanceIncentiveMonthly')}
-                      className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                      min={0} step={100}
-                    />
+                    <label className="block text-xs font-medium text-primary mb-1 text-left">Performance Incentive (% of CTC)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={formData.performanceIncentiveMonthly}
+                        onChange={handleNumberChange('performanceIncentiveMonthly')}
+                        className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                        min={0} max={100} step={1}
+                      />
+                      <span className="text-sm text-muted-foreground font-medium">%</span>
+                    </div>
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">Other Allowances (Monthly)</label>
-                    <input
-                      type="number"
-                      value={formData.otherAllowancesMonthly}
-                      onChange={handleNumberChange('otherAllowancesMonthly')}
-                      className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                      min={0} step={100}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Employer Contributions */}
-              <div className="rounded-xl border border-border p-5 space-y-4 bg-card">
-                <h4 className="text-sm font-bold text-foreground tracking-tight border-b border-border pb-2">
-                  Employer Contributions
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">PF Employer (% of Basic)</label>
+                    <label className="block text-xs font-medium text-primary mb-1 text-left">City Allowance (% of CTC)</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        value={formData.pfEmployerPercent}
-                        onChange={handleNumberChange('pfEmployerPercent')}
+                        value={formData.otherAllowancesMonthly}
+                        onChange={handleNumberChange('otherAllowancesMonthly')}
                         className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                        min={0} max={100} step={0.01}
+                        min={0} max={100} step={1}
                       />
                       <span className="text-sm text-muted-foreground font-medium">%</span>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">Gratuity (% of Basic)</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={formData.gratuityPercent}
-                        onChange={handleNumberChange('gratuityPercent')}
-                        className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                        min={0} max={100} step={0.01}
-                      />
-                      <span className="text-sm text-muted-foreground font-medium">%</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">ESI Employer (% of Gross)</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={formData.esiEmployerPercent}
-                        onChange={handleNumberChange('esiEmployerPercent')}
-                        className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                        min={0} max={100} step={0.01}
-                      />
-                      <span className="text-sm text-muted-foreground font-medium">%</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">Insurance (Monthly)</label>
-                    <input
-                      type="number"
-                      value={formData.insuranceMonthly}
-                      onChange={handleNumberChange('insuranceMonthly')}
-                      className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                      min={0} step={100}
-                    />
-                  </div>
-                </div>
-
-                {/* ESI Toggle */}
-                <div className="flex items-center gap-3 pt-2 border-t border-border">
-                  <button
-                    type="button"
-                    onClick={() => handleChange('applyEsiOnlyIfGrossBelow21000', !formData.applyEsiOnlyIfGrossBelow21000)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      formData.applyEsiOnlyIfGrossBelow21000 ? 'bg-primary' : 'bg-muted-foreground/30'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
-                        formData.applyEsiOnlyIfGrossBelow21000 ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                  <span className="text-xs font-medium text-foreground flex items-center gap-1">
-                    Apply ESI only if Gross &lt; 21,000
-                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                  </span>
                 </div>
               </div>
             </div>
 
-            {/* RIGHT COLUMN — Deductions + Preview */}
+            {/* RIGHT COLUMN — Preview */}
             <div className="space-y-6">
-              {/* Deductions */}
-              <div className="rounded-xl border border-border p-5 space-y-4 bg-card">
-                <h4 className="text-sm font-bold text-foreground tracking-tight border-b border-border pb-2">
-                  Deductions
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">PF Employee (% of Basic)</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={formData.pfEmployeePercent}
-                        onChange={handleNumberChange('pfEmployeePercent')}
-                        className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                        min={0} max={100} step={0.01}
-                      />
-                      <span className="text-sm text-muted-foreground font-medium">%</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">Professional Tax (Monthly)</label>
-                    <input
-                      type="number"
-                      value={formData.professionalTaxMonthly}
-                      onChange={handleNumberChange('professionalTaxMonthly')}
-                      className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                      min={0} step={50}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-primary mb-1 text-left">Income Tax (TDS) (Monthly)</label>
-                    <input
-                      type="number"
-                      value={formData.incomeTaxTdsMonthly}
-                      onChange={handleNumberChange('incomeTaxTdsMonthly')}
-                      className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-                      min={0} step={100}
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Preview */}
               <div className="rounded-xl border border-primary/30 p-5 space-y-4 bg-primary/5">
                 <div>
@@ -686,95 +585,100 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
                   )}
                 </div>
 
-                {/* Preview Grid */}
-                <div className="space-y-2 text-xs">
-                  {/* Earnings */}
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">CTC / Month</span>
-                      <span className="font-semibold">{formatCurrency(preview.ctcMonthly)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Gross / Month</span>
-                      <span className="font-semibold">{formatCurrency(preview.grossPay)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Basic</span>
-                      <span className="font-semibold">{formatCurrency(preview.basic)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">HRA</span>
-                      <span className="font-semibold">{formatCurrency(preview.hra)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Conveyance</span>
-                      <span className="font-semibold">{formatCurrency(preview.conveyance)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Performance</span>
-                      <span className="font-semibold">{formatCurrency(preview.performance)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Other Allowance</span>
-                      <span className="font-semibold">{formatCurrency(preview.otherAllowances)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Special Allowance</span>
-                      <span className="font-semibold">{formatCurrency(preview.specialAllowance)}</span>
-                    </div>
-                  </div>
-
-                  {/* Divider */}
-                  <div className="border-t border-border my-2" />
-
-                  {/* Deductions */}
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">PF (Employee)</span>
-                      <span className="font-semibold text-destructive">-{formatCurrency(preview.pfEmployee)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Professional Tax</span>
-                      <span className="font-semibold text-destructive">-{formatCurrency(preview.professionalTax)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">TDS</span>
-                      <span className="font-semibold text-destructive">-{formatCurrency(preview.tds)}</span>
-                    </div>
-                    {preview.lopDeduction > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-destructive font-medium">Loss of Pay (LOP)</span>
-                        <span className="font-semibold text-destructive font-mono">-{formatCurrency(preview.lopDeduction)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-primary font-bold font-sans">Net Pay</span>
-                      <span className="font-bold text-primary font-mono">{formatCurrency(preview.netPay)}</span>
-                    </div>
-                  </div>
-
-                  {/* Divider */}
-                  <div className="border-t border-border my-2" />
-
-                  {/* Employer Contributions */}
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">PF (Employer)</span>
-                      <span className="font-semibold text-orange-500">{formatCurrency(preview.pfEmployer)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Gratuity</span>
-                      <span className="font-semibold text-orange-500">{formatCurrency(preview.gratuity)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">ESI (Employer)</span>
-                      <span className="font-semibold text-orange-500">{formatCurrency(preview.esiEmployer)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">Insurance</span>
-                      <span className="font-semibold text-orange-500">{formatCurrency(preview.insurance)}</span>
-                    </div>
-                  </div>
+                {/* Preview Table */}
+                <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                  <table className="w-full text-sm text-left text-muted-foreground border-collapse">
+                    <thead className="text-xs uppercase bg-muted/40 text-foreground border-b border-border font-bold">
+                      <tr>
+                        <th className="px-4 py-3 text-left">Description</th>
+                        <th className="px-4 py-3 text-right">Yearly</th>
+                        <th className="px-4 py-3 text-right">Monthly</th>
+                        <th className="px-4 py-3 text-right">%</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60 text-foreground">
+                      {/* Basic */}
+                      <tr className="hover:bg-muted/10 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-left">Basic</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.basic * 12)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.basic)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-primary">
+                          {preview.ctcMonthly > 0 ? `${Math.round((preview.basic / preview.ctcMonthly) * 100)}%` : '0%'}
+                        </td>
+                      </tr>
+                      {/* HRA */}
+                      <tr className="hover:bg-muted/10 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-left">House Rent Allowance</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.hra * 12)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.hra)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-primary">
+                          {preview.ctcMonthly > 0 ? `${Math.round((preview.hra / preview.ctcMonthly) * 100)}%` : '0%'}
+                        </td>
+                      </tr>
+                      {/* Conveyance / Internet Allowance */}
+                      {preview.conveyance > 0 && (
+                        <tr className="hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-left">Internet Allowance</td>
+                          <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.conveyance * 12)}</td>
+                          <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.conveyance)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-primary">
+                            {preview.ctcMonthly > 0 ? `${Math.round((preview.conveyance / preview.ctcMonthly) * 100)}%` : '0%'}
+                          </td>
+                        </tr>
+                      )}
+                      {/* Performance Incentive */}
+                      {preview.performance > 0 && (
+                        <tr className="hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-left">Performance Incentive</td>
+                          <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.performance * 12)}</td>
+                          <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.performance)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-primary">
+                            {preview.ctcMonthly > 0 ? `${Math.round((preview.performance / preview.ctcMonthly) * 100)}%` : '0%'}
+                          </td>
+                        </tr>
+                      )}
+                      {/* Other Allowances / City Allowance */}
+                      {preview.otherAllowances > 0 && (
+                        <tr className="hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-left">City Allowance</td>
+                          <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.otherAllowances * 12)}</td>
+                          <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.otherAllowances)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-primary">
+                            {preview.otherAllowances > 0 && preview.ctcMonthly > 0 ? `${Math.round((preview.otherAllowances / preview.ctcMonthly) * 100)}%` : '0%'}
+                          </td>
+                        </tr>
+                      )}
+                      {/* Special Allowance */}
+                      {preview.specialAllowance > 0 && (
+                        <tr className="hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-left">Special Allowance</td>
+                          <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.specialAllowance * 12)}</td>
+                          <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.specialAllowance)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-primary">
+                            {preview.ctcMonthly > 0 ? `${Math.round((preview.specialAllowance / preview.ctcMonthly) * 100)}%` : '0%'}
+                          </td>
+                        </tr>
+                      )}
+                      {/* LOP Deduction */}
+                      {preview.lopDeduction > 0 && (
+                        <tr className="hover:bg-muted/10 transition-colors text-destructive">
+                          <td className="px-4 py-3 font-semibold text-left">Loss of Pay (LOP) Deduction</td>
+                          <td className="px-4 py-3 text-right font-mono">-{formatCurrency(preview.lopDeduction * 12)}</td>
+                          <td className="px-4 py-3 text-right font-mono">-{formatCurrency(preview.lopDeduction)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-destructive">
+                            {preview.ctcMonthly > 0 ? `-${Math.round((preview.lopDeduction / preview.ctcMonthly) * 100)}%` : '0%'}
+                          </td>
+                        </tr>
+                      )}
+                      {/* Net Pay */}
+                      <tr className="bg-primary/10 text-primary font-black border-t border-border">
+                        <td className="px-4 py-3 text-left">Net Pay</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.netPay * 12)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(preview.netPay)}</td>
+                        <td className="px-4 py-3 text-right font-semibold"></td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
