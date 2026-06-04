@@ -366,7 +366,7 @@ export class EmployeeService {
 
     // Pagination
     const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 100;
+    const limitNum = parseInt(limit as string) || 1000;
     const skipNum = (pageNum - 1) * limitNum;
 
     // Sorting

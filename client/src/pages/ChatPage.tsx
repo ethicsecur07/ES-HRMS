@@ -114,7 +114,7 @@ export const ChatPage: React.FC = () => {
   // ── Data queries ─────────────────────────────────────────────────────────────
   const { data: employeesData, isLoading: empLoading } = useQuery({
     queryKey: ['employees'],
-    queryFn: () => employeeApi.getAll(),
+    queryFn: () => employeeApi.getAll({ limit: 1000 }),
   });
   const employees = employeesData?.employees || [];
 

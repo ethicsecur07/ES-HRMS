@@ -28,6 +28,40 @@ export const ProjectsPage = () => {
   const [allocatedManagerId, setAllocatedManagerId] = useState('');
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
   const [status, setStatus] = useState('PLANNING');
+  const [projectCategory, setProjectCategory] = useState<'GENERAL' | 'AMC'>('GENERAL');
+  const [amcDuration, setAmcDuration] = useState<string>('');
+
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+  };
+
+  const handleEndDateChange = (val: string) => {
+    setEndDate(val);
+    if (projectCategory === 'AMC' && val) {
+      const end = new Date(val);
+      if (!isNaN(end.getTime())) {
+        const amc = new Date(end);
+        amc.setFullYear(end.getFullYear() + 1);
+        setAmcDuration(amc.toISOString().split('T')[0]);
+      }
+    }
+  };
+
+  const handleCategoryChange = (cat: 'GENERAL' | 'AMC') => {
+    setProjectCategory(cat);
+    if (cat === 'AMC') {
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          const amc = new Date(end);
+          amc.setFullYear(end.getFullYear() + 1);
+          setAmcDuration(amc.toISOString().split('T')[0]);
+        }
+      } else {
+        setAmcDuration('');
+      }
+    }
+  };
 
   // Budget currency state
   // USD_TO_INR: fixed reference rate (update periodically for accuracy)
@@ -80,7 +114,7 @@ export const ProjectsPage = () => {
       try {
         const [projData, empData] = await Promise.all([
           projectApi.getProjects(),
-          employeeApi.getAll()
+          employeeApi.getAll({ limit: 1000 })
         ]);
         setProjects(projData.projects || []);
         setEmployees(empData.employees || []);
@@ -111,7 +145,9 @@ export const ProjectsPage = () => {
         budget,
         allocatedManagerId,
         teamMemberIds,
-        status
+        status,
+        projectCategory,
+        amcDuration: projectCategory === 'AMC' ? amcDuration : undefined,
       });
       
       // Reset form
@@ -126,6 +162,8 @@ export const ProjectsPage = () => {
       setAllocatedManagerId('');
       setTeamMemberIds([]);
       setStatus('PLANNING');
+      setProjectCategory('GENERAL');
+      setAmcDuration('');
       
       setIsOpen(false);
       fetchProjects();
@@ -241,18 +279,42 @@ export const ProjectsPage = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            <Select 
+              label="Project Category *"
+              value={projectCategory}
+              onChange={(e) => handleCategoryChange(e.target.value as any)}
+              options={[
+                { value: 'GENERAL', label: 'General Project' },
+                { value: 'AMC', label: 'AMC Project' }
+              ]}
+              required
+            />
+            {projectCategory === 'AMC' ? (
+              <Input 
+                label="AMC Duration *"
+                type="date"
+                value={amcDuration}
+                onChange={(e) => setAmcDuration(e.target.value)}
+                required
+              />
+            ) : (
+              <div />
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <Input 
               label="Start Date *"
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => handleStartDateChange(e.target.value)}
               required
             />
             <Input 
               label="End Date *"
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => handleEndDateChange(e.target.value)}
               required
             />
           </div>
@@ -312,63 +374,6 @@ export const ProjectsPage = () => {
                 />
               </div>
             </div>
-
-            {/* Live analysis panel — shown only when a value is entered */}
-            {inputVal > 0 && (
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2 mt-1">
-                {/* Header */}
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary/70">
-                  <TrendingUp className="w-3 h-3" />
-                  Budget Analysis
-                  <span className="ml-auto text-muted-foreground font-normal normal-case tracking-normal">Rate: 1 USD = {USD_TO_INR} INR</span>
-                </div>
-
-                {/* Conversion row */}
-                <div className="flex items-center justify-between gap-3">
-                  {/* USD column */}
-                  <div className="flex-1 bg-background rounded-lg border border-border p-2.5 text-center">
-                    <div className="flex items-center justify-center gap-1 text-muted-foreground text-[10px] font-semibold uppercase mb-1">
-                      <DollarSign className="w-3 h-3" />
-                      USD
-                    </div>
-                    <div className="text-base font-bold text-foreground">
-                      ${budgetUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                  </div>
-
-                  {/* Arrow */}
-                  <div className="text-muted-foreground">
-                    <ArrowLeftRight className="w-4 h-4" />
-                  </div>
-
-                  {/* INR column */}
-                  <div className="flex-1 bg-background rounded-lg border border-border p-2.5 text-center">
-                    <div className="flex items-center justify-center gap-1 text-muted-foreground text-[10px] font-semibold uppercase mb-1">
-                      <IndianRupee className="w-3 h-3" />
-                      INR
-                    </div>
-                    <div className="text-base font-bold text-foreground">
-                      ₹{budgetINR.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Breakdown chips */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-background border border-border text-[10px] text-muted-foreground">
-                    <DollarSign className="w-2.5 h-2.5" />
-                    Monthly: ${(budgetUSD / 12).toLocaleString('en-US', { maximumFractionDigits: 0 })} / mo
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-background border border-border text-[10px] text-muted-foreground">
-                    <IndianRupee className="w-2.5 h-2.5" />
-                    Monthly: ₹{(budgetINR / 12).toLocaleString('en-IN', { maximumFractionDigits: 0 })} / mo
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px]">
-                    ⚠ Reference rate only
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
 
           <Select

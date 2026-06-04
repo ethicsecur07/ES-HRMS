@@ -62,6 +62,15 @@ const projectSchema = new mongoose_1.Schema({
         type: String,
         default: 'General',
     },
+    projectCategory: {
+        type: String,
+        enum: ['GENERAL', 'AMC'],
+        default: 'GENERAL',
+    },
+    amcDuration: {
+        type: String,
+        default: '',
+    },
     priority: {
         type: String,
         enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],

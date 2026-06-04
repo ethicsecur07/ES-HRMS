@@ -55,7 +55,20 @@ const getProjects = async (req, res, next) => {
         const role = req.user?.role;
         const employeeId = req.user?.employeeId;
         let query = { organizationId };
-        if (role === 'EMPLOYEE' && employeeId) {
+        const { RoleMember } = await import('../../models/RoleMember.js');
+        const roleCodes = role ? [role] : [];
+        const customMembers = await RoleMember.find({
+            organizationId,
+            userId: req.user?.id
+        }).populate('roleId');
+        for (const cm of customMembers) {
+            const roleObj = cm.roleId;
+            if (roleObj && roleObj.code) {
+                roleCodes.push(roleObj.code);
+            }
+        }
+        const hasManagementRole = roleCodes.some(code => ['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD'].includes(code));
+        if (!hasManagementRole && employeeId) {
             const employee = await Employee_js_1.Employee.findById(employeeId);
             if (employee) {
                 // Detect if the employee is an Intern

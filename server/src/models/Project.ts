@@ -18,6 +18,8 @@ export interface IProject extends Document {
     status: 'PENDING' | 'COMPLETED';
   }[];
   projectType: string;
+  projectCategory?: 'GENERAL' | 'AMC';
+  amcDuration?: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   teamLeadId?: mongoose.Types.ObjectId;
   tags?: string[];
@@ -52,6 +54,15 @@ const projectSchema = new Schema<IProject>(
     projectType: {
       type: String,
       default: 'General',
+    },
+    projectCategory: {
+      type: String,
+      enum: ['GENERAL', 'AMC'],
+      default: 'GENERAL',
+    },
+    amcDuration: {
+      type: String,
+      default: '',
     },
     priority: {
       type: String,

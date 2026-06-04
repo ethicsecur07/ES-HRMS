@@ -135,7 +135,7 @@ export const ScheduleMeetingModal: React.FC<ScheduleMeetingModalProps> = ({
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['employees-for-meeting'],
     queryFn: async () => {
-      const res = await employeeApi.getAll();
+      const res = await employeeApi.getAll({ limit: 1000 });
       return res?.employees || [];
     },
     enabled: isOpen,

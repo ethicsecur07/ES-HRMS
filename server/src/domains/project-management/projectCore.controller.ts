@@ -68,7 +68,23 @@ export const getProjects = async (req: RBACRequest, res: Response, next: NextFun
 
     let query: any = { organizationId };
 
-    if (role === 'EMPLOYEE' && employeeId) {
+    const { RoleMember } = await import('../../models/RoleMember.js');
+    const roleCodes = role ? [role] : [];
+    const customMembers = await RoleMember.find({
+      organizationId,
+      userId: req.user?.id
+    }).populate('roleId');
+
+    for (const cm of customMembers) {
+      const roleObj = cm.roleId as any;
+      if (roleObj && roleObj.code) {
+        roleCodes.push(roleObj.code);
+      }
+    }
+
+    const hasManagementRole = roleCodes.some(code => ['ADMIN', 'MANAGER', 'HR', 'TEAM_LEAD'].includes(code));
+
+    if (!hasManagementRole && employeeId) {
       const employee = await Employee.findById(employeeId);
       if (employee) {
         // Detect if the employee is an Intern

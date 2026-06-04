@@ -53,7 +53,7 @@ export const ProjectDetailsPage = () => {
   const { user } = useAuthStore();
   const userRole = (user as any)?.role || '';
   const isAdmin = userRole === 'ADMIN';
-  const canEditProject = ['HR', 'MANAGER'].includes(userRole);
+  const canEditProject = hasPermission('PROJECTS', 'edit');
 
   const [project, setProject] = useState<any>(null);
   const [sprints, setSprints] = useState<any[]>([]);
@@ -85,6 +85,40 @@ export const ProjectDetailsPage = () => {
   const [projectStatus, setProjectStatus] = useState('PLANNING');
   const [projectType, setProjectType] = useState('General');
   const [projectPriority, setProjectPriority] = useState('MEDIUM');
+  const [projectCategory, setProjectCategory] = useState<'GENERAL' | 'AMC'>('GENERAL');
+  const [amcDuration, setAmcDuration] = useState<string>('');
+
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+  };
+
+  const handleEndDateChange = (val: string) => {
+    setEndDate(val);
+    if (projectCategory === 'AMC' && val) {
+      const end = new Date(val);
+      if (!isNaN(end.getTime())) {
+        const amc = new Date(end);
+        amc.setFullYear(end.getFullYear() + 1);
+        setAmcDuration(amc.toISOString().split('T')[0]);
+      }
+    }
+  };
+
+  const handleCategoryChange = (cat: 'GENERAL' | 'AMC') => {
+    setProjectCategory(cat);
+    if (cat === 'AMC') {
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          const amc = new Date(end);
+          amc.setFullYear(end.getFullYear() + 1);
+          setAmcDuration(amc.toISOString().split('T')[0]);
+        }
+      } else {
+        setAmcDuration('');
+      }
+    }
+  };
 
   // Sprint forms
   const [sprintName, setSprintName] = useState('');
@@ -123,6 +157,8 @@ export const ProjectDetailsPage = () => {
       setProjectStatus(data.project.status);
       setProjectType(data.project.projectType || 'General');
       setProjectPriority(data.project.priority || 'MEDIUM');
+      setProjectCategory(data.project.projectCategory || 'GENERAL');
+      setAmcDuration(data.project.amcDuration || 0);
     } catch (e) {
       console.error('Failed to fetch project details', e);
     }
@@ -175,7 +211,7 @@ export const ProjectDetailsPage = () => {
 
     const loadEmployees = async () => {
       try {
-        const data = await employeeApi.getAll();
+        const data = await employeeApi.getAll({ limit: 1000 });
         setEmployees(data.employees || []);
       } catch (error) {
         console.error('Failed to fetch employees', error);
@@ -208,6 +244,8 @@ export const ProjectDetailsPage = () => {
         status: projectStatus,
         projectType,
         priority: projectPriority,
+        projectCategory,
+        amcDuration: projectCategory === 'AMC' ? amcDuration : undefined,
       });
       setIsEditProjectOpen(false);
       fetchProjectDetails();
@@ -475,7 +513,7 @@ export const ProjectDetailsPage = () => {
                   <Edit className="w-4 h-4" /> Edit Project
                 </button>
               )}
-              {canEditProject && (
+              {hasPermission('PROJECTS', 'delete') && (
                 <button
                   onClick={handleDeleteProject}
                   className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 dark:bg-red-500/20 hover:bg-red-500/20 dark:hover:bg-red-500/30 text-red-600 dark:text-red-400 rounded-xl border border-red-500/20 dark:border-red-500/30 transition-colors text-sm font-semibold"
@@ -571,6 +609,20 @@ export const ProjectDetailsPage = () => {
                           {new Date(project.startDate).toLocaleDateString()} — {new Date(project.endDate).toLocaleDateString()}
                         </span>
                       </div>
+                      <div className="bg-muted/50 border border-border rounded-xl p-4 flex flex-col">
+                        <span className="text-xs font-semibold text-muted-foreground/80">PROJECT CATEGORY</span>
+                        <span className="text-sm font-bold text-foreground mt-1">
+                          {project.projectCategory === 'AMC' ? 'AMC Project' : 'General Project'}
+                        </span>
+                      </div>
+                      {project.projectCategory === 'AMC' && (
+                        <div className="bg-muted/50 border border-border rounded-xl p-4 flex flex-col">
+                          <span className="text-xs font-semibold text-muted-foreground/80">AMC DURATION</span>
+                          <span className="text-sm font-bold text-primary mt-1">
+                            {project.amcDuration ? new Date(project.amcDuration).toLocaleDateString() : 'N/A'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -652,7 +704,7 @@ export const ProjectDetailsPage = () => {
                     <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                       <Clock className="w-5 h-5 text-muted-foreground" /> Sprints
                     </h2>
-                    {hasPermission('PROJECTS', 'edit') && !isAdmin && ['HR', 'MANAGER', 'TEAM_LEAD'].includes(userRole) && (
+                    {hasPermission('PROJECTS', 'edit') && (
                       <button
                         onClick={() => setIsCreateSprintOpen(true)}
                         className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl border border-primary/30 transition-all"
@@ -683,7 +735,7 @@ export const ProjectDetailsPage = () => {
                               {new Date(s.startDate).toLocaleDateString()} — {new Date(s.endDate).toLocaleDateString()}
                             </p>
                           </div>
-                          {hasPermission('PROJECTS', 'edit') && !isAdmin && (
+                          {hasPermission('PROJECTS', 'edit') && (
                             <button
                               onClick={() => {
                                 setSelectedSprintId(s._id);
@@ -706,7 +758,7 @@ export const ProjectDetailsPage = () => {
                     <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                       <Trophy className="w-5 h-5 text-muted-foreground" /> Milestones Checklist
                     </h2>
-                    {hasPermission('PROJECTS', 'edit') && !isAdmin && (
+                    {hasPermission('PROJECTS', 'edit') && (
                       <button
                         onClick={() => setIsCreateMilestoneOpen(true)}
                         className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl border border-primary/30 transition-all"
@@ -742,7 +794,7 @@ export const ProjectDetailsPage = () => {
                               </p>
                             </div>
                           </div>
-                          {!isAdmin && hasPermission('PROJECTS', 'edit') && (
+                          {hasPermission('PROJECTS', 'edit') && (
                             <button
                               onClick={() => handleDeleteMilestone(idx)}
                               className="p-1.5 bg-red-500/10 dark:bg-red-500/20 hover:bg-red-500/20 border border-red-500/20 text-red-600 dark:text-red-400 rounded-lg transition-colors"
@@ -778,7 +830,7 @@ export const ProjectDetailsPage = () => {
                       ))}
                     </select>
 
-                    {selectedSprintId !== 'backlog' && hasPermission('PROJECTS', 'edit') && !isAdmin && (
+                    {selectedSprintId !== 'backlog' && hasPermission('PROJECTS', 'edit') && (
                       <button
                         onClick={openEditSprintModal}
                         className="p-2 bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border rounded-xl transition-colors"
@@ -788,7 +840,7 @@ export const ProjectDetailsPage = () => {
                       </button>
                     )}
 
-                    {hasPermission('PROJECTS', 'edit') && !isAdmin && ['HR', 'MANAGER', 'TEAM_LEAD'].includes(userRole) && (
+                    {hasPermission('PROJECTS', 'edit') && (
                       <button
                         onClick={() => setIsCreateSprintOpen(true)}
                         className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-2 rounded-xl border border-primary/30 transition-all"
@@ -1144,8 +1196,29 @@ export const ProjectDetailsPage = () => {
                 { value: 'CRITICAL', label: 'Critical' },
               ]}
             />
-            <Input label="Start Date *" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
-            <Input label="End Date *" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
+            <Select 
+              label="Project Category *"
+              value={projectCategory}
+              onChange={(e) => handleCategoryChange(e.target.value as any)}
+              options={[
+                { value: 'GENERAL', label: 'General Project' },
+                { value: 'AMC', label: 'AMC Project' }
+              ]}
+              required
+            />
+            {projectCategory === 'AMC' ? (
+              <Input 
+                label="AMC Duration *"
+                type="date"
+                value={amcDuration}
+                onChange={(e) => setAmcDuration(e.target.value)}
+                required
+              />
+            ) : (
+              <div />
+            )}
+            <Input label="Start Date *" type="date" value={startDate} onChange={e => handleStartDateChange(e.target.value)} required />
+            <Input label="End Date *" type="date" value={endDate} onChange={e => handleEndDateChange(e.target.value)} required />
             <Input label="Budget *" type="number" value={budget} onChange={e => setBudget(Number(e.target.value))} required />
             <Select label="Allocated Manager *" value={allocatedManagerId} onChange={e => setAllocatedManagerId(e.target.value)} required>
               <option value="">Select Manager</option>

@@ -110,12 +110,6 @@ export const DocumentPage: React.FC = () => {
     });
   }, [allPayrolls, selectedEmpId]);
 
-  // 4. Fetch Assigned Assets (for ASSET tab)
-  const { data: employeeAssets = [], isLoading: isAssetsLoading } = useQuery({
-    queryKey: ['employee-assets-docs', selectedEmpId],
-    queryFn: () => assetApi.getEmployeeAssets(selectedEmpId),
-    enabled: !!selectedEmpId && activeTab === 'ASSET',
-  });
 
   // Upload Mutation
   const uploadDocMutation = useMutation({
@@ -197,7 +191,6 @@ export const DocumentPage: React.FC = () => {
     { value: 'CERTIFICATE', label: 'Certificates' },
     { value: 'TAX_DOCUMENT', label: 'Tax Documents' },
     { value: 'PAYSLIP', label: 'Payslips' },
-    { value: 'ASSET', label: 'Assigned Assets' },
     { value: 'OTHER', label: 'Other Uploads' },
   ];
 
@@ -528,63 +521,7 @@ export const DocumentPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Assigned Assets Tab Panel */}
-                {activeTab === 'ASSET' && (
-                  <div className="space-y-4 animate-in fade-in duration-200">
-                    {isAssetsLoading ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {[1, 2, 3].map(n => (
-                          <div key={n} className="p-4 border border-border bg-card rounded-xl space-y-3">
-                            <div className="flex justify-between items-start gap-2">
-                              <Skeleton className="h-5 w-24" />
-                              <Skeleton className="h-4 w-12 rounded" />
-                            </div>
-                            <Skeleton className="h-3 w-16" />
-                            <div className="pt-2.5 border-t border-border/40 flex justify-between items-center">
-                              <Skeleton className="h-3.5 w-20" />
-                              <Skeleton className="h-4 w-10 rounded-full" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : employeeAssets.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl bg-muted/10">
-                        <Cpu className="w-10 h-10 text-muted-foreground/45 mb-2.5" />
-                        <p className="font-bold text-xs">No Assets Assigned</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">Assign hardware/software assets under the assets tab.</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {employeeAssets.map(asset => (
-                          <Card key={asset._id} className="p-4 border border-border/80 bg-card/65 flex flex-col justify-between space-y-3">
-                            <div>
-                              <div className="flex justify-between items-start gap-2">
-                                <h4 className="font-bold text-sm text-foreground truncate" title={asset.name}>
-                                  {asset.name}
-                                </h4>
-                                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-muted border border-border text-muted-foreground">
-                                  {asset.type}
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-muted-foreground font-mono mt-1">S/N: {asset.serialNumber}</p>
-                              {asset.notes && (
-                                <p className="text-[10px] text-muted-foreground/80 italic mt-2 line-clamp-2">
-                                  Note: {asset.notes}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between pt-2.5 border-t border-border/40 text-[10px] text-muted-foreground font-semibold">
-                              <span>Allocated Status:</span>
-                              <span className="inline-flex px-2 py-0.5 rounded-full font-bold uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                {asset.status}
-                              </span>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+             
               </div>
             </>
           ) : (
