@@ -937,8 +937,8 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
         fullName: name,
         email: normalizedEmail,
         phone: '0000000000',
-        department: 'HR',
-        designation: 'HR Manager',
+        department: 'ADMIN',
+        designation: 'ADMIN',
         joiningDate: new Date(),
         salary: 0,
         address: 'Office Address',
@@ -1056,12 +1056,14 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
       });
 
       res.status(201).json({
-        success: true,
         message: 'Organization and administrator account successfully registered!',
-        organizationId: organization._id,
-        slug: normalizedSlug,
-        user: userObj,
-        token: accessToken,
+        data: {
+          success: true,
+          organizationId: organization._id,
+          slug: normalizedSlug,
+          user: userObj,
+          token: accessToken,
+        }
       });
     } catch (transactionError) {
       await session.abortTransaction();
