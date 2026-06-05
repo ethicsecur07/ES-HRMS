@@ -91,6 +91,11 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         return;
       }
 
+      if (user.role !== decoded.role) {
+        res.status(401).json({ message: 'User role updated. Session refresh required.' });
+        return;
+      }
+
       // Update session activity
       session.lastActivity = new Date();
       await session.save();

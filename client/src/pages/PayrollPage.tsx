@@ -106,8 +106,8 @@ export const PayrollPage: React.FC = () => {
   });
 
   const { data: employees, isLoading: empLoading } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => employeeApi.getAll().then(res => res.employees),
+    queryKey: ['employees', { limit: 1000 }],
+    queryFn: () => employeeApi.getAll({ limit: 1000 }).then(res => res.employees),
   });
 
   // Fetch org settings to read salaryCycleStartDay

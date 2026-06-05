@@ -112,11 +112,10 @@ export const ChatPage: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Data queries ─────────────────────────────────────────────────────────────
-  const { data: employeesData, isLoading: empLoading } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => employeeApi.getAll({ limit: 1000 }),
+  const { data: employees = [], isLoading: empLoading } = useQuery({
+    queryKey: ['employees', { limit: 1000 }],
+    queryFn: () => employeeApi.getAll({ limit: 1000 }).then(res => res.employees),
   });
-  const employees = employeesData?.employees || [];
 
   const { data: projectsData, isLoading: projLoading } = useQuery({
     queryKey: ['projects'],
@@ -141,7 +140,10 @@ export const ChatPage: React.FC = () => {
     mutationFn: () => chatApi.sendMessage(selectedUser!, message.trim()),
     onSuccess: (newMsg) => {
       setMessage('');
-      qc.setQueryData<typeof messages>(['chat', selectedUser], (old = []) => [...old, newMsg]);
+      qc.setQueryData<typeof messages>(['chat', selectedUser], (old = []) => {
+        const exists = old.some(m => m._id === newMsg._id);
+        return exists ? old : [...old, newMsg];
+      });
       useNotificationStore.setState((s) => ({
         lastMessageAt: { ...s.lastMessageAt, [selectedUser!]: newMsg.createdAt || new Date().toISOString() }
       }));
@@ -154,7 +156,10 @@ export const ChatPage: React.FC = () => {
     mutationFn: (file: File) => chatApi.sendFile(selectedUser!, file),
     onSuccess: (newMsg) => {
       setFilePreview(null);
-      qc.setQueryData<typeof messages>(['chat', selectedUser], (old = []) => [...old, newMsg]);
+      qc.setQueryData<typeof messages>(['chat', selectedUser], (old = []) => {
+        const exists = old.some(m => m._id === newMsg._id);
+        return exists ? old : [...old, newMsg];
+      });
       useNotificationStore.setState((s) => ({
         lastMessageAt: { ...s.lastMessageAt, [selectedUser!]: newMsg.createdAt || new Date().toISOString() }
       }));

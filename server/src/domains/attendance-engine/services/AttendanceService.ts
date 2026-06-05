@@ -375,7 +375,7 @@ export class AttendanceService {
       //   - 2nd+ late in the cycle → auto-create & approve a Casual Leave for today, then allow check-in with a warning
       if (isLate) {
         // Fetch org salary cycle start day (default 10 → cycle runs 10th to 9th)
-        const startDay = org?.settings?.salaryCycleStartDay ?? 10;
+        const startDay = org?.settings?.salaryCycleStartDay ?? 11;
 
         const { cycleStart, cycleEnd } = AttendanceService.getSalaryCycleDates(now, startDay, timezone);
 

@@ -103,6 +103,22 @@ axiosInstance.interceptors.response.use(
         }
 
         useAuthStore.getState().setToken(newToken);
+
+        try {
+          const base64Url = newToken.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const tokenPayload = JSON.parse(atob(base64));
+          const currentStore = useAuthStore.getState();
+          if (currentStore.user && tokenPayload.role) {
+            useAuthStore.setState({
+              role: tokenPayload.role,
+              user: { ...currentStore.user, role: tokenPayload.role }
+            });
+          }
+        } catch (e) {
+          console.error('Failed to parse token payload:', e);
+        }
+
         axiosInstance.defaults.headers.common.Authorization = `Bearer ${newToken}`;
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
 

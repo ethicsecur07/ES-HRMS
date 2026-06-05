@@ -109,7 +109,7 @@ export const AttendancePage: React.FC = () => {
   })();
 
   const { data: employees, isLoading: empLoading } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ['employees', { limit: 1000 }],
     queryFn: () => employeeApi.getAll({ limit: 1000 }).then(res => res.employees),
   });
 

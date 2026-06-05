@@ -75,14 +75,12 @@ interface PolicyFormProps {
 
 const PolicyForm: React.FC<PolicyFormProps> = ({ policy, onChange }) => {
   const set = (key: keyof LeavePolicy, value: any) => onChange({ ...policy, [key]: value });
-  const setNested = (parent: keyof LeavePolicy, key: string, value: any) =>
-    onChange({ ...policy, [parent]: { ...(policy[parent] as any), [key]: value } });
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="Monthly Allowance (days / hrs)"
+          label={policy.leaveType === 'Permission' ? "Monthly Allowance (hrs)" : "Monthly Allowance (days)"}
           type="number"
           min={0}
           step={0.5}
@@ -98,130 +96,6 @@ const PolicyForm: React.FC<PolicyFormProps> = ({ policy, onChange }) => {
             { value: 'EMPLOYEE', label: 'General Employees Only' },
           ]}
         />
-        <Input
-          label="Advance Notice (days)"
-          type="number"
-          min={0}
-          value={policy.advanceNoticeDays ?? 0}
-          onChange={(e) => set('advanceNoticeDays', parseInt(e.target.value))}
-        />
-        <Input
-          label="Max Consecutive Days (0 = unlimited)"
-          type="number"
-          min={0}
-          value={policy.maxConsecutiveDays ?? 0}
-          onChange={(e) => set('maxConsecutiveDays', parseInt(e.target.value))}
-        />
-        <Input
-          label="Late Penalty Count (marks → 0.5 day)"
-          type="number"
-          min={1}
-          value={policy.latePenaltyCount ?? 3}
-          onChange={(e) => set('latePenaltyCount', parseInt(e.target.value))}
-        />
-        <Input
-          label="Permission Limit (hrs/month)"
-          type="number"
-          min={0}
-          step={0.5}
-          value={policy.permissionConversionHours ?? 3}
-          onChange={(e) => set('permissionConversionHours', parseFloat(e.target.value))}
-        />
-        <Select
-          label="Applicable Gender"
-          value={policy.applicableGender ?? 'All'}
-          onChange={(e) => set('applicableGender', e.target.value)}
-          options={[
-            { value: 'All', label: 'All Genders' },
-            { value: 'Male', label: 'Male Only' },
-            { value: 'Female', label: 'Female Only' },
-          ]}
-        />
-      </div>
-
-      {/* Carry Forward */}
-      <div className="p-4 bg-muted/20 rounded-xl border border-border space-y-3">
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Carry Forward</p>
-        <div className="flex items-center gap-4">
-          <TogglePill value={policy.carryForward ?? false} onChange={(v) => set('carryForward', v)} label="Carry Forward" />
-          {policy.carryForward && (
-            <Input
-              label="Carry Forward Limit (days)"
-              type="number"
-              min={0}
-              value={policy.carryForwardLimit ?? 0}
-              onChange={(e) => set('carryForwardLimit', parseInt(e.target.value))}
-              className="w-48"
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Rule Toggles */}
-      <div className="p-4 bg-muted/20 rounded-xl border border-border space-y-3">
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Rules</p>
-        <div className="flex flex-wrap gap-3">
-          <TogglePill value={policy.sandwichLeaveRule ?? false} onChange={(v) => set('sandwichLeaveRule', v)} label="Sandwich Leave Rule" />
-          <TogglePill value={policy.holidayOverlapRule ?? true} onChange={(v) => set('holidayOverlapRule', v)} label="Holiday Overlap Excluded" />
-          <TogglePill value={policy.halfDayEnabled ?? true} onChange={(v) => set('halfDayEnabled', v)} label="Half-Day Enabled" />
-          <TogglePill value={policy.probationExempt ?? false} onChange={(v) => set('probationExempt', v)} label="Probation Exempt" />
-          <TogglePill value={policy.permissionAutoConvert ?? false} onChange={(v) => set('permissionAutoConvert', v)} label="Permission → Half-Day Auto-Convert" />
-        </div>
-      </div>
-
-      {/* Compensatory Off */}
-      <div className="p-4 bg-muted/20 rounded-xl border border-border space-y-3">
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Compensatory Off</p>
-        <div className="flex items-center gap-4">
-          <TogglePill
-            value={policy.compensatoryOffEligibility?.canEarn ?? false}
-            onChange={(v) => setNested('compensatoryOffEligibility', 'canEarn', v)}
-            label="Can Earn Comp Off"
-          />
-          {policy.compensatoryOffEligibility?.canEarn && (
-            <Input
-              label="Validity (days)"
-              type="number"
-              min={1}
-              value={policy.compensatoryOffEligibility?.validityDays ?? 60}
-              onChange={(e) => setNested('compensatoryOffEligibility', 'validityDays', parseInt(e.target.value))}
-              className="w-36"
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Encashment */}
-      <div className="p-4 bg-muted/20 rounded-xl border border-border space-y-3">
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Encashment</p>
-        <div className="flex flex-wrap items-center gap-4">
-          <TogglePill
-            value={policy.encashmentRule?.canEncash ?? false}
-            onChange={(v) => setNested('encashmentRule', 'canEncash', v)}
-            label="Can Encash"
-          />
-          {policy.encashmentRule?.canEncash && (
-            <>
-              <Input
-                label="Max Encashable Days"
-                type="number"
-                min={1}
-                value={policy.encashmentRule?.maxEncashableDays ?? 10}
-                onChange={(e) => setNested('encashmentRule', 'maxEncashableDays', parseInt(e.target.value))}
-                className="w-40"
-              />
-              <Input
-                label="Rate (%)"
-                type="number"
-                min={1}
-                max={100}
-                value={policy.encashmentRule?.encashmentRatePercentage ?? 100}
-                onChange={(e) => setNested('encashmentRule', 'encashmentRatePercentage', parseInt(e.target.value))}
-                className="w-32"
-              />
-            </>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -611,24 +485,7 @@ export const LeavePolicyPage: React.FC = () => {
 
                     </div>
 
-                    {/* Policy rules grid */}
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      {[
-                        { label: 'Carry Forward', value: policy.carryForward ? `✓ (max ${policy.carryForwardLimit ?? '∞'} days)` : '✗ No' },
-                        { label: 'Sandwich Rule', value: policy.sandwichLeaveRule ? '✓ Yes' : '✗ No' },
-                        { label: 'Half-Day', value: policy.halfDayEnabled ? '✓ Enabled' : '✗ Disabled' },
-                        { label: 'Perm Convert', value: policy.permissionAutoConvert ? '✓ Auto' : '✗ Manual' },
-                        { label: 'Late Penalty', value: `After ${policy.latePenaltyCount} marks → 0.5d` },
-                        { label: 'Advance Notice', value: policy.advanceNoticeDays > 0 ? `${policy.advanceNoticeDays} days` : 'None' },
-                        { label: 'Max Consecutive', value: policy.maxConsecutiveDays > 0 ? `${policy.maxConsecutiveDays} days` : 'Unlimited' },
-                        { label: 'Encashment', value: policy.encashmentRule?.canEncash ? `✓ ${policy.encashmentRule.maxEncashableDays}d` : '✗ No' },
-                      ].map((item) => (
-                        <div key={item.label} className="flex flex-col p-2 bg-muted/30 rounded-lg">
-                          <span className="text-muted-foreground font-semibold">{item.label}</span>
-                          <span className="text-foreground font-mono font-bold">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
+
 
                     {/* Status badge */}
                     <div className="flex justify-end">
