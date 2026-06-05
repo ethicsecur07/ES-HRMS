@@ -240,7 +240,7 @@ export class LeavePolicyEngine {
 
     // Fallback to org settings, then hardcoded default
     const org = await Organization.findById(organizationId);
-    const limitHours = policy?.permissionConversionHours ?? org?.settings?.monthlyPermissionHours ?? 3;
+    const limitHours = policy?.monthlyAllowance ?? policy?.permissionConversionHours ?? org?.settings?.monthlyPermissionHours ?? 3;
 
     const balance = await LeaveBalance.findOne({ organizationId, employeeId, leaveType: 'Permission' });
     const usedHours = balance?.used ?? 0;

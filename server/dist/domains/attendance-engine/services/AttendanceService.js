@@ -101,14 +101,19 @@ class AttendanceService {
                 return [];
             }
         }
-        else if (role === 'ADMIN') {
-            const allowedUsers = await User_js_1.User.find({
-                organizationId: orgId,
-                role: { $in: ['HR', 'MANAGER'] },
-                employeeId: { $exists: true, $ne: null }
-            }).select('employeeId');
-            const allowedEmployeeIds = allowedUsers.map(u => u.employeeId);
-            query.employeeId = { $in: allowedEmployeeIds };
+        else if (role === 'MANAGER' && userId) {
+            const { getManagerTeamEmployeeIds } = await import('../../../utils/getManagerTeamEmployeeIds.js');
+            const teamEmployeeIds = await getManagerTeamEmployeeIds(userId, orgId);
+            const user = await User_js_1.User.findOne({ _id: userId, organizationId: orgId });
+            if (user && user.employeeId) {
+                teamEmployeeIds.push(user.employeeId.toString());
+            }
+            else if (email) {
+                const emp = await Employee_js_1.Employee.findOne({ email, organizationId: orgId });
+                if (emp)
+                    teamEmployeeIds.push(emp._id.toString());
+            }
+            query.employeeId = { $in: teamEmployeeIds };
         }
         return Attendance_js_1.Attendance.find(query).populate('employeeId');
     }
@@ -134,14 +139,19 @@ class AttendanceService {
                 return [];
             }
         }
-        else if (role === 'ADMIN') {
-            const allowedUsers = await User_js_1.User.find({
-                organizationId: orgId,
-                role: { $in: ['HR', 'MANAGER'] },
-                employeeId: { $exists: true, $ne: null }
-            }).select('employeeId');
-            const allowedEmployeeIds = allowedUsers.map(u => u.employeeId);
-            query.employeeId = { $in: allowedEmployeeIds };
+        else if (role === 'MANAGER' && userId) {
+            const { getManagerTeamEmployeeIds } = await import('../../../utils/getManagerTeamEmployeeIds.js');
+            const teamEmployeeIds = await getManagerTeamEmployeeIds(userId, orgId);
+            const user = await User_js_1.User.findOne({ _id: userId, organizationId: orgId });
+            if (user && user.employeeId) {
+                teamEmployeeIds.push(user.employeeId.toString());
+            }
+            else if (email) {
+                const emp = await Employee_js_1.Employee.findOne({ email, organizationId: orgId });
+                if (emp)
+                    teamEmployeeIds.push(emp._id.toString());
+            }
+            query.employeeId = { $in: teamEmployeeIds };
         }
         return Attendance_js_1.Attendance.find(query).populate('employeeId').sort({ date: -1, loginTime: -1 });
     }

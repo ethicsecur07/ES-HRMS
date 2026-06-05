@@ -61,10 +61,20 @@ const createPolicy = async (req, res) => {
             res.status(400).json({ message: `Invalid leave type. Must be one of: ${VALID_LEAVE_TYPES.join(', ')}` });
             return;
         }
+        let allowanceVal = Number(monthlyAllowance);
+        let permHoursVal = permissionConversionHours !== undefined ? Number(permissionConversionHours) : 3;
+        if (leaveType === 'Permission') {
+            if (allowanceVal === 0 || isNaN(allowanceVal)) {
+                allowanceVal = permHoursVal;
+            }
+            else {
+                permHoursVal = allowanceVal;
+            }
+        }
         const policy = await LeavePolicy_js_1.LeavePolicy.create({
             organizationId: orgId,
             leaveType,
-            monthlyAllowance: Number(monthlyAllowance),
+            monthlyAllowance: allowanceVal,
             carryForward: carryForward ?? false,
             carryForwardLimit: carryForwardLimit ?? 0,
             sandwichLeaveRule: sandwichLeaveRule ?? false,
@@ -72,7 +82,7 @@ const createPolicy = async (req, res) => {
             compensatoryOffEligibility: compensatoryOffEligibility ?? { canEarn: false, validityDays: 60 },
             encashmentRule: encashmentRule ?? { canEncash: false, maxEncashableDays: 10, encashmentRatePercentage: 100 },
             latePenaltyCount: latePenaltyCount ?? 3,
-            permissionConversionHours: permissionConversionHours ?? 3,
+            permissionConversionHours: permHoursVal,
             halfDayEnabled: halfDayEnabled ?? true,
             advanceNoticeDays: advanceNoticeDays ?? 0,
             maxConsecutiveDays: maxConsecutiveDays ?? 0,
@@ -84,13 +94,13 @@ const createPolicy = async (req, res) => {
         });
         // Sync newly created policy with LeaveBalances for employees immediately
         await LeaveBalanceService_js_1.LeaveBalanceService.syncBalancesForPolicy(policy);
-        await (0, auditLog_service_js_1.createAuditLog)('LEAVE_POLICY_CREATED', req.user.email, 'LEAVE_POLICY', policy.id, `Created ${leaveType} policy (${monthlyAllowance} days/month)`, orgId);
+        await (0, auditLog_service_js_1.createAuditLog)('LEAVE_POLICY_CREATED', req.user.email, 'LEAVE_POLICY', policy.id, `Created ${leaveType} policy (${allowanceVal} days/month)`, orgId);
         try {
             const creator = await User_js_1.User.findById(req.user.id);
             await Announcement_js_1.Announcement.create({
                 organizationId: orgId,
                 title: `New Leave Policy: ${leaveType}`,
-                content: `A new leave policy has been configured for ${leaveType} with a monthly allowance of ${monthlyAllowance} days. Applicable to: ${applicableGender || 'All'}.`,
+                content: `A new leave policy has been configured for ${leaveType} with a monthly allowance of ${allowanceVal} days. Applicable to: ${applicableGender || 'All'}.`,
                 type: 'POLICY_CHANGE',
                 createdBy: req.user.id,
                 createdByName: creator?.name || req.user.email,
@@ -140,6 +150,20 @@ const updatePolicy = async (req, res) => {
         for (const field of updatableFields) {
             if (req.body[field] !== undefined) {
                 policy[field] = req.body[field];
+            }
+        }
+        if (policy.leaveType === 'Permission') {
+            const reqAllowance = req.body.monthlyAllowance;
+            const reqPermHours = req.body.permissionConversionHours;
+            if (reqPermHours !== undefined && reqAllowance === undefined) {
+                policy.monthlyAllowance = Number(reqPermHours);
+            }
+            else if (reqAllowance !== undefined && reqPermHours === undefined) {
+                policy.permissionConversionHours = Number(reqAllowance);
+            }
+            else if (reqPermHours !== undefined && reqAllowance !== undefined) {
+                policy.monthlyAllowance = Number(reqPermHours);
+                policy.permissionConversionHours = Number(reqPermHours);
             }
         }
         // Handle nested objects

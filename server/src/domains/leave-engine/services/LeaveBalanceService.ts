@@ -61,8 +61,8 @@ export class LeaveBalanceService {
         initialAllocated = employee.leaveBalance ?? 2;
       } else if (policy.leaveType === 'WFH' && initialAllocated === 0) {
         initialAllocated = employee.wfhBalance ?? 1;
-      } else if (policy.leaveType === 'Permission' && initialAllocated === 0) {
-        initialAllocated = employee.permissionHoursBalance ?? 3;
+      } else if (policy.leaveType === 'Permission') {
+        initialAllocated = policy.permissionConversionHours || policy.monthlyAllowance || employee.permissionHoursBalance || 3;
       }
 
       const newB = await LeaveBalance.findOneAndUpdate(
@@ -312,7 +312,9 @@ export class LeaveBalanceService {
   ): Promise<void> {
     const orgId = policy.organizationId;
     const leaveType = policy.leaveType;
-    const newAllowance = policy.monthlyAllowance;
+    const newAllowance = leaveType === 'Permission'
+      ? (policy.permissionConversionHours || policy.monthlyAllowance || 3)
+      : policy.monthlyAllowance;
 
     // Find all active employees matching the policy's applicability
     const query: any = { organizationId: orgId, isActive: true };

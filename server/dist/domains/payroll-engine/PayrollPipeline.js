@@ -104,6 +104,10 @@ class PayrollPipeline {
                 organizationId: run.organizationId,
                 status: 'ACTIVE'
             }).populate('components.componentId');
+            // Fetch leave policies once for the organization
+            const leavePolicies = await LeavePolicy_js_1.LeavePolicy.find({ organizationId: run.organizationId });
+            const casualLeavePolicy = leavePolicies.find(p => p.leaveType === 'Casual Leave' && p.isActive);
+            const permissionPolicy = leavePolicies.find(p => p.leaveType === 'Permission' && p.isActive);
             for (const structure of structures) {
                 try {
                     // Fetch leaves, attendance, reimbursements
@@ -152,14 +156,14 @@ class PayrollPipeline {
                             paidLeaveDays += getOverlapDays(leave.startDate, leave.endDate, cycleStart, cycleEnd);
                         }
                     }
-                    const leaveLimit = org?.settings?.monthlyLeaveLimit || 2;
+                    const leaveLimit = casualLeavePolicy ? casualLeavePolicy.monthlyAllowance : (org?.settings?.monthlyLeaveLimit || 2);
                     const excessLeaveDays = Math.max(0, paidLeaveDays - leaveLimit);
                     // Calculate Permission hours LOP
                     let totalPermissionHours = 0;
                     for (const perm of approvedPermissions) {
                         totalPermissionHours += perm.totalHours;
                     }
-                    const permissionLimit = org?.settings?.monthlyPermissionHours || 3;
+                    const permissionLimit = permissionPolicy ? (permissionPolicy.permissionConversionHours ?? permissionPolicy.monthlyAllowance) : (org?.settings?.monthlyPermissionHours || 3);
                     const excessPermissionHours = Math.max(0, totalPermissionHours - permissionLimit);
                     const permissionLopDays = excessPermissionHours / 8; // Assuming 8-hour workday
                     // Calculate Absent days (no attendance and no approved leave on a workday)
@@ -174,9 +178,8 @@ class PayrollPipeline {
                             continue;
                         absentDays++;
                     }
-                    // Calculate Late Penalties (using LeavePolicy settings)
-                    const leavePolicies = await LeavePolicy_js_1.LeavePolicy.find({ organizationId: run.organizationId });
-                    const latePolicy = leavePolicies.find(p => p.latePenaltyCount > 0);
+                    // Calculate Late Penalties (using LeavePolicy settings fetched outside the loop)
+                    const latePolicy = leavePolicies.find(p => p.latePenaltyCount > 0 && p.isActive);
                     let lateDeductionDays = 0;
                     let lateCount = 0;
                     if (latePolicy) {

@@ -241,7 +241,7 @@ const getMyLeaveBalances = async (req, res, next) => {
             empId = emp?._id.toString();
         }
         if (!empId) {
-            res.json({ data: { balances: [], employeeId: null }, message: 'Employee profile not found.' });
+            res.json({ balances: [], employeeId: null, message: 'Employee profile not found.' });
             return;
         }
         const employee = await Employee_js_1.Employee.findById(empId);

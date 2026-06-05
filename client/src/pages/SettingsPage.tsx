@@ -354,9 +354,6 @@ export const SettingsPage: React.FC = () => {
 
   const [companyName, setCompanyName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
-  const [monthlyLeaveLimit, setMonthlyLeaveLimit] = useState(2);
-  const [monthlyWFHLimit, setMonthlyWFHLimit] = useState(1);
-  const [monthlyPermissionHours, setMonthlyPermissionHours] = useState(3);
   const [salaryCycleStartDay, setSalaryCycleStartDay] = useState(1);
   const [officeIPs, setOfficeIPs] = useState<string[]>([]);
   const [newIP, setNewIP] = useState('');
@@ -368,9 +365,6 @@ export const SettingsPage: React.FC = () => {
     if (settings) {
       setCompanyName(settings.companyName);
       setAdminEmail(settings.adminEmail);
-      setMonthlyLeaveLimit(settings.monthlyLeaveLimit);
-      setMonthlyWFHLimit(settings.monthlyWFHLimit);
-      setMonthlyPermissionHours(settings.monthlyPermissionHours);
       setSalaryCycleStartDay(settings.salaryCycleStartDay || 1);
       setOfficeIPs(settings.officeWiFiIPs || []);
       if (settings.activeWorkdays) {
@@ -420,9 +414,6 @@ export const SettingsPage: React.FC = () => {
     updateSettingsMutation.mutate({
       companyName,
       adminEmail,
-      monthlyLeaveLimit,
-      monthlyWFHLimit,
-      monthlyPermissionHours,
       salaryCycleStartDay,
       officeWiFiIPs: officeIPs,
       activeWorkdays,
@@ -526,10 +517,11 @@ export const SettingsPage: React.FC = () => {
       {activeSubTab === 'global' && canViewSettings && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
           <Card className="space-y-6 border-l-4 border-l-primary shadow-md">
-            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">General Company Profile</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">General Company Profile & Cycles</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <Input label="Company Name *" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required disabled={!canEditSettings} />
               <Input label="Admin Contact Email *" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required disabled={!canEditSettings} />
+              <Input label="Salary & Attendance Cycle Start Day (1-31) *" type="number" value={salaryCycleStartDay} onChange={(e) => setSalaryCycleStartDay(Number(e.target.value))} min={1} max={31} required disabled={!canEditSettings} />
             </div>
           </Card>
 
@@ -594,15 +586,6 @@ export const SettingsPage: React.FC = () => {
             </div>
           </Card>
 
-          <Card className="space-y-6 border-l-4 border-l-muted-foreground shadow-md">
-            <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Monthly Global Allowance Policies</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-              <Input label="Casual Leave Limit (Days/Month) *" type="number" value={monthlyLeaveLimit} onChange={(e) => setMonthlyLeaveLimit(Number(e.target.value))} required disabled={!canEditSettings} />
-              <Input label="WFH Limit (Days/Month) *" type="number" value={monthlyWFHLimit} onChange={(e) => setMonthlyWFHLimit(Number(e.target.value))} required disabled={!canEditSettings} />
-              <Input label="Permission Limit (Hours/Month) *" type="number" value={monthlyPermissionHours} onChange={(e) => setMonthlyPermissionHours(Number(e.target.value))} required disabled={!canEditSettings} />
-              <Input label="Salary & Attendance Cycle Start Day (1-31) *" type="number" value={salaryCycleStartDay} onChange={(e) => setSalaryCycleStartDay(Number(e.target.value))} min={1} max={31} required disabled={!canEditSettings} />
-            </div>
-          </Card>
 
           <Card className="space-y-6 border-l-4 border-l-primary shadow-md">
             <h3 className="text-lg font-bold text-foreground border-b border-border pb-3">Login Approval Permissions</h3>

@@ -362,73 +362,157 @@ export const PayrollSetupModal: React.FC<PayrollSetupModalProps> = ({ isOpen, on
 
           {selectedEmployeeId && employees && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
-              {/* Leaves Taken Card */}
-              <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between transition-all hover:shadow-md hover:border-primary/30 group">
-                <div className="space-y-1 z-10">
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider block">Total Leaves Taken</span>
-                  <span className="text-2xl font-black text-foreground tracking-tight">
-                    {leaveBalances ? (
-                      leaveBalances
-                        .filter(b => {
-                          const type = (b.leaveType || '').toLowerCase().trim();
-                          return type !== 'wfh' && type !== 'permission';
-                        })
-                        .reduce((sum, b) => sum + (b.used || 0), 0)
-                    ) : (
-                      <span className="inline-block animate-pulse w-8 h-6 bg-muted rounded" />
-                    )}{' '}
-                    <span className="text-xs font-semibold text-muted-foreground">Days</span>
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-primary/10 text-primary transition-all group-hover:scale-110">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div className="absolute right-0 bottom-0 w-24 h-24 bg-gradient-to-tr from-primary/10 to-transparent rounded-full translate-x-8 translate-y-8 blur-md -z-0" />
-              </div>
 
-              {/* Permission Taken Card */}
-              <div className="relative overflow-hidden rounded-xl border border-sky-500/20 bg-sky-500/5 p-4 flex items-center justify-between transition-all hover:shadow-md hover:border-sky-500/30 group">
-                <div className="space-y-1 z-10">
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider block">Permission Taken</span>
-                  <span className="text-2xl font-black text-foreground tracking-tight">
-                    {leaveBalances ? (
-                      leaveBalances
-                        .filter(b => (b.leaveType || '').toLowerCase().trim() === 'permission')
-                        .reduce((sum, b) => sum + (b.used || 0), 0)
-                    ) : (
-                      <span className="inline-block animate-pulse w-8 h-6 bg-muted rounded" />
-                    )}{' '}
-                    <span className="text-xs font-semibold text-muted-foreground">Hours</span>
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-sky-500/10 text-sky-500 transition-all group-hover:scale-110">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div className="absolute right-0 bottom-0 w-24 h-24 bg-gradient-to-tr from-sky-500/10 to-transparent rounded-full translate-x-8 translate-y-8 blur-md -z-0" />
-              </div>
+              {/* Leaves Exceeded Card */}
+              {(() => {
+                const leaveLimit = orgSettings?.monthlyLeaveLimit ?? 2;
+                const leavesTaken = leaveBalances
+                  ? leaveBalances
+                      .filter(b => { const t = (b.leaveType || '').toLowerCase().trim(); return t !== 'wfh' && t !== 'permission'; })
+                      .reduce((sum, b) => sum + (b.used || 0), 0)
+                  : null;
+                const excess = leavesTaken !== null ? Math.max(0, leavesTaken - leaveLimit) : 0;
+                const pct = leaveLimit > 0 && leavesTaken !== null ? Math.min(100, Math.round((leavesTaken / leaveLimit) * 100)) : 0;
+                const exceeded = leavesTaken !== null && leavesTaken > leaveLimit;
+                return (
+                  <div className={`relative overflow-hidden rounded-xl border p-4 transition-all hover:shadow-md group ${exceeded ? 'border-destructive/40 bg-destructive/5' : 'border-primary/20 bg-primary/5 hover:border-primary/30'}`}>
+                    <div className="space-y-1 z-10">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider">Leaves Exceeded</span>
+                        {exceeded && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                            +{excess} Exceeds
+                          </span>
+                        )}
+                        {!exceeded && leavesTaken !== null && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            Within Limit
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-end gap-1.5">
+                        <span className={`text-2xl font-black tracking-tight ${exceeded ? 'text-destructive' : 'text-foreground'}`}>
+                          {leavesTaken !== null ? leavesTaken : <span className="inline-block animate-pulse w-8 h-6 bg-muted rounded" />}
+                        </span>
+                        <span className="text-xs font-semibold text-muted-foreground mb-0.5">/ {leaveLimit} days</span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${exceeded ? 'bg-destructive' : pct >= 75 ? 'bg-amber-500' : 'bg-primary'}`}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{pct}% of monthly leave limit used</p>
+                    </div>
+                    {/* <div className={`p-3 rounded-xl transition-all group-hover:scale-110 absolute right-4 top-4 ${exceeded ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
+                      <Calendar className="w-5 h-5" />
+                    </div> */}
+                    <div className={`absolute right-0 bottom-0 w-24 h-24 rounded-full translate-x-8 translate-y-8 blur-md -z-0 ${exceeded ? 'bg-gradient-to-tr from-destructive/15 to-transparent' : 'bg-gradient-to-tr from-primary/10 to-transparent'}`} />
+                  </div>
+                );
+              })()}
 
-              {/* WFH Taken Card */}
-              <div className="relative overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center justify-between transition-all hover:shadow-md hover:border-emerald-500/30 group">
-                <div className="space-y-1 z-10">
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider block">WFH Taken</span>
-                  <span className="text-2xl font-black text-foreground tracking-tight">
-                    {leaveBalances ? (
-                      leaveBalances
-                        .filter(b => (b.leaveType || '').toLowerCase().trim() === 'wfh')
-                        .reduce((sum, b) => sum + (b.used || 0), 0)
-                    ) : (
-                      <span className="inline-block animate-pulse w-8 h-6 bg-muted rounded" />
-                    )}{' '}
-                    <span className="text-xs font-semibold text-muted-foreground">Days</span>
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 transition-all group-hover:scale-110">
-                  <Home className="w-5 h-5" />
-                </div>
-                <div className="absolute right-0 bottom-0 w-24 h-24 bg-gradient-to-tr from-emerald-500/10 to-transparent rounded-full translate-x-8 translate-y-8 blur-md -z-0" />
-              </div>
+              {/* Permission Exceeded Card */}
+              {(() => {
+                const permLimit = orgSettings?.monthlyPermissionHours ?? 3;
+                const permTaken = leaveBalances
+                  ? leaveBalances
+                      .filter(b => (b.leaveType || '').toLowerCase().trim() === 'permission')
+                      .reduce((sum, b) => sum + (b.used || 0), 0)
+                  : null;
+                const excess = permTaken !== null ? Math.max(0, permTaken - permLimit) : 0;
+                const pct = permLimit > 0 && permTaken !== null ? Math.min(100, Math.round((permTaken / permLimit) * 100)) : 0;
+                const exceeded = permTaken !== null && permTaken > permLimit;
+                return (
+                  <div className={`relative overflow-hidden rounded-xl border p-4 transition-all hover:shadow-md group ${exceeded ? 'border-destructive/40 bg-destructive/5' : 'border-sky-500/20 bg-sky-500/5 hover:border-sky-500/30'}`}>
+                    <div className="space-y-1 z-10">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider">Permission Exceeded</span>
+                        {exceeded && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                            +{excess.toFixed(1)} hrs Over
+                          </span>
+                        )}
+                        {!exceeded && permTaken !== null && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 border border-sky-500/20">
+                            Within Limit
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-end gap-1.5">
+                        <span className={`text-2xl font-black tracking-tight ${exceeded ? 'text-destructive' : 'text-foreground'}`}>
+                          {permTaken !== null ? permTaken : <span className="inline-block animate-pulse w-8 h-6 bg-muted rounded" />}
+                        </span>
+                        <span className="text-xs font-semibold text-muted-foreground mb-0.5">/ {permLimit} hrs</span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${exceeded ? 'bg-destructive' : pct >= 75 ? 'bg-amber-500' : 'bg-sky-500'}`}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{pct}% of monthly permission limit used</p>
+                    </div>
+                    {/* <div className={`p-3 rounded-xl transition-all group-hover:scale-110 absolute right-4 top-4 ${exceeded ? 'bg-destructive/10 text-destructive' : 'bg-sky-500/10 text-sky-500'}`}>
+                      <Clock className="w-5 h-5" />
+                    </div> */}
+                    <div className={`absolute right-0 bottom-0 w-24 h-24 rounded-full translate-x-8 translate-y-8 blur-md -z-0 ${exceeded ? 'bg-gradient-to-tr from-destructive/15 to-transparent' : 'bg-gradient-to-tr from-sky-500/10 to-transparent'}`} />
+                  </div>
+                );
+              })()}
+
+              {/* WFH Exceeded Card */}
+              {(() => {
+                const wfhLimit = orgSettings?.monthlyWFHLimit ?? 1;
+                const wfhTaken = leaveBalances
+                  ? leaveBalances
+                      .filter(b => (b.leaveType || '').toLowerCase().trim() === 'wfh')
+                      .reduce((sum, b) => sum + (b.used || 0), 0)
+                  : null;
+                const excess = wfhTaken !== null ? Math.max(0, wfhTaken - wfhLimit) : 0;
+                const pct = wfhLimit > 0 && wfhTaken !== null ? Math.min(100, Math.round((wfhTaken / wfhLimit) * 100)) : 0;
+                const exceeded = wfhTaken !== null && wfhTaken > wfhLimit;
+                return (
+                  <div className={`relative overflow-hidden rounded-xl border p-4 transition-all hover:shadow-md group ${exceeded ? 'border-destructive/40 bg-destructive/5' : 'border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/30'}`}>
+                    <div className="space-y-1 z-10">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider">WFH Exceeded</span>
+                        {exceeded && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                            +{excess} day{excess !== 1 ? 's' : ''} Over
+                          </span>
+                        )}
+                        {!exceeded && wfhTaken !== null && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                            Within Limit
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-end gap-1.5">
+                        <span className={`text-2xl font-black tracking-tight ${exceeded ? 'text-destructive' : 'text-foreground'}`}>
+                          {wfhTaken !== null ? wfhTaken : <span className="inline-block animate-pulse w-8 h-6 bg-muted rounded" />}
+                        </span>
+                        <span className="text-xs font-semibold text-muted-foreground mb-0.5">/ {wfhLimit} day{wfhLimit !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${exceeded ? 'bg-destructive' : pct >= 75 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{pct}% of monthly WFH limit used</p>
+                    </div>
+                    {/* <div className={`p-3 rounded-xl transition-all group-hover:scale-110 absolute right-4 top-4 ${exceeded ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                      <Home className="w-5 h-5" />
+                    </div> */}
+                    <div className={`absolute right-0 bottom-0 w-24 h-24 rounded-full translate-x-8 translate-y-8 blur-md -z-0 ${exceeded ? 'bg-gradient-to-tr from-destructive/15 to-transparent' : 'bg-gradient-to-tr from-emerald-500/10 to-transparent'}`} />
+                  </div>
+                );
+              })()}
+
             </div>
           )}
+
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* LEFT COLUMN — Configuration Inputs */}

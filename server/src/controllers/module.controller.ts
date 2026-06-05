@@ -74,34 +74,52 @@ const DEFAULT_ROUTES = [
   { moduleCode: 'SETTINGS', routePath: '/settings', displayName: 'Settings', order: 17 },
 ];
 
+let coreInitializationPromise: Promise<void> | null = null;
+
 // Helper to ensure core Modules and ModuleRoutes exist in database
 const ensureCoreModulesAndRoutes = async () => {
-  // Clean up any obsolete/removed core modules, routes, and permissions from database
-  await Module.deleteMany({ code: { $in: ['EMPLOYEE_LIFECYCLE', 'ORG_STRUCTURE'] } });
-  await ModuleRoute.deleteMany({}); // Clear all to force a clean re-seeding of order values
-  await OrganizationModule.deleteMany({ moduleCode: { $in: ['EMPLOYEE_LIFECYCLE', 'ORG_STRUCTURE'] } });
-  await Permission.deleteMany({ module: { $in: ['EMPLOYEE_LIFECYCLE', 'ORG_STRUCTURE'] } });
-
-  for (const m of DEFAULT_MODULES) {
-    await Module.updateOne({ code: m.code }, { $set: m }, { upsert: true });
+  if (coreInitializationPromise) {
+    return coreInitializationPromise;
   }
 
-  for (const r of DEFAULT_ROUTES) {
-    await ModuleRoute.create(r);
-  }
+  coreInitializationPromise = (async () => {
+    try {
+      // Clean up any obsolete/removed core modules, routes, and permissions from database
+      await Module.deleteMany({ code: { $in: ['EMPLOYEE_LIFECYCLE', 'ORG_STRUCTURE'] } });
+      await ModuleRoute.deleteMany({}); // Clear all to force a clean re-seeding of order values
+      await OrganizationModule.deleteMany({ moduleCode: { $in: ['EMPLOYEE_LIFECYCLE', 'ORG_STRUCTURE'] } });
+      await Permission.deleteMany({ module: { $in: ['EMPLOYEE_LIFECYCLE', 'ORG_STRUCTURE'] } });
+
+      for (const m of DEFAULT_MODULES) {
+        await Module.updateOne({ code: m.code }, { $set: m }, { upsert: true });
+      }
+
+      await ModuleRoute.insertMany(DEFAULT_ROUTES);
+    } catch (error) {
+      coreInitializationPromise = null; // Reset on error so subsequent requests can retry
+      throw error;
+    }
+  })();
+
+  return coreInitializationPromise;
 };
 
 const ensureOrgModules = async (orgId: mongoose.Types.ObjectId) => {
-  for (const code of DEFAULT_MODULE_CODES) {
-    const exists = await OrganizationModule.findOne({ organizationId: orgId, moduleCode: code });
-    if (!exists) {
-      await OrganizationModule.create({
-        organizationId: orgId,
-        moduleCode: code,
-        isEnabled: true,
-        featureFlags: new Map(),
-      });
-    }
+  const bulkOps = DEFAULT_MODULE_CODES.map((code) => ({
+    updateOne: {
+      filter: { organizationId: orgId, moduleCode: code },
+      update: {
+        $setOnInsert: {
+          isEnabled: true,
+          featureFlags: new Map(),
+        },
+      },
+      upsert: true,
+    },
+  }));
+
+  if (bulkOps.length > 0) {
+    await OrganizationModule.bulkWrite(bulkOps);
   }
 };
 

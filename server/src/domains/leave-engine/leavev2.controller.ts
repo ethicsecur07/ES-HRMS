@@ -276,7 +276,7 @@ export const getMyLeaveBalances = async (req: RBACRequest, res: Response, next: 
     }
 
     if (!empId) {
-      res.json({ data: { balances: [], employeeId: null }, message: 'Employee profile not found.' });
+      res.json({ balances: [], employeeId: null, message: 'Employee profile not found.' });
       return;
     }
 

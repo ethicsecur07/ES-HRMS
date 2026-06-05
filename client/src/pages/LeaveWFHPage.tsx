@@ -5,7 +5,7 @@ import { leaveApi } from '../api_service/leaveApi';
 import { wfhApi } from '../api_service/wfhApi';
 import { permissionApi } from '../api_service/permissionApi';
 import { employeeApi } from '../api_service/employeeApi';
-import { leaveBalanceApi } from '../api_service/leavePolicyApi';
+import { leaveBalanceApi, leavePolicyApi } from '../api_service/leavePolicyApi';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { Card } from '../Components/WrapperComponents/Card';
@@ -17,8 +17,19 @@ import { WFHRequestModal } from '../Components/SpecifiedComponents/WFHRequestMod
 import { PermissionRequestModal } from '../Components/SpecifiedComponents/PermissionRequestModal';
 import type { LeaveRequest, PermissionRequest } from '../types';
 import { formatDate } from '../utils/formatters';
-import { Calendar, Plus, Palmtree, Laptop, Clock, FileText, Info } from 'lucide-react';
+import { Calendar, Plus, Palmtree, Laptop, Clock, FileText, Info, Shield, Settings, CheckCircle, XCircle } from 'lucide-react';
 import { HolidayEnhancedCalendar } from '../Components/SpecifiedComponents/HolidayEnhancedCalendar';
+
+// ─── Per-type display metadata (icon + colour class) ────────────────────────
+const LEAVE_TYPE_META: Record<string, { icon: React.ReactNode; color: string; borderColor: string; label: string }> = {
+  'Casual Leave':     { icon: <Palmtree className="w-12 h-12" />,    color: 'text-primary',        borderColor: 'border-l-primary',     label: 'Casual / Sick Leaves' },
+  'Sick Leave':       { icon: <Shield className="w-12 h-12" />,       color: 'text-blue-500',       borderColor: 'border-l-blue-500',    label: 'Sick Leaves' },
+  'WFH':              { icon: <Laptop className="w-12 h-12" />,       color: 'text-foreground',     borderColor: 'border-l-foreground',  label: 'Work From Home (WFH)' },
+  'Permission':       { icon: <Clock className="w-12 h-12" />,        color: 'text-amber-500',      borderColor: 'border-l-amber-500',   label: 'Permission Hours' },
+  'Compensatory Off': { icon: <CheckCircle className="w-12 h-12" />,  color: 'text-teal-500',       borderColor: 'border-l-teal-500',    label: 'Compensatory Off' },
+  'Unpaid Leave':     { icon: <XCircle className="w-12 h-12" />,      color: 'text-rose-500',       borderColor: 'border-l-rose-500',    label: 'Unpaid Leave' },
+};
+const DEFAULT_META = { icon: <Settings className="w-12 h-12" />, color: 'text-muted-foreground', borderColor: 'border-l-muted-foreground', label: '' };
 
 export const LeaveWFHPage: React.FC = () => {
   const { role, user } = useAuthStore();
@@ -48,6 +59,7 @@ export const LeaveWFHPage: React.FC = () => {
     queryFn: leaveBalanceApi.getMyBalances,
   });
 
+
   const { data: employeeProfile } = useQuery({
     queryKey: ['employeeProfile', user?.employeeId],
     queryFn: () => employeeApi.getById(user?.employeeId as string),
@@ -55,6 +67,24 @@ export const LeaveWFHPage: React.FC = () => {
   });
 
   const isUserIntern = role === 'INTERN' || user?.role === 'INTERN' || employeeProfile?.isIntern || employeeProfile?.role === 'INTERN';
+
+  // Fetch all policies to know which are active (drives balance card visibility)
+  const { data: allPolicies = [] } = useQuery({
+    queryKey: ['leave-policies'],
+    queryFn: leavePolicyApi.getAll,
+    enabled: !isUserIntern,
+  });
+
+  // Only show balance cards for active policies (deduplicated by leaveType)
+  const activePolicies = useMemo(() => {
+    const seen = new Set<string>();
+    return allPolicies.filter((p) => {
+      if (!p.isActive || seen.has(p.leaveType)) return false;
+      seen.add(p.leaveType);
+      return true;
+    });
+  }, [allPolicies]);
+
 
   // Helper to find balance for a type
   const getBalance = (type: string) => leaveBalances.find(b => b.leaveType === type);
@@ -404,94 +434,90 @@ export const LeaveWFHPage: React.FC = () => {
       {/* Render selected primary tab */}
       {activePageTab === 'DASHBOARD' ? (
         <div className="space-y-6 animate-in fade-in duration-250">
-          {/* Balances (Full Width, Horizontal Cards Grid) */}
+          {/* Balances — dynamically built from active policies in Policy Engine */}
           {!isUserIntern && (
             <div className="space-y-4">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-primary" />
                 Your Balance Allowances
               </h3>
-              <div className={`grid grid-cols-1 ${isUserIntern ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-6`}>
-                {/* Casual Leave Balance */}
-                {!isUserIntern && (() => {
-                  const b = getBalance('Casual Leave');
-                  return (
-                    <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-                      <div className="absolute right-3 top-3 opacity-10">
-                        <Palmtree className="w-12 h-12 text-primary" />
-                      </div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Casual / Sick Leaves</p>
-                      <h4 className="text-3xl font-black text-foreground">
-                        {b ? b.balance : (employeeProfile?.leaveBalance ?? 0)}{' '}
-                        <span className="text-xs font-semibold text-muted-foreground">days left</span>
-                      </h4>
-                      {b && (
-                        <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-                          <span>Allocated: <strong>{b.allocated}</strong></span>
-                          <span>Used: <strong>{b.used}</strong></span>
-                        </div>
-                      )}
-                      <p className="text-[10px] text-muted-foreground mt-2">Resets monthly ({b?.monthlyAllowance ?? 2} days/month)</p>
-                    </Card>
-                  );
-                })()}
 
-                {/* WFH Balance */}
-                {(() => {
-                  const b = getBalance('WFH');
-                  return (
-                    <Card className="border-l-4 border-l-foreground p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-                      <div className="absolute right-3 top-3 opacity-10">
-                        <Laptop className="w-12 h-12 text-foreground" />
-                      </div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Work From Home (WFH)</p>
-                      <h4 className="text-3xl font-black text-foreground">
-                        {b ? b.balance : (employeeProfile?.wfhBalance ?? 0)}{' '}
-                        <span className="text-xs font-semibold text-muted-foreground">days left</span>
-                      </h4>
-                      {b && (
-                        <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-                          <span>Allocated: <strong>{b.allocated}</strong></span>
-                          <span>Used: <strong>{b.used}</strong></span>
-                        </div>
-                      )}
-                      <p className="text-[10px] text-muted-foreground mt-2">Resets monthly ({b?.monthlyAllowance ?? 1} day/month)</p>
-                    </Card>
-                  );
-                })()}
+              {activePolicies.length === 0 ? (
+                <Card className="p-8 text-center border-dashed">
+                  <Info className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-30" />
+                  <p className="text-sm font-semibold text-muted-foreground">No active leave policies configured.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Ask your admin to activate policies in Settings → Leave Policy.</p>
+                </Card>
+              ) : (
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${
+                  activePolicies.length >= 3 ? 'md:grid-cols-3' : activePolicies.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1'
+                } gap-6`}>
+                  {activePolicies.map((policy) => {
+                    const meta = LEAVE_TYPE_META[policy.leaveType] ?? DEFAULT_META;
+                    const b = getBalance(policy.leaveType);
+                    const isPermission = policy.leaveType === 'Permission';
 
-                {/* Permission Balance */}
-                {(() => {
-                  const b = getBalance('Permission');
-                  const limit = b?.permissionConversionHours ?? 3;
-                  const used = b?.used ?? (employeeProfile?.permissionHoursBalance !== undefined ? limit - employeeProfile.permissionHoursBalance : 0);
-                  const remaining = b ? b.balance : (employeeProfile?.permissionHoursBalance ?? limit);
-                  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-                  return (
-                    <Card className="border-l-4 border-l-primary p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden">
-                      <div className="absolute right-3 top-3 opacity-10">
-                        <Clock className="w-12 h-12 text-primary" />
-                      </div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Permission Hours</p>
-                      <h4 className="text-3xl font-black text-foreground">
-                        {remaining.toFixed ? remaining.toFixed(1) : remaining}{' '}
-                        <span className="text-xs font-semibold text-muted-foreground">hrs left</span>
-                      </h4>
-                      {/* Progress bar */}
-                      <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-rose-500' : pct >= 75 ? 'bg-amber-500' : 'bg-primary'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">{pct}% used of {limit} hr monthly limit</p>
-                      {pct >= 100 && (
-                        <p className="text-[10px] text-rose-600 font-bold mt-1">⚠ Limit reached — next approval may trigger half-day deduction</p>
-                      )}
-                    </Card>
-                  );
-                })()}
-              </div>
+                    if (isPermission) {
+                      // Special rendering for permission hours with progress bar
+                      const limit = b?.permissionConversionHours ?? policy.permissionConversionHours ?? 3;
+                      const used = b?.used ?? (employeeProfile?.permissionHoursBalance !== undefined ? limit - employeeProfile.permissionHoursBalance : 0);
+                      const remaining = b ? b.balance : (employeeProfile?.permissionHoursBalance ?? limit);
+                      const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+                      return (
+                        <Card key={policy._id} className={`border-l-4 ${meta.borderColor} p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden`}>
+                          <div className={`absolute right-3 top-3 opacity-10 ${meta.color}`}>
+                            {meta.icon}
+                          </div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">{meta.label || policy.leaveType}</p>
+                          <h4 className="text-3xl font-black text-foreground">
+                            {typeof remaining === 'number' && Number.isFinite(remaining) ? remaining.toFixed(1) : remaining}{' '}
+                            <span className="text-xs font-semibold text-muted-foreground">hrs left</span>
+                          </h4>
+                          <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-rose-500' : pct >= 75 ? 'bg-amber-500' : 'bg-primary'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">{pct}% used of {limit} hr monthly limit</p>
+                          {pct >= 100 && (
+                            <p className="text-[10px] text-rose-600 font-bold mt-1">⚠ Limit reached — next approval may trigger half-day deduction</p>
+                          )}
+                        </Card>
+                      );
+                    }
+
+                    // Standard day-based balance card
+                    const balance = b ? b.balance : 0;
+                    const allocated = b?.allocated ?? policy.monthlyAllowance ?? 0;
+                    const used = b?.used ?? 0;
+                    const allowance = b?.monthlyAllowance ?? policy.monthlyAllowance ?? 0;
+                    return (
+                      <Card key={policy._id} className={`border-l-4 ${meta.borderColor} p-5 hover:shadow-md transition-shadow bg-card relative overflow-hidden`}>
+                        <div className={`absolute right-3 top-3 opacity-10 ${meta.color}`}>
+                          {meta.icon}
+                        </div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                          {meta.label || policy.leaveType}
+                        </p>
+                        <h4 className="text-3xl font-black text-foreground">
+                          {balance}{' '}
+                          <span className="text-xs font-semibold text-muted-foreground">days left</span>
+                        </h4>
+                        {b && (
+                          <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
+                            <span>Allocated: <strong>{allocated}</strong></span>
+                            <span>Used: <strong>{used}</strong></span>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-muted-foreground mt-2">
+                          Resets monthly ({allowance} {allowance === 1 ? 'day' : 'days'}/month)
+                        </p>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

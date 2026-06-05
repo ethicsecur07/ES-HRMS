@@ -174,7 +174,7 @@ class LeavePolicyEngine {
         const policy = await this.getPolicy(organizationId, 'Permission', isIntern).catch(() => null);
         // Fallback to org settings, then hardcoded default
         const org = await Organization_js_1.Organization.findById(organizationId);
-        const limitHours = policy?.permissionConversionHours ?? org?.settings?.monthlyPermissionHours ?? 3;
+        const limitHours = policy?.monthlyAllowance ?? policy?.permissionConversionHours ?? org?.settings?.monthlyPermissionHours ?? 3;
         const balance = await LeaveBalance_js_1.LeaveBalance.findOne({ organizationId, employeeId, leaveType: 'Permission' });
         const usedHours = balance?.used ?? 0;
         const remainingHours = parseFloat((limitHours - usedHours).toFixed(2));
