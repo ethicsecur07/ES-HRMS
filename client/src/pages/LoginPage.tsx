@@ -53,7 +53,7 @@ export const LoginPage: React.FC = () => {
   useEffect(() => {
     if (tenantQuery) {
       const cleanQuery = tenantQuery.trim().toLowerCase();
-      if (cleanQuery) {
+      if (cleanQuery && cleanQuery !== 'undefined') {
         setTenantSlug(cleanQuery);
         fetchTenantConfig(cleanQuery);
       }

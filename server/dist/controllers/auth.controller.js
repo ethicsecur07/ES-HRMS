@@ -798,8 +798,8 @@ const signup = async (req, res) => {
                 fullName: name,
                 email: normalizedEmail,
                 phone: '0000000000',
-                department: 'HR',
-                designation: 'HR Manager',
+                department: 'ADMIN',
+                designation: 'ADMIN',
                 joiningDate: new Date(),
                 salary: 0,
                 address: 'Office Address',
@@ -903,12 +903,14 @@ const signup = async (req, res) => {
                 maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
             });
             res.status(201).json({
-                success: true,
                 message: 'Organization and administrator account successfully registered!',
-                organizationId: organization._id,
-                slug: normalizedSlug,
-                user: userObj,
-                token: accessToken,
+                data: {
+                    success: true,
+                    organizationId: organization._id,
+                    slug: normalizedSlug,
+                    user: userObj,
+                    token: accessToken,
+                }
             });
         }
         catch (transactionError) {

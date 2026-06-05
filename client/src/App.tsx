@@ -110,7 +110,8 @@ export const App: React.FC = () => {
 
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         const urlParams = new URLSearchParams(window.location.search);
-        tenantIdentifier = urlParams.get('tenant') || 'ethicsecur';
+        const queryVal = urlParams.get('tenant');
+        tenantIdentifier = (queryVal && queryVal !== 'undefined') ? queryVal : 'ethicsecur';
       } else {
         const parts = hostname.split('.');
         if (parts.length > 2 && !parts[parts.length - 1].match(/^\d+$/)) {

@@ -28,18 +28,25 @@ interface TenantState {
   tenantConfig: TenantConfig | null;
   isLoading: boolean;
   error: string | null;
+  lastFetchedSlug: string | null;
   fetchTenantConfig: (slugOrDomain: string) => Promise<TenantConfig | null>;
   clearTenantConfig: () => void;
 }
 
-export const useTenantStore = create<TenantState>((set) => ({
+export const useTenantStore = create<TenantState>((set, get) => ({
   tenantConfig: null,
   isLoading: false,
   error: null,
+  lastFetchedSlug: null,
 
   fetchTenantConfig: async (slugOrDomain: string) => {
-    if (!slugOrDomain) return null;
-    set({ isLoading: true, error: null });
+    if (!slugOrDomain || slugOrDomain === 'undefined') return null;
+
+    if (get().lastFetchedSlug === slugOrDomain) {
+      return get().tenantConfig;
+    }
+
+    set({ isLoading: true, error: null, lastFetchedSlug: slugOrDomain });
     try {
       const response = await axios.get(`${BASE_URL}/api/public/organization-config/${encodeURIComponent(slugOrDomain)}`);
       const resData = response.data;
@@ -57,5 +64,5 @@ export const useTenantStore = create<TenantState>((set) => ({
     }
   },
 
-  clearTenantConfig: () => set({ tenantConfig: null, error: null }),
+  clearTenantConfig: () => set({ tenantConfig: null, error: null, lastFetchedSlug: null }),
 }));
