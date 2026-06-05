@@ -12,6 +12,7 @@ import { PermissionRequest } from '../../../models/PermissionRequest.js';
 import { Leave } from '../../../models/Leave.js';
 import { Organization } from '../../../models/Organization.js';
 import { HolidayCalendar } from '../../../models/HolidayCalendar.js';
+import { ipMatchesRange } from '../../../utils/ipHelper.js';
 
 class TimezoneHelper {
   static getInfo(date: Date, timezone?: string) {
@@ -179,10 +180,10 @@ export class AttendanceService {
     session.startTransaction();
 
     try {
-      // Fetch organization settings to resolve timezone and active workdays
+      // Fetch organization settings to resolve timezone, active workdays, and allowed IPs
       const org = await Organization.findOne({ _id: orgId })
         .session(session)
-        .select('settings.activeWorkdays settings.timezone settings.salaryCycleStartDay');
+        .select('settings.activeWorkdays settings.timezone settings.salaryCycleStartDay settings.allowedIPs');
       const timezone = org?.settings?.timezone || 'Asia/Kolkata';
 
       const now = new Date();
@@ -291,7 +292,8 @@ export class AttendanceService {
       }
 
       // 3. Verify location (Office IP Range or GPS GeoFence)
-      const isOfficeIP = ipAddress.includes('192.168.29') || ipAddress === '127.0.0.1' || ipAddress === '::1';
+      const allowedIPs = org?.settings?.allowedIPs || ['127.0.0.1', '::1'];
+      const isOfficeIP = ipMatchesRange(ipAddress, allowedIPs);
       let withinGeoFence = false;
       let matchedFence = null;
       let distanceFromCenter = 0;
@@ -673,8 +675,8 @@ export class AttendanceService {
     const todayStr = nowInfo.dateString;
     const currentHour = nowInfo.hour;
 
-    // If it is >= 6:00 PM (18:00), we can check out today's record as well
-    const queryDate = currentHour >= 18 ? { $lte: todayStr } : { $lt: todayStr };
+    // Only auto-checkout for past days to avoid checking out active sessions today
+    const queryDate = { $lt: todayStr };
 
     // Find attendance records where logoutTime is missing
     const openAttendances = await Attendance.find({

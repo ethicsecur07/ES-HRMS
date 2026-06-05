@@ -111,10 +111,12 @@ async function createSessionAndRespond(user, org, req, res, risk) {
     // Audit logging
     await (0, auditLog_service_js_1.createAuditLog)('USER_LOGIN', `${user.name} (${user.role})`, 'AUTH', 'User Session', `Logged in from IP ${req.ip} (${deviceInfo})`, org._id);
     // Set Refresh Token as HttpOnly Cookie
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+        secure: isSecure,
+        sameSite: isSecure ? 'none' : 'lax',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     const userObj = user.toObject();
@@ -393,10 +395,12 @@ const logout = async (req, res) => {
         if (req.user) {
             await (0, auditLog_service_js_1.createAuditLog)('USER_LOGOUT', req.user.email, 'AUTH', 'User Session', 'Logged out', req.user.organizationId);
         }
+        const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
         res.clearCookie('refreshToken', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            secure: isSecure,
+            sameSite: isSecure ? 'none' : 'lax',
+            path: '/',
         });
         res.status(200).json({ message: 'Logged out successfully' });
     }
@@ -430,6 +434,24 @@ const refreshToken = async (req, res) => {
         // Replay Attack Detection
         if (session.isRevoked || session.refreshTokenHash !== currentHash) {
             if (session.rotatedTokenHashes.includes(currentHash)) {
+                // Grace period (e.g. 5 seconds) to handle concurrent client requests or React StrictMode double effects
+                const rotationGraceMs = 5000;
+                const timeSinceLastUpdate = Date.now() - session.updatedAt.getTime();
+                if (timeSinceLastUpdate < rotationGraceMs) {
+                    const user = await User_js_1.User.findById(session.userId);
+                    if (user && user.isActive) {
+                        const accessToken = (0, jwt_js_1.generateAccessToken)({
+                            id: user.id,
+                            role: user.role,
+                            email: user.email,
+                            organizationId: user.organizationId.toString(),
+                            employeeId: user.employeeId?.toString(),
+                            sessionId: session._id.toString(),
+                        });
+                        res.status(200).json({ token: accessToken });
+                        return;
+                    }
+                }
                 // Replay attack suspected! Revoke all sessions for this user.
                 session.isRevoked = true;
                 await session.save();
@@ -438,10 +460,12 @@ const refreshToken = async (req, res) => {
                 if (user) {
                     await (0, auditLog_service_js_1.createAuditLog)('SECURITY_ALERT', user.email, 'AUTH', 'Token Replay', 'Refresh token replay attack detected. All active sessions revoked.', user.organizationId);
                 }
+                const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
                 res.clearCookie('refreshToken', {
                     httpOnly: true,
-                    secure: process.env.NODE_ENV === 'production',
-                    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+                    secure: isSecure,
+                    sameSite: isSecure ? 'none' : 'lax',
+                    path: '/',
                 });
                 res.status(401).json({
                     message: 'Suspicious session usage detected. Access revoked. Please log in again.',
@@ -476,10 +500,12 @@ const refreshToken = async (req, res) => {
             employeeId: user.employeeId?.toString(),
             sessionId: session._id.toString(),
         });
+        const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
         res.cookie('refreshToken', newRefreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            secure: isSecure,
+            sameSite: isSecure ? 'none' : 'lax',
+            path: '/',
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
         res.status(200).json({ token: accessToken });
@@ -692,7 +718,7 @@ const updateMe = async (req, res) => {
 };
 exports.updateMe = updateMe;
 const signup = async (req, res) => {
-    const { name, email, password, organizationName, organizationSlug, organizationSector } = req.body;
+    const { name, email, password, organizationName, organizationSlug, organizationSector, allowedIPs } = req.body;
     if (!name || !email || !password || !organizationName || !organizationSlug || !organizationSector) {
         res.status(400).json({ message: 'All registration fields are required.' });
         return;
@@ -725,6 +751,20 @@ const signup = async (req, res) => {
         const session = await mongoose_1.default.startSession();
         session.startTransaction();
         try {
+            // Parse allowed IPs
+            let parsedIPs = ['127.0.0.1', '::1'];
+            if (allowedIPs) {
+                if (Array.isArray(allowedIPs)) {
+                    parsedIPs = allowedIPs.map((ip) => String(ip).trim()).filter(Boolean);
+                }
+                else if (typeof allowedIPs === 'string') {
+                    parsedIPs = allowedIPs.split(',').map(ip => ip.trim()).filter(Boolean);
+                }
+            }
+            if (!parsedIPs.includes('127.0.0.1'))
+                parsedIPs.push('127.0.0.1');
+            if (!parsedIPs.includes('::1'))
+                parsedIPs.push('::1');
             // Create Organization
             const organization = new Organization_js_1.Organization({
                 name: organizationName,
@@ -734,6 +774,7 @@ const signup = async (req, res) => {
                 settings: {
                     adminEmail: normalizedEmail,
                     theme: 'dark',
+                    allowedIPs: parsedIPs,
                 },
             });
             await organization.save({ session });
@@ -776,14 +817,98 @@ const signup = async (req, res) => {
             // Sync Default Permissions and Roles for the new Tenant
             const { PermissionSyncService } = await import('../domains/organization/services/PermissionSyncService.js');
             await PermissionSyncService.syncForTenant(organization._id, session);
+            // Create database-backed user session for auto-login
+            const sessionId = new mongoose_1.default.Types.ObjectId();
+            const userObj = adminUser.toObject();
+            delete userObj.password;
+            delete userObj.mfaSecret;
+            delete userObj.backupCodes;
+            // Parse User-Agent
+            const userAgent = req.headers['user-agent'] || '';
+            let browser = 'Unknown Browser';
+            let os = 'Unknown OS';
+            if (/chrome/i.test(userAgent))
+                browser = 'Chrome';
+            else if (/firefox/i.test(userAgent))
+                browser = 'Firefox';
+            else if (/safari/i.test(userAgent))
+                browser = 'Safari';
+            else if (/edge/i.test(userAgent))
+                browser = 'Edge';
+            if (/windows/i.test(userAgent))
+                os = 'Windows';
+            else if (/macintosh|mac os/i.test(userAgent))
+                os = 'macOS';
+            else if (/linux/i.test(userAgent))
+                os = 'Linux';
+            else if (/android/i.test(userAgent))
+                os = 'Android';
+            else if (/iphone|ipad/i.test(userAgent))
+                os = 'iOS';
+            const deviceInfo = `${browser} on ${os}`;
+            // Generate Refresh Token
+            const refreshToken = (0, jwt_js_1.generateRefreshToken)({
+                id: adminUser.id,
+                organizationId: organization._id.toString(),
+                sessionId: sessionId.toString(),
+            });
+            const refreshTokenHash = crypto_1.default.createHash('sha256').update(refreshToken).digest('hex');
+            await UserSession_js_1.UserSession.create([{
+                    _id: sessionId,
+                    userId: adminUser._id,
+                    organizationId: organization._id,
+                    refreshTokenHash,
+                    deviceInfo,
+                    ipAddress: req.ip,
+                    browser,
+                    os,
+                    location: 'Unknown',
+                    lastActivity: new Date(),
+                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+                }], { session });
+            // Generate Access Token
+            const accessToken = (0, jwt_js_1.generateAccessToken)({
+                id: adminUser.id,
+                role: adminUser.role,
+                email: adminUser.email,
+                organizationId: organization._id.toString(),
+                employeeId: adminUser.employeeId?.toString(),
+                sessionId: sessionId.toString(),
+            });
+            // Record SUCCESS login event
+            await LoginRiskService_js_1.LoginRiskService.recordEvent({
+                userId: adminUser._id,
+                organizationId: organization._id,
+                email: adminUser.email,
+                status: 'SUCCESS',
+                ipAddress: req.ip || '127.0.0.1',
+                userAgent,
+                location: 'Unknown',
+                riskLevel: 'LOW',
+                riskFactors: [],
+                sessionId: sessionId.toString(),
+            });
+            adminUser.lastLogin = new Date();
+            await adminUser.save({ session });
             // Audit log creation
             await (0, auditLog_service_js_1.createAuditLog)('ORGANIZATION_SIGNUP', normalizedEmail, 'AUTH', 'Organization', `Registered new organization "${organizationName}" with slug "${normalizedSlug}" and administrator "${name}"`, organization._id);
             await session.commitTransaction();
+            // Set Refresh Token as HttpOnly Cookie
+            const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
+            res.cookie('refreshToken', refreshToken, {
+                httpOnly: true,
+                secure: isSecure,
+                sameSite: isSecure ? 'none' : 'lax',
+                path: '/',
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            });
             res.status(201).json({
                 success: true,
                 message: 'Organization and administrator account successfully registered!',
                 organizationId: organization._id,
                 slug: normalizedSlug,
+                user: userObj,
+                token: accessToken,
             });
         }
         catch (transactionError) {

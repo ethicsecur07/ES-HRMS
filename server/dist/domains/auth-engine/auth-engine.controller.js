@@ -46,6 +46,39 @@ const getOrgProviders = async (req, res) => {
     }
 };
 exports.getOrgProviders = getOrgProviders;
+const resolveDynamicRedirectUri = (req, provider, adapter) => {
+    // Determine the client's origin from the request headers.
+    // This ensures:
+    //   - localhost dev:  http://localhost:5173/sso/callback
+    //   - production:     https://ethicsecur-hrms.onrender.com/sso/callback
+    const clientOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+    if (clientOrigin) {
+        if (provider.redirectUri) {
+            try {
+                // Keep only the pathname from the stored URI (e.g. "/sso/callback")
+                // and rebuild the full URL from the actual client origin.
+                // This prevents the stored port (e.g. :5173) from leaking into the
+                // production redirect URI.
+                const storedUri = new URL(provider.redirectUri);
+                const dynamicRedirectUri = `${clientOrigin}${storedUri.pathname}`;
+                adapter.config.redirectUri = dynamicRedirectUri;
+            }
+            catch (e) {
+                // ignore parse errors — adapter will fall back to stored value
+            }
+        }
+        if (provider.samlCallbackUrl) {
+            try {
+                const storedUri = new URL(provider.samlCallbackUrl);
+                const dynamicCallbackUrl = `${clientOrigin}${storedUri.pathname}`;
+                adapter.config.samlCallbackUrl = dynamicCallbackUrl;
+            }
+            catch (e) {
+                // ignore parse errors
+            }
+        }
+    }
+};
 /**
  * GET /api/v2/auth/sso/initiate/:orgSlug/:providerType
  * Initiate SSO login — redirects user to the IDP.
@@ -65,6 +98,7 @@ const initiateSSO = async (req, res) => {
             return;
         }
         const adapter = ProviderRegistry_js_1.ProviderRegistry.createAdapter(provider);
+        resolveDynamicRedirectUri(req, provider, adapter);
         // Encode org.slug and providerKey in the state to allow stateless context recovery
         const state = `${crypto_1.default.randomUUID()}_${org.slug}_${providerKey}`;
         const authUrl = adapter.getAuthorizationUrl(state);
@@ -97,6 +131,7 @@ const handleSSOCallback = async (req, res) => {
             return;
         }
         const adapter = ProviderRegistry_js_1.ProviderRegistry.createAdapter(provider);
+        resolveDynamicRedirectUri(req, provider, adapter);
         const authResult = await adapter.handleCallback(SAMLResponse || code);
         if (!authResult.profile.email) {
             res.status(400).json({ success: false, message: 'No email returned from identity provider' });
@@ -334,10 +369,12 @@ const handleSSOCallback = async (req, res) => {
             sessionId: sessionId.toString(),
         });
         // Set Refresh Token as HttpOnly Cookie
+        const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            secure: isSecure,
+            sameSite: isSecure ? 'none' : 'lax',
+            path: '/',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
         // Issue full session token

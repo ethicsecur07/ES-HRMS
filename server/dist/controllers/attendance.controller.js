@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.submitPendingReport = exports.getPendingReports = exports.updateAttendance = exports.verifyIP = exports.checkOut = exports.checkIn = exports.getAllAttendance = exports.getTodayAttendance = void 0;
 const AttendanceService_js_1 = require("../domains/attendance-engine/services/AttendanceService.js");
+const ipHelper_js_1 = require("../utils/ipHelper.js");
 const getTodayAttendance = async (req, res) => {
     try {
         const authReq = req;
@@ -110,10 +111,35 @@ const checkOut = async (req, res) => {
 };
 exports.checkOut = checkOut;
 const verifyIP = async (req, res) => {
-    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
-    const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
-    const isOfficeIP = ipString.includes('192.168.29.') || ipString === '127.0.0.1' || ipString === '::1';
-    res.status(200).json({ data: { isOfficeIP, currentIP: ipString } });
+    try {
+        const authReq = req;
+        const { organizationId } = authReq.user || {};
+        const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
+        const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
+        let allowedIPs = ['127.0.0.1', '::1'];
+        if (organizationId) {
+            const Organization = (await import('../models/Organization.js')).Organization;
+            const org = await Organization.findById(organizationId).select('settings.allowedIPs');
+            if (org?.settings?.allowedIPs) {
+                allowedIPs = org.settings.allowedIPs;
+            }
+        }
+        else {
+            const slug = req.query.slug;
+            if (slug) {
+                const Organization = (await import('../models/Organization.js')).Organization;
+                const org = await Organization.findOne({ slug }).select('settings.allowedIPs');
+                if (org?.settings?.allowedIPs) {
+                    allowedIPs = org.settings.allowedIPs;
+                }
+            }
+        }
+        const isOfficeIP = (0, ipHelper_js_1.ipMatchesRange)(ipString, allowedIPs);
+        res.status(200).json({ data: { isOfficeIP, currentIP: ipString } });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 };
 exports.verifyIP = verifyIP;
 const updateAttendance = async (req, res) => {

@@ -22,6 +22,6 @@ router.get('/', authenticate as any, getAllAttendance as any);
 router.post('/checkin', authenticate as any, validateRequest(checkInSchema) as any, checkIn as any);
 router.post('/checkout/:id', authenticate as any, validateRequest(checkOutSchema) as any, checkOut as any);
 router.put('/:id', authenticate as any, authorize(['ADMIN', 'HR']) as any, updateAttendance as any);
-router.get('/verify-ip', verifyIP as any);
+router.get('/verify-ip', authenticate as any, verifyIP as any);
 
 export default router;

@@ -42,6 +42,7 @@ export const authApi = {
     organizationName: string;
     organizationSlug: string;
     organizationSector: string;
+    allowedIPs?: string;
   }) => {
     const response = await axiosInstance.post<{
       success: boolean;

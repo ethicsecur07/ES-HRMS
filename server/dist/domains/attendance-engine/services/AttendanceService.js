@@ -18,6 +18,7 @@ const PermissionRequest_js_1 = require("../../../models/PermissionRequest.js");
 const Leave_js_1 = require("../../../models/Leave.js");
 const Organization_js_1 = require("../../../models/Organization.js");
 const HolidayCalendar_js_1 = require("../../../models/HolidayCalendar.js");
+const ipHelper_js_1 = require("../../../utils/ipHelper.js");
 class TimezoneHelper {
     static getInfo(date, timezone) {
         const tz = (!timezone || timezone === 'UTC') ? 'Asia/Kolkata' : timezone;
@@ -153,10 +154,10 @@ class AttendanceService {
         const session = await mongoose_1.default.startSession();
         session.startTransaction();
         try {
-            // Fetch organization settings to resolve timezone and active workdays
+            // Fetch organization settings to resolve timezone, active workdays, and allowed IPs
             const org = await Organization_js_1.Organization.findOne({ _id: orgId })
                 .session(session)
-                .select('settings.activeWorkdays settings.timezone settings.salaryCycleStartDay');
+                .select('settings.activeWorkdays settings.timezone settings.salaryCycleStartDay settings.allowedIPs');
             const timezone = org?.settings?.timezone || 'Asia/Kolkata';
             const now = new Date();
             const nowInfo = TimezoneHelper.getInfo(now, timezone);
@@ -248,7 +249,8 @@ class AttendanceService {
                 throw new Error(`Check-in is disabled today due to the holiday: ${publicHoliday.name}.`);
             }
             // 3. Verify location (Office IP Range or GPS GeoFence)
-            const isOfficeIP = ipAddress.includes('192.168.29') || ipAddress === '127.0.0.1' || ipAddress === '::1';
+            const allowedIPs = org?.settings?.allowedIPs || ['127.0.0.1', '::1'];
+            const isOfficeIP = (0, ipHelper_js_1.ipMatchesRange)(ipAddress, allowedIPs);
             let withinGeoFence = false;
             let matchedFence = null;
             let distanceFromCenter = 0;
@@ -544,8 +546,8 @@ class AttendanceService {
         const nowInfo = TimezoneHelper.getInfo(now, timezone);
         const todayStr = nowInfo.dateString;
         const currentHour = nowInfo.hour;
-        // If it is >= 6:00 PM (18:00), we can check out today's record as well
-        const queryDate = currentHour >= 18 ? { $lte: todayStr } : { $lt: todayStr };
+        // Only auto-checkout for past days to avoid checking out active sessions today
+        const queryDate = { $lt: todayStr };
         // Find attendance records where logoutTime is missing
         const openAttendances = await Attendance_js_1.Attendance.find({
             organizationId: orgId,

@@ -127,10 +127,12 @@ async function createSessionAndRespond(
   );
 
   // Set Refresh Token as HttpOnly Cookie
+  const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+    secure: isSecure,
+    sameSite: isSecure ? 'none' : 'lax',
+    path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
@@ -460,10 +462,12 @@ export const logout = async (req: AuthRequest, res: Response): Promise<void> => 
       );
     }
 
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
+      path: '/',
     });
 
     res.status(200).json({ message: 'Logged out successfully' });
@@ -500,6 +504,26 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
     // Replay Attack Detection
     if (session.isRevoked || session.refreshTokenHash !== currentHash) {
       if (session.rotatedTokenHashes.includes(currentHash)) {
+        // Grace period (e.g. 5 seconds) to handle concurrent client requests or React StrictMode double effects
+        const rotationGraceMs = 5000;
+        const timeSinceLastUpdate = Date.now() - session.updatedAt.getTime();
+
+        if (timeSinceLastUpdate < rotationGraceMs) {
+          const user = await User.findById(session.userId);
+          if (user && user.isActive) {
+            const accessToken = generateAccessToken({
+              id: user.id,
+              role: user.role,
+              email: user.email,
+              organizationId: user.organizationId.toString(),
+              employeeId: user.employeeId?.toString(),
+              sessionId: session._id.toString(),
+            });
+            res.status(200).json({ token: accessToken });
+            return;
+          }
+        }
+
         // Replay attack suspected! Revoke all sessions for this user.
         session.isRevoked = true;
         await session.save();
@@ -518,10 +542,12 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
           );
         }
 
+        const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
         res.clearCookie('refreshToken', {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+          secure: isSecure,
+          sameSite: isSecure ? 'none' : 'lax',
+          path: '/',
         });
         res.status(401).json({
           message: 'Suspicious session usage detected. Access revoked. Please log in again.',
@@ -563,10 +589,12 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
       sessionId: session._id.toString(),
     });
 
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -821,7 +849,7 @@ export const updateMe = async (req: AuthRequest, res: Response): Promise<void> =
 };
 
 export const signup = async (req: Request, res: Response): Promise<void> => {
-  const { name, email, password, organizationName, organizationSlug, organizationSector } = req.body;
+  const { name, email, password, organizationName, organizationSlug, organizationSector, allowedIPs } = req.body;
 
   if (!name || !email || !password || !organizationName || !organizationSlug || !organizationSector) {
     res.status(400).json({ message: 'All registration fields are required.' });
@@ -861,6 +889,18 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
     session.startTransaction();
 
     try {
+      // Parse allowed IPs
+      let parsedIPs: string[] = ['127.0.0.1', '::1'];
+      if (allowedIPs) {
+        if (Array.isArray(allowedIPs)) {
+          parsedIPs = allowedIPs.map((ip: any) => String(ip).trim()).filter(Boolean);
+        } else if (typeof allowedIPs === 'string') {
+          parsedIPs = allowedIPs.split(',').map(ip => ip.trim()).filter(Boolean);
+        }
+      }
+      if (!parsedIPs.includes('127.0.0.1')) parsedIPs.push('127.0.0.1');
+      if (!parsedIPs.includes('::1')) parsedIPs.push('::1');
+
       // Create Organization
       const organization = new Organization({
         name: organizationName,
@@ -870,6 +910,7 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
         settings: {
           adminEmail: normalizedEmail,
           theme: 'dark',
+          allowedIPs: parsedIPs,
         },
       });
       await organization.save({ session });
@@ -1005,10 +1046,12 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
       await session.commitTransaction();
 
       // Set Refresh Token as HttpOnly Cookie
+      const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
       res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+        secure: isSecure,
+        sameSite: isSecure ? 'none' : 'lax',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 

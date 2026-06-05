@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../types/index.js';
 import { AttendanceService } from '../domains/attendance-engine/services/AttendanceService.js';
+import { ipMatchesRange } from '../utils/ipHelper.js';
 
 export const getTodayAttendance = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -126,11 +127,35 @@ export const checkOut = async (req: AuthRequest, res: Response): Promise<void> =
 };
 
 export const verifyIP = async (req: Request, res: Response): Promise<void> => {
-  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
-  const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
-  const isOfficeIP = ipString.includes('192.168.29.') || ipString === '127.0.0.1' || ipString === '::1';
+  try {
+    const authReq = req as AuthRequest;
+    const { organizationId } = authReq.user || {};
+    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
+    const ipString = Array.isArray(clientIP) ? clientIP[0] : clientIP;
 
-  res.status(200).json({ data: { isOfficeIP, currentIP: ipString } });
+    let allowedIPs = ['127.0.0.1', '::1'];
+    if (organizationId) {
+      const Organization = (await import('../models/Organization.js')).Organization;
+      const org = await Organization.findById(organizationId).select('settings.allowedIPs');
+      if (org?.settings?.allowedIPs) {
+        allowedIPs = org.settings.allowedIPs;
+      }
+    } else {
+      const slug = req.query.slug;
+      if (slug) {
+        const Organization = (await import('../models/Organization.js')).Organization;
+        const org = await Organization.findOne({ slug }).select('settings.allowedIPs');
+        if (org?.settings?.allowedIPs) {
+          allowedIPs = org.settings.allowedIPs;
+        }
+      }
+    }
+
+    const isOfficeIP = ipMatchesRange(ipString, allowedIPs);
+    res.status(200).json({ data: { isOfficeIP, currentIP: ipString } });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const updateAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
