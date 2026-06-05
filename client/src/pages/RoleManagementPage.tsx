@@ -411,7 +411,7 @@ export const RoleManagementPage: React.FC = () => {
 
       {/* CREATE / EDIT MODAL */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingRole ? 'Modify System Role' : 'Register New Role'}>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 px-4">
           <Input 
             label="Role Name *" 
             value={name} 
