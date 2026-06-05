@@ -70,7 +70,7 @@ export const checkIn = async (req: AuthRequest, res: Response): Promise<void> =>
       const { AttendanceService } = await import('../domains/attendance-engine/services/AttendanceService.js');
 
       const org = await Organization.findOne({ _id: orgId }).select('settings.salaryCycleStartDay settings.timezone');
-      const startDay = org?.settings?.salaryCycleStartDay ?? 10;
+      const startDay = org?.settings?.salaryCycleStartDay ?? 11;
       const timezone = org?.settings?.timezone;
 
       const { cycleStart, cycleEnd } = AttendanceService.getSalaryCycleDates(now, startDay, timezone);

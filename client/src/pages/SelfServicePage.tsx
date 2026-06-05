@@ -70,7 +70,7 @@ export const SelfServicePage: React.FC = () => {
 
   // Queries
   const { data: employees } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ['employees', { limit: 1000 }],
     queryFn: () => employeeApi.getAll({ limit: 1000 }).then(res => res.employees),
     enabled: role === 'ADMIN' || role === 'HR',
   });

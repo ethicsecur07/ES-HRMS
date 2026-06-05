@@ -35,7 +35,7 @@ import ESLogo from '../../assets/ES_Logo.png';
 export const SidebarExpandedContext = createContext<{
   expanded: boolean;
   setExpanded: (v: boolean) => void;
-}>({ expanded: false, setExpanded: () => {} });
+}>({ expanded: false, setExpanded: () => { } });
 
 export const useSidebarExpanded = () => useContext(SidebarExpandedContext);
 
@@ -172,18 +172,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             onClick={onClose}
             title={!expanded ? item.name : undefined}
             className={({ isActive }) =>
-              `relative flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl font-medium text-sm transition-all duration-200 group ${
-                isActive
-                  ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              `relative flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl font-medium text-sm transition-all duration-200 group ${isActive
+                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`
             }
           >
             <Icon className="h-5 w-5 flex-shrink-0" />
             <span
-              className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${
-                expanded ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0'
-              }`}
+              className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0'
+                }`}
             >
               {item.name}
             </span>
@@ -214,17 +212,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       <aside
         onMouseEnter={() => setExpanded(true)}
         onMouseLeave={() => setExpanded(false)}
-        className={`hidden lg:flex flex-col fixed left-0 top-0 h-screen z-40 bg-card border-r border-border shadow-sm backdrop-blur-md transition-all duration-300 ease-in-out overflow-hidden ${
-          expanded ? 'w-64' : 'w-16'
-        }`}
+        className={`hidden lg:flex flex-col fixed left-0 top-0 h-screen z-40 bg-card border-r border-border shadow-sm backdrop-blur-md transition-all duration-300 ease-in-out overflow-hidden ${expanded ? 'w-64' : 'w-16'
+          }`}
       >
         {/* Logo */}
         <div className="flex items-center gap-3 p-3 border-b border-border h-20 flex-shrink-0 overflow-hidden">
           <img src={ESLogo} alt="EthicSec" className="h-9 w-9 object-contain flex-shrink-0" />
           <div
-            className={`flex flex-col text-left overflow-hidden transition-all duration-300 ${
-              expanded ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0'
-            }`}
+            className={`flex flex-col text-left overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0'
+              }`}
           >
             <span className="font-bold text-sm text-foreground tracking-tight leading-none whitespace-nowrap">ES EthicSecur</span>
             <span className="text-[10px] text-muted-foreground mt-0.5 font-medium tracking-wide uppercase whitespace-nowrap">SofTec HRMS</span>
@@ -274,9 +270,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
       {/* ── MOBILE sidebar (slide-in drawer from right) ── */}
       <aside
-        className={`lg:hidden w-64 bg-card border-l border-border flex flex-col min-h-screen fixed right-0 top-0 z-40 shadow-2xl backdrop-blur-md transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`lg:hidden w-64 bg-card border-l border-border flex flex-col min-h-screen fixed right-0 top-0 z-40 shadow-2xl backdrop-blur-md transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
       >
         {/* Mobile header */}
         <div className="p-5 border-b border-border flex items-center gap-3">
@@ -341,9 +336,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         <div
                           key={n._id}
                           onClick={() => handleNotificationClick(n)}
-                          className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${
-                            n.read ? 'bg-background border-border text-muted-foreground' : 'bg-primary/5 border-primary/20 text-foreground shadow-sm hover:border-primary/40'
-                          }`}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer text-left ${n.read ? 'bg-background border-border text-muted-foreground' : 'bg-primary/5 border-primary/20 text-foreground shadow-sm hover:border-primary/40'
+                            }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-bold uppercase tracking-wider text-primary">{n.type}</span>
@@ -373,8 +367,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 to={item.path}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${
-                    isActive ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  `flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${isActive ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`
                 }
               >

@@ -4,6 +4,8 @@ import { AuthRequest } from '../types/index.js';
 import { RoleMember } from '../models/RoleMember.js';
 import mongoose from 'mongoose';
 import { redisClearPattern } from '../utils/redisClient.js';
+import { User } from '../models/User.js';
+import { ROLES } from '../constants/index.js';
 
 /**
  * Get all roles for the authenticated user's organization.
@@ -363,6 +365,16 @@ export const updateRoleMembers = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
+    // Find previous members before deletion to manage system role updates
+    const systemRoles = Object.values(ROLES);
+    const isSystemRole = systemRoles.includes(role.code as any);
+    let previousUserIds: string[] = [];
+
+    if (isSystemRole) {
+      const previousMembers = await RoleMember.find({ roleId: id, organizationId: orgId }).session(session);
+      previousUserIds = previousMembers.map(m => m.userId.toString());
+    }
+
     // Remove current members of this role
     await RoleMember.deleteMany({ roleId: id, organizationId: orgId }).session(session);
 
@@ -374,6 +386,28 @@ export const updateRoleMembers = async (req: AuthRequest, res: Response): Promis
         userId: new mongoose.Types.ObjectId(uid)
       }));
       await RoleMember.insertMany(records, { session });
+    }
+
+    // Synchronize User.role if it's a system role
+    if (isSystemRole) {
+      const newUserIdsStrings = userIds.map(uid => uid.toString());
+
+      // 1. Promote new members to the system role
+      if (newUserIdsStrings.length > 0) {
+        await User.updateMany(
+          { _id: { $in: newUserIdsStrings }, organizationId: orgId },
+          { $set: { role: role.code } }
+        ).session(session);
+      }
+
+      // 2. Revert demoted members back to EMPLOYEE role
+      const demotedUserIds = previousUserIds.filter(uid => !newUserIdsStrings.includes(uid));
+      if (demotedUserIds.length > 0) {
+        await User.updateMany(
+          { _id: { $in: demotedUserIds }, organizationId: orgId },
+          { $set: { role: 'EMPLOYEE' } }
+        ).session(session);
+      }
     }
 
     await session.commitTransaction();
