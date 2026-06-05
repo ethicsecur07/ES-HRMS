@@ -357,9 +357,10 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
 
     const { companyName, monthlyLeaveLimit, monthlyWFHLimit, monthlyPermissionHours, salaryCycleStartDay, officeWiFiIPs, adminEmail, activeWorkdays, loginApprovalRoles, visibleDepartments } = req.body;
     
-    const newSalaryCycleStartDay = Number(salaryCycleStartDay) || 1;
-    const newLeaveLimit = Number(monthlyLeaveLimit) || 2;
-    const newPermissionHours = Number(monthlyPermissionHours) || 3;
+    const newSalaryCycleStartDay = salaryCycleStartDay !== undefined ? Number(salaryCycleStartDay) : (org.settings.salaryCycleStartDay || 1);
+    const newLeaveLimit = monthlyLeaveLimit !== undefined ? Number(monthlyLeaveLimit) : (org.settings.monthlyLeaveLimit || 2);
+    const newWFHLimit = monthlyWFHLimit !== undefined ? Number(monthlyWFHLimit) : (org.settings.monthlyWFHLimit || 1);
+    const newPermissionHours = monthlyPermissionHours !== undefined ? Number(monthlyPermissionHours) : (org.settings.monthlyPermissionHours || 3);
 
     const getOrdinal = (n: number) => {
       const s = ["th", "st", "nd", "rd"];
@@ -383,7 +384,7 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
     // Use field-level mutations to preserve other settings (customHolidays, activeWorkdays, theme, etc.)
     if (!org.settings) org.settings = {} as any;
     org.settings.monthlyLeaveLimit = newLeaveLimit;
-    org.settings.monthlyWFHLimit = Number(monthlyWFHLimit) || org.settings.monthlyWFHLimit || 1;
+    org.settings.monthlyWFHLimit = newWFHLimit;
     org.settings.monthlyPermissionHours = newPermissionHours;
     org.settings.salaryCycleStartDay = newSalaryCycleStartDay;
     org.settings.allowedIPs = officeWiFiIPs?.length ? officeWiFiIPs : (org.settings.allowedIPs || ['127.0.0.1', '::1']);
