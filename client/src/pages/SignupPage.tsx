@@ -48,6 +48,7 @@ export const SignupPage: React.FC = () => {
     organizationName: '',
     organizationSlug: '',
     organizationSector: '',
+    allowedIPs: '192.168.29.0/24',
   });
 
   const [passwordStrength, setPasswordStrength] = useState({
@@ -158,9 +159,9 @@ export const SignupPage: React.FC = () => {
 
   const handleSubmitStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { name, email, password, organizationName, organizationSlug, organizationSector } = formData;
+    const { name, email, password, organizationName, organizationSlug, organizationSector, allowedIPs } = formData;
 
-    if (!name || !email || !password || !organizationName || !organizationSlug || !organizationSector) {
+    if (!name || !email || !password || !organizationName || !organizationSlug || !organizationSector || !allowedIPs) {
       addToast('Validation Error', 'Please fill in all registration fields.', 'error');
       return;
     }
@@ -179,6 +180,7 @@ export const SignupPage: React.FC = () => {
         organizationName,
         organizationSlug,
         organizationSector,
+        allowedIPs,
       });
 
       if (response.success) {
@@ -500,6 +502,21 @@ export const SignupPage: React.FC = () => {
                 className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
                 required
               />
+
+              <div className="w-full">
+                <Input
+                  label="Office IP Range / CIDR (comma separated)"
+                  value={formData.allowedIPs}
+                  onChange={(e) => setFormData({ ...formData, allowedIPs: e.target.value })}
+                  placeholder="e.g. 192.168.29.0/24, 192.168.1.0/24"
+                  icon={<Globe className="w-4 h-4 text-[#F75F0A]" />}
+                  className="focus:border-[#F75F0A] focus:ring-[#F75F0A]"
+                  required
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground text-left font-sans">
+                  Only employees checking in from within these IP ranges will be counted as OFFICE. Others will be marked as WFH.
+                </p>
+              </div>
             </div>
 
             {/* Admin User Section */}

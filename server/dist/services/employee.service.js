@@ -60,6 +60,15 @@ class EmployeeService {
                 : !!(employeeData.designation?.toLowerCase().includes('intern') || employeeData.department?.toLowerCase().includes('intern') || employeeData.departmentId === '605c72ef1f77bcf86cd79777'); // Fallback department checks
             let createdAzureUser = null;
             if (employeeData.createAzureAccount && employeeData.azureUserPrincipalName) {
+                if (!employeeData.employeeCode) {
+                    throw new Error('Employee ID is required for Azure AD provisioning.');
+                }
+                if (!employeeData.phone) {
+                    throw new Error('Mobile number is required for Azure AD provisioning.');
+                }
+                if (!employeeData.joiningDate) {
+                    throw new Error('Hire/joining date is required for Azure AD provisioning.');
+                }
                 const { MicrosoftGraphService } = await import('./microsoftGraph.service.js');
                 createdAzureUser = await MicrosoftGraphService.createUserInAzure(orgId, {
                     userPrincipalName: employeeData.azureUserPrincipalName,
@@ -69,6 +78,9 @@ class EmployeeService {
                     jobTitle: employeeData.designation,
                     department: employeeData.department,
                     tempPassword: employeeData.azureTempPassword,
+                    employeeId: employeeData.employeeCode,
+                    employeeHireDate: String(employeeData.joiningDate),
+                    mobilePhone: employeeData.phone,
                 });
                 if (createdAzureUser && employeeData.azureLicenses && employeeData.azureLicenses.length > 0) {
                     await MicrosoftGraphService.assignLicenses(orgId, createdAzureUser.id, employeeData.azureLicenses);
@@ -418,6 +430,17 @@ class EmployeeService {
                     await user.save({ session });
                 }
             }
+            // 3. Delete from Azure AD if the employee is NOT an intern
+            if (!employee.isIntern) {
+                try {
+                    const { MicrosoftGraphService } = await import('./microsoftGraph.service.js');
+                    await MicrosoftGraphService.deleteUserInAzure(orgId, employee.email);
+                }
+                catch (azureError) {
+                    // Log the error but do NOT block database deletion
+                    console.warn(`[Azure AD] Failed to delete user ${employee.email} from Azure AD:`, azureError.message);
+                }
+            }
             await (0, auditLog_service_js_1.createAuditLog)('EMPLOYEE_DELETE', emailForAudit, 'EMPLOYEE', employee.employeeCode, `Soft-deleted record and revoked user account for ${employee.fullName}`, orgId);
             await session.commitTransaction();
             return true;
@@ -743,6 +766,15 @@ class EmployeeService {
             if (!employee.isIntern) {
                 throw new Error('This employee is already a full-time employee.');
             }
+            if (!convertData.employeeId) {
+                throw new Error('Employee ID is required for Azure AD provisioning.');
+            }
+            if (!convertData.employeeHireDate) {
+                throw new Error('Employee Hire/Joining Date is required for Azure AD provisioning.');
+            }
+            if (!convertData.mobilePhone) {
+                throw new Error('Mobile Number is required for Azure AD provisioning.');
+            }
             // 2. Create the user in Azure AD
             const { MicrosoftGraphService } = await import('./microsoftGraph.service.js');
             const azureUser = await MicrosoftGraphService.createUserInAzure(orgId, {
@@ -753,6 +785,9 @@ class EmployeeService {
                 jobTitle: convertData.jobTitle || employee.designation,
                 department: convertData.department || employee.department,
                 tempPassword: convertData.tempPassword,
+                employeeId: convertData.employeeId,
+                employeeHireDate: convertData.employeeHireDate,
+                mobilePhone: convertData.mobilePhone,
             });
             // 3. Assign licenses in Azure AD
             if (convertData.selectedLicenses && convertData.selectedLicenses.length > 0) {
@@ -763,6 +798,10 @@ class EmployeeService {
             const originalEmail = employee.email;
             employee.email = azureUser.userPrincipalName.toLowerCase();
             employee.internshipStatus = 'COMPLETED';
+            employee.fullName = convertData.displayName.trim();
+            employee.employeeCode = convertData.employeeId.trim();
+            employee.joiningDate = new Date(convertData.employeeHireDate);
+            employee.phone = convertData.mobilePhone.trim();
             if (convertData.salary !== undefined) {
                 employee.salary = convertData.salary;
             }

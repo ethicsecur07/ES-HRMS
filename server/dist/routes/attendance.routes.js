@@ -13,5 +13,5 @@ router.get('/', auth_middleware_js_1.authenticate, attendance_controller_js_1.ge
 router.post('/checkin', auth_middleware_js_1.authenticate, (0, validate_middleware_js_1.validateRequest)(attendance_validation_js_1.checkInSchema), attendance_controller_js_1.checkIn);
 router.post('/checkout/:id', auth_middleware_js_1.authenticate, (0, validate_middleware_js_1.validateRequest)(attendance_validation_js_1.checkOutSchema), attendance_controller_js_1.checkOut);
 router.put('/:id', auth_middleware_js_1.authenticate, (0, auth_middleware_js_1.authorize)(['ADMIN', 'HR']), attendance_controller_js_1.updateAttendance);
-router.get('/verify-ip', attendance_controller_js_1.verifyIP);
+router.get('/verify-ip', auth_middleware_js_1.authenticate, attendance_controller_js_1.verifyIP);
 exports.default = router;

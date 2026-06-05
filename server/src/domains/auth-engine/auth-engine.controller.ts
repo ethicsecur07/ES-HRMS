@@ -49,28 +49,32 @@ export const getOrgProviders = async (req: Request, res: Response): Promise<void
 };
 
 const resolveDynamicRedirectUri = (req: Request, provider: any, adapter: any) => {
+  // Determine the client's origin from the request headers.
+  // This ensures:
+  //   - localhost dev:  http://localhost:5173/sso/callback
+  //   - production:     https://ethicsecur-hrms.onrender.com/sso/callback
   const clientOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
   if (clientOrigin) {
     if (provider.redirectUri) {
       try {
-        const resolvedUri = new URL(provider.redirectUri);
-        const clientUrl = new URL(clientOrigin);
-        resolvedUri.protocol = clientUrl.protocol;
-        resolvedUri.host = clientUrl.host;
-        (adapter as any).config.redirectUri = resolvedUri.toString();
+        // Keep only the pathname from the stored URI (e.g. "/sso/callback")
+        // and rebuild the full URL from the actual client origin.
+        // This prevents the stored port (e.g. :5173) from leaking into the
+        // production redirect URI.
+        const storedUri = new URL(provider.redirectUri);
+        const dynamicRedirectUri = `${clientOrigin}${storedUri.pathname}`;
+        (adapter as any).config.redirectUri = dynamicRedirectUri;
       } catch (e) {
-        // ignore
+        // ignore parse errors — adapter will fall back to stored value
       }
     }
     if (provider.samlCallbackUrl) {
       try {
-        const resolvedUri = new URL(provider.samlCallbackUrl);
-        const clientUrl = new URL(clientOrigin);
-        resolvedUri.protocol = clientUrl.protocol;
-        resolvedUri.host = clientUrl.host;
-        (adapter as any).config.samlCallbackUrl = resolvedUri.toString();
+        const storedUri = new URL(provider.samlCallbackUrl);
+        const dynamicCallbackUrl = `${clientOrigin}${storedUri.pathname}`;
+        (adapter as any).config.samlCallbackUrl = dynamicCallbackUrl;
       } catch (e) {
-        // ignore
+        // ignore parse errors
       }
     }
   }
@@ -398,10 +402,12 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
     });
 
     // Set Refresh Token as HttpOnly Cookie
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
