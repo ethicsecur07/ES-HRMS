@@ -128,7 +128,8 @@ export const PayrollPage: React.FC = () => {
     return payrolls.filter((item) => {
       const empId = item.employeeId ? (typeof item.employeeId === 'object' ? item.employeeId._id : item.employeeId) : '';
       const emp = employees?.find((e) => e._id === empId);
-      const empName = emp?.fullName || '';
+      if (!emp) return false;
+      const empName = emp.fullName;
 
       const matchName = !nameFilter || empName.toLowerCase().includes(nameFilter.toLowerCase());
       const monthStr = `${selectedYear}-${selectedMonth}`;

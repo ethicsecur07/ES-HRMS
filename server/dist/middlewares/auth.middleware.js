@@ -81,6 +81,10 @@ const authenticate = async (req, res, next) => {
                 res.status(401).json({ message: 'Your login request has not been approved by an administrator yet. Please contact your organization.' });
                 return;
             }
+            if (user.role !== decoded.role) {
+                res.status(401).json({ message: 'User role updated. Session refresh required.' });
+                return;
+            }
             // Update session activity
             session.lastActivity = new Date();
             await session.save();

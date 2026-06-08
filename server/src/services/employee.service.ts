@@ -8,6 +8,8 @@ import { Department } from '../models/Department.js';
 import { Designation } from '../models/Designation.js';
 import { OrganizationAuthConfig } from '../models/OrganizationAuthConfig.js';
 import { Organization } from '../models/Organization.js';
+import { Payroll } from '../models/Payroll.js';
+import { Payslip } from '../models/Payslip.js';
 
 export interface EmployeeQueryOptions {
   search?: string;
@@ -354,6 +356,25 @@ export class EmployeeService {
           { email: { $in: revokedEmails } }
         ]
       });
+    } else if (isLoginApproved !== 'all') {
+      // Exclude revoked or inactive users by default
+      const revokedUsers = await User.find({
+        organizationId: orgId,
+        $or: [
+          { isLoginApproved: false },
+          { isActive: false }
+        ]
+      }).select('employeeId email');
+
+      const revokedEmployeeIds = revokedUsers.map(u => u.employeeId).filter(Boolean);
+      const revokedEmails = revokedUsers.map(u => u.email?.toLowerCase().trim()).filter(Boolean);
+
+      if (revokedEmployeeIds.length > 0 || revokedEmails.length > 0) {
+        andConditions.push({
+          _id: { $nin: revokedEmployeeIds },
+          email: { $nin: revokedEmails }
+        });
+      }
     }
 
     if (search) {
@@ -506,6 +527,15 @@ export class EmployeeService {
 
       // 1. Soft-delete the Employee (this updates isDeleted and deletedAt)
       await (employee as any).softDelete({ session });
+
+      // 1b. Soft-delete their corresponding Payroll records and delete Payslip records
+      const payrolls = await Payroll.find({ employeeId: employee._id, organizationId: orgId }).session(session);
+      for (const pr of payrolls) {
+        if (typeof (pr as any).softDelete === 'function') {
+          await (pr as any).softDelete({ session });
+        }
+      }
+      await Payslip.deleteMany({ employeeId: employee._id, organizationId: orgId }).session(session);
 
       // 2. Revoke User login (soft-delete the user if it supports it, otherwise deactivate)
       const user = await User.findOne({ employeeId: employee._id, organizationId: orgId }).session(session);
@@ -779,7 +809,9 @@ export class EmployeeService {
             user.email = email;
             user.employeeId = employee._id; // Ensure linked
             user.isActive = true;
-            user.isLoginApproved = true;
+            if (user.isLoginApproved !== false) {
+              user.isLoginApproved = true;
+            }
             user.ssoData = ssoData;
             await user.save();
           } else {

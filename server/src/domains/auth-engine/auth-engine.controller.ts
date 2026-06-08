@@ -233,7 +233,9 @@ export const handleSSOCallback = async (req: Request, res: Response): Promise<vo
         department: authResult.profile.department || undefined,
         lastSyncedAt: new Date()
       };
-      user.isLoginApproved = true;
+      if (user.isLoginApproved !== false) {
+        user.isLoginApproved = true;
+      }
       await user.save();
     } else if (provider.autoProvision) {
       user = await User.create({

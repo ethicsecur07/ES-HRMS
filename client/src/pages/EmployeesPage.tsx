@@ -157,7 +157,7 @@ export const EmployeesPage: React.FC = () => {
         isLoginApproved:
           selectedStatus === 'Approved' ? 'true'
           : selectedStatus === 'Revoked' ? 'false'
-          : undefined,
+          : 'all',
         page: currentPage,
         limit: itemsPerPage,
       }),

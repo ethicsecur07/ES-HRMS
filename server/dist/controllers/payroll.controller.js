@@ -13,7 +13,9 @@ const getPayrolls = async (req, res) => {
         const payrolls = await Payroll_js_1.Payroll.find({ organizationId: authReq.user?.organizationId })
             .populate('employeeId')
             .sort({ month: -1 });
-        res.status(200).json({ payrolls });
+        // Filter out payroll records where the employee is null (soft-deleted or deleted)
+        const activePayrolls = payrolls.filter(p => p.employeeId !== null && p.employeeId !== undefined);
+        res.status(200).json({ payrolls: activePayrolls });
     }
     catch (error) {
         res.status(500).json({ message: error.message });

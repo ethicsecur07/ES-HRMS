@@ -73,4 +73,4 @@ const payslipSchema = new Schema<IPayslip>(
 
 payslipSchema.index({ employeeId: 1, month: 1 }, { unique: true });
 
-export const Payslip = mongoose.model<IPayslip>('Payslip', payslipSchema);
+export const Payslip = (mongoose.models.Payslip as mongoose.Model<IPayslip>) || mongoose.model<IPayslip>('Payslip', payslipSchema);
