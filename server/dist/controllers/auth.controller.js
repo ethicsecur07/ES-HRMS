@@ -476,8 +476,8 @@ const refreshToken = async (req, res) => {
             return;
         }
         const user = await User_js_1.User.findById(session.userId);
-        if (!user || !user.isActive) {
-            res.status(401).json({ message: 'User inactive or not found' });
+        if (!user || !user.isActive || user.isLoginApproved === false) {
+            res.status(401).json({ message: 'User inactive, not found or login access revoked.' });
             return;
         }
         // Rotate token

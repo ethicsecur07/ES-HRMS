@@ -56,4 +56,4 @@ const payrollSchema = new mongoose_1.Schema({
 const softDeletePlugin_js_1 = require("../utils/softDeletePlugin.js");
 payrollSchema.index({ employeeId: 1, month: 1 }, { unique: true });
 payrollSchema.plugin(softDeletePlugin_js_1.softDeletePlugin);
-exports.Payroll = mongoose_1.default.model('Payroll', payrollSchema);
+exports.Payroll = mongoose_1.default.models.Payroll || mongoose_1.default.model('Payroll', payrollSchema);

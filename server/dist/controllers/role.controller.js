@@ -8,6 +8,8 @@ const Role_js_1 = require("../models/Role.js");
 const RoleMember_js_1 = require("../models/RoleMember.js");
 const mongoose_1 = __importDefault(require("mongoose"));
 const redisClient_js_1 = require("../utils/redisClient.js");
+const User_js_1 = require("../models/User.js");
+const index_js_1 = require("../constants/index.js");
 /**
  * Get all roles for the authenticated user's organization.
  */
@@ -321,6 +323,14 @@ const updateRoleMembers = async (req, res) => {
             res.status(404).json({ success: false, message: 'Role not found.' });
             return;
         }
+        // Find previous members before deletion to manage system role updates
+        const systemRoles = Object.values(index_js_1.ROLES);
+        const isSystemRole = systemRoles.includes(role.code);
+        let previousUserIds = [];
+        if (isSystemRole) {
+            const previousMembers = await RoleMember_js_1.RoleMember.find({ roleId: id, organizationId: orgId }).session(session);
+            previousUserIds = previousMembers.map(m => m.userId.toString());
+        }
         // Remove current members of this role
         await RoleMember_js_1.RoleMember.deleteMany({ roleId: id, organizationId: orgId }).session(session);
         // Create new members
@@ -331,6 +341,19 @@ const updateRoleMembers = async (req, res) => {
                 userId: new mongoose_1.default.Types.ObjectId(uid)
             }));
             await RoleMember_js_1.RoleMember.insertMany(records, { session });
+        }
+        // Synchronize User.role if it's a system role
+        if (isSystemRole) {
+            const newUserIdsStrings = userIds.map(uid => uid.toString());
+            // 1. Promote new members to the system role
+            if (newUserIdsStrings.length > 0) {
+                await User_js_1.User.updateMany({ _id: { $in: newUserIdsStrings }, organizationId: orgId }, { $set: { role: role.code } }).session(session);
+            }
+            // 2. Revert demoted members back to EMPLOYEE role
+            const demotedUserIds = previousUserIds.filter(uid => !newUserIdsStrings.includes(uid));
+            if (demotedUserIds.length > 0) {
+                await User_js_1.User.updateMany({ _id: { $in: demotedUserIds }, organizationId: orgId }, { $set: { role: 'EMPLOYEE' } }).session(session);
+            }
         }
         await session.commitTransaction();
         session.endSession();

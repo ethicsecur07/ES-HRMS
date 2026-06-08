@@ -14,6 +14,8 @@ const Department_js_1 = require("../models/Department.js");
 const Designation_js_1 = require("../models/Designation.js");
 const OrganizationAuthConfig_js_1 = require("../models/OrganizationAuthConfig.js");
 const Organization_js_1 = require("../models/Organization.js");
+const Payroll_js_1 = require("../models/Payroll.js");
+const Payslip_js_1 = require("../models/Payslip.js");
 class EmployeeService {
     /**
      * Onboards a new employee, creates their system User account, and hashes their password atomically.
@@ -280,6 +282,24 @@ class EmployeeService {
                 ]
             });
         }
+        else if (isLoginApproved !== 'all') {
+            // Exclude revoked or inactive users by default
+            const revokedUsers = await User_js_1.User.find({
+                organizationId: orgId,
+                $or: [
+                    { isLoginApproved: false },
+                    { isActive: false }
+                ]
+            }).select('employeeId email');
+            const revokedEmployeeIds = revokedUsers.map(u => u.employeeId).filter(Boolean);
+            const revokedEmails = revokedUsers.map(u => u.email?.toLowerCase().trim()).filter(Boolean);
+            if (revokedEmployeeIds.length > 0 || revokedEmails.length > 0) {
+                andConditions.push({
+                    _id: { $nin: revokedEmployeeIds },
+                    email: { $nin: revokedEmails }
+                });
+            }
+        }
         if (search) {
             const escapedSearch = String(search).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
             andConditions.push({
@@ -419,6 +439,14 @@ class EmployeeService {
             }
             // 1. Soft-delete the Employee (this updates isDeleted and deletedAt)
             await employee.softDelete({ session });
+            // 1b. Soft-delete their corresponding Payroll records and delete Payslip records
+            const payrolls = await Payroll_js_1.Payroll.find({ employeeId: employee._id, organizationId: orgId }).session(session);
+            for (const pr of payrolls) {
+                if (typeof pr.softDelete === 'function') {
+                    await pr.softDelete({ session });
+                }
+            }
+            await Payslip_js_1.Payslip.deleteMany({ employeeId: employee._id, organizationId: orgId }).session(session);
             // 2. Revoke User login (soft-delete the user if it supports it, otherwise deactivate)
             const user = await User_js_1.User.findOne({ employeeId: employee._id, organizationId: orgId }).session(session);
             if (user) {
@@ -651,7 +679,9 @@ class EmployeeService {
                         user.email = email;
                         user.employeeId = employee._id; // Ensure linked
                         user.isActive = true;
-                        user.isLoginApproved = true;
+                        if (user.isLoginApproved !== false) {
+                            user.isLoginApproved = true;
+                        }
                         user.ssoData = ssoData;
                         await user.save();
                     }

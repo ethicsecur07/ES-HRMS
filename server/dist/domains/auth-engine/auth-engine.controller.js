@@ -215,7 +215,9 @@ const handleSSOCallback = async (req, res) => {
                 department: authResult.profile.department || undefined,
                 lastSyncedAt: new Date()
             };
-            user.isLoginApproved = true;
+            if (user.isLoginApproved !== false) {
+                user.isLoginApproved = true;
+            }
             await user.save();
         }
         else if (provider.autoProvision) {

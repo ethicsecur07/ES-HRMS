@@ -69,4 +69,4 @@ const payslipSchema = new mongoose_1.Schema({
     generatedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 payslipSchema.index({ employeeId: 1, month: 1 }, { unique: true });
-exports.Payslip = mongoose_1.default.model('Payslip', payslipSchema);
+exports.Payslip = mongoose_1.default.models.Payslip || mongoose_1.default.model('Payslip', payslipSchema);
